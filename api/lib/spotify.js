@@ -45,8 +45,9 @@ async function searchTrack(token, artist, trackTitle) {
     console.log(`[spotify] no results for "${q}"`);
     return null;
   }
-  console.log(`[spotify] matched "${track.name}" by "${track.artists?.[0]?.name}" previewUrl=${track.preview_url}`);
-  return { id: track.id, previewUrl: track.preview_url || null };
+  const preview = track.preview_url || null;
+  console.log(`[spotify] hit: id=${track.id} preview=${preview ? 'YES' : 'NULL'}`);
+  return { id: track.id, previewUrl: preview };
 }
 
 async function fetchAudioFeatures(token, trackId) {
@@ -55,10 +56,12 @@ async function fetchAudioFeatures(token, trackId) {
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) {
-    console.log(`[spotify] audio-features ${res.status} for ${trackId} — endpoint may be deprecated for this app`);
+    console.log(`[spotify] features=${res.status}`);
     return null;
   }
-  return res.json();
+  const f = await res.json();
+  console.log(`[spotify] features: bpm=${Math.round(f.tempo)} key=${f.key} mode=${f.mode}`);
+  return f;
 }
 
 const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null };
