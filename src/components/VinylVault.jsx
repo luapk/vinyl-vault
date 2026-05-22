@@ -1665,51 +1665,18 @@ function ExploreView({ collection, accentRGB, onSelectRecord }) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" style={{ animation: "fadeUp 0.22s ease-out" }}>
-      {tagEntries.map(([tag, records], entryIdx) => {
-        const covers = records.filter((r) => r.coverUrl).slice(0, 4).map((r) => r.coverUrl);
-        return (
-          <button
-            key={tag}
-            onClick={() => setSelectedTag(tag)}
-            className="relative rounded-2xl overflow-hidden text-left group transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)", animation: `fadeUp 0.3s ease-out ${entryIdx * 0.04}s both` }}
-          >
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.07), transparent)` }} />
-
-            {/* Cover mosaic */}
-            <div className="aspect-square relative overflow-hidden">
-              {covers.length === 0 && (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.04)` }}>
-                  <VinylRecord size={32} weight="thin" className="opacity-15" />
-                </div>
-              )}
-              {covers.length === 1 && (
-                <img src={covers[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              )}
-              {covers.length === 2 && (
-                <div className="grid grid-cols-2 h-full">
-                  {covers.map((c, i) => <img key={i} src={c} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />)}
-                </div>
-              )}
-              {covers.length >= 3 && (
-                <div className="grid grid-cols-2 grid-rows-2 h-full">
-                  <img src={covers[0]} alt="" className="w-full h-full object-cover row-span-2 group-hover:scale-105 transition-transform duration-500" />
-                  <img src={covers[1]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  {covers[2] ? <img src={covers[2]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <div />}
-                </div>
-              )}
-              <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 55%)" }} />
-            </div>
-
-            {/* Tag name + count */}
-            <div className="relative p-3">
-              <div className="text-[12px] font-display text-white/85 leading-snug truncate">{tag}</div>
-              <div className="text-[10px] font-mono text-white/35">{records.length}</div>
-            </div>
-          </button>
-        );
-      })}
+    <div className="flex flex-wrap gap-2.5" style={{ animation: "fadeUp 0.22s ease-out" }}>
+      {tagEntries.map(([tag, records]) => (
+        <button
+          key={tag}
+          onClick={() => setSelectedTag(tag)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-mono transition-all hover:scale-[1.03] active:scale-[0.97]"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)" }}
+        >
+          {tag}
+          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.28)" }}>{records.length}</span>
+        </button>
+      ))}
     </div>
   );
 }
