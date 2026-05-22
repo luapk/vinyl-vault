@@ -96,12 +96,14 @@ const camelotColor = (key) => {
 // ----- Main Component ----------------------------------------------------
 
 export default function VinylVault() {
-  const [phase, setPhase] = useState("idle"); // idle | processing | result | error
+  const [phase, setPhase] = useState("idle"); // idle | processing | disambiguation | result | error
   const [status, setStatus] = useState("");
   const [release, setRelease] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
   const [accent, setAccent] = useState({ r: 157, g: 141, b: 241 });
   const [errorMsg, setErrorMsg] = useState("");
+  const [candidates, setCandidates] = useState([]);
+  const [visionData, setVisionData] = useState(null);
 
   const processImage = async (file) => {
     setPhase("processing");
@@ -109,7 +111,6 @@ export default function VinylVault() {
     setErrorMsg("");
 
     try {
-      // Client-side resize keeps Vercel request body comfortably under 4.5MB
       const dataUrl = await resizeImage(file);
       setImageUrl(dataUrl);
 
@@ -118,10 +119,10 @@ export default function VinylVault() {
 
       const base64Data = dataUrl.split(",")[1];
 
-      await new Promise((r) => setTimeout(r, 400));
-      setStatus("Identifying release");
+      await new Promise((r) => setTimeout(r, 500));
+      setStatus("Searching Discogs");
 
-      const response = await fetch("/api/identify", {
+      const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
@@ -133,25 +134,52 @@ export default function VinylVault() {
       }
 
       const data = await response.json();
-      const textBlock = data.content?.find((b) => b.type === "text");
-      if (!textBlock) throw new Error("No text response from model");
 
-      let raw = textBlock.text.trim();
-      raw = raw
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .trim();
-      const parsed = JSON.parse(raw);
-
-      setStatus("Loading metadata");
-      await new Promise((r) => setTimeout(r, 600));
-
-      setRelease(parsed);
-      setPhase("result");
+      if (data.status === "disambiguation") {
+        setCandidates(data.candidates);
+        setVisionData(data.vision);
+        setPhase("disambiguation");
+      } else if (data.status === "complete") {
+        setRelease(data.release);
+        setPhase("result");
+      } else {
+        throw new Error(data.error || "Unexpected response from scan");
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message || "Identification failed");
+      setPhase("error");
+    }
+  };
+
+  const pickCandidate = async (candidate) => {
+    setPhase("processing");
+    setStatus("Pulling audio features");
+    setErrorMsg("");
+
+    try {
+      const response = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
+      }
+
+      const data = await response.json();
+
+      if (data.status === "complete") {
+        setRelease(data.release);
+        setPhase("result");
+      } else {
+        throw new Error(data.error || "Unexpected response from scan");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || "Enrichment failed");
       setPhase("error");
     }
   };
@@ -162,6 +190,8 @@ export default function VinylVault() {
     setImageUrl(null);
     setAccent({ r: 157, g: 141, b: 241 });
     setErrorMsg("");
+    setCandidates([]);
+    setVisionData(null);
   };
 
   const accentRGB = `${accent.r}, ${accent.g}, ${accent.b}`;
@@ -210,7 +240,7 @@ export default function VinylVault() {
             </div>
           </div>
         </div>
-        {phase === "result" && (
+        {(phase === "result" || phase === "disambiguation") && (
           <button
             onClick={reset}
             className="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 font-mono"
@@ -225,6 +255,15 @@ export default function VinylVault() {
         {phase === "idle" && <IdleView onUpload={processImage} accentRGB={accentRGB} />}
         {phase === "processing" && (
           <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />
+        )}
+        {phase === "disambiguation" && (
+          <DisambiguationView
+            candidates={candidates}
+            vision={visionData}
+            imageUrl={imageUrl}
+            accentRGB={accentRGB}
+            onPick={pickCandidate}
+          />
         )}
         {phase === "result" && release && (
           <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} />
@@ -394,12 +433,20 @@ function ResultView({ release, imageUrl, accentRGB }) {
       style={{ animation: "fadeUp 0.8s ease-out" }}
     >
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <ConfidenceBadge
             confidence={release.confidence}
             identified={release.identified}
             accentRGB={accentRGB}
           />
+          {release.source && release.source !== "vision" && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono text-white/40"
+              style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              {release.source === "discogs+spotify" ? "Discogs · Spotify" : "Discogs"}
+            </div>
+          )}
           {release.notes && (
             <div className="text-[11px] text-white/50 font-mono">{release.notes}</div>
           )}
@@ -480,17 +527,19 @@ function ResultView({ release, imageUrl, accentRGB }) {
         </div>
       </div>
 
-      <Section
-        title="Tracklist"
-        subtitle={`${release.tracklist?.length || 0} tracks`}
-        accentRGB={accentRGB}
-      >
-        <div className="space-y-1">
-          {release.tracklist?.map((track, i) => (
-            <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} />
-          ))}
-        </div>
-      </Section>
+      {release.tracklist && release.tracklist.length > 0 && (
+        <Section
+          title="Tracklist"
+          subtitle={`${release.tracklist.length} tracks`}
+          accentRGB={accentRGB}
+        >
+          <div className="space-y-1">
+            {release.tracklist.map((track, i) => (
+              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} />
+            ))}
+          </div>
+        </Section>
+      )}
 
       {release.suggestedBoxes && release.suggestedBoxes.length > 0 && (
         <Section
@@ -539,7 +588,7 @@ function ResultView({ release, imageUrl, accentRGB }) {
 }
 
 function TrackRow({ track, index, accentRGB }) {
-  const keyColor = camelotColor(track.key);
+  const keyColor = track.key ? camelotColor(track.key) : null;
   return (
     <div
       className="grid grid-cols-[40px_1fr_auto] md:grid-cols-[50px_1fr_auto_auto_auto] items-center gap-3 md:gap-5 px-3 md:px-5 py-3 md:py-3.5 rounded-xl transition-all group hover:bg-white/[0.03]"
@@ -554,9 +603,11 @@ function TrackRow({ track, index, accentRGB }) {
         <div className="md:hidden text-[10px] tracking-[0.1em] text-white/40 mt-0.5 flex items-center gap-2 font-mono">
           {track.duration && <span>{track.duration}</span>}
           {track.duration && <span>·</span>}
-          <span>{track.bpm} BPM</span>
+          <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
           <span>·</span>
-          <span style={{ color: keyColor }}>{track.key}</span>
+          <span style={{ color: keyColor || "rgba(255,255,255,0.25)" }}>
+            {track.key || "—"}
+          </span>
         </div>
       </div>
 
@@ -567,18 +618,24 @@ function TrackRow({ track, index, accentRGB }) {
 
       <div className="hidden md:flex items-center gap-1.5 text-[12px] tabular-nums min-w-[80px] justify-end font-mono">
         <span className="text-white/30 text-[10px]">BPM</span>
-        <span className="font-medium">{track.bpm}</span>
+        <span className="font-medium">{track.bpm != null ? track.bpm : "—"}</span>
       </div>
 
-      <div
-        className="flex items-center justify-center w-12 md:w-14 h-7 md:h-8 rounded-full text-[11px] md:text-[12px] font-semibold tabular-nums font-mono"
-        style={{
-          background: keyColor.replace("hsl", "hsla").replace(")", ", 0.12)"),
-          border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.35)")}`,
-          color: keyColor,
-        }}
-      >
-        {track.key}
+      <div className="flex items-center justify-center w-12 md:w-14 h-7 md:h-8">
+        {keyColor ? (
+          <div
+            className="w-full h-full rounded-full flex items-center justify-center text-[11px] md:text-[12px] font-semibold tabular-nums font-mono"
+            style={{
+              background: keyColor.replace("hsl", "hsla").replace(")", ", 0.12)"),
+              border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.35)")}`,
+              color: keyColor,
+            }}
+          >
+            {track.key}
+          </div>
+        ) : (
+          <span className="text-white/25 text-[11px] font-mono">—</span>
+        )}
       </div>
     </div>
   );
@@ -686,6 +743,115 @@ function ErrorView({ message, onReset }) {
       >
         Try again
       </button>
+    </div>
+  );
+}
+
+function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick }) {
+  return (
+    <div className="pt-8 md:pt-12" style={{ animation: "fadeUp 0.6s ease-out" }}>
+      <div className="mb-10">
+        <div className="text-[11px] tracking-[0.3em] uppercase text-white/40 mb-4 font-mono">
+          /* Multiple pressings found */
+        </div>
+        <h2 className="text-4xl md:text-5xl leading-[1.05] mb-3 font-display">
+          <span className="italic">Pick a pressing</span>
+        </h2>
+        {vision && (
+          <p className="text-white/40 text-sm font-mono">
+            Read as:{" "}
+            <span className="text-white/70">
+              {vision.artist}
+              {vision.title ? ` — ${vision.title}` : ""}
+            </span>
+            {vision.catalogNumber && (
+              <span className="text-white/40"> · {vision.catalogNumber}</span>
+            )}
+          </p>
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {candidates.map((candidate, i) => (
+          <button
+            key={candidate.id}
+            onClick={() => onPick(candidate)}
+            className="text-left rounded-2xl overflow-hidden transition-all group relative"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
+              backdropFilter: "blur(40px) saturate(180%)",
+              WebkitBackdropFilter: "blur(40px) saturate(180%)",
+              border: `1px solid rgba(${accentRGB},0.15)`,
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 50px -20px rgba(0,0,0,0.4)",
+              animation: `fadeUp 0.4s ease-out ${i * 0.07}s both`,
+            }}
+          >
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              style={{
+                background: `linear-gradient(135deg, rgba(${accentRGB},0.1), transparent)`,
+              }}
+            />
+
+            <div className="relative aspect-square overflow-hidden">
+              {candidate.coverUrl ? (
+                <img
+                  src={candidate.coverUrl}
+                  alt={candidate.recordTitle || candidate.artist}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ background: `rgba(${accentRGB},0.07)` }}
+                >
+                  <Disc3 className="w-12 h-12 opacity-15" />
+                </div>
+              )}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)",
+                }}
+              />
+            </div>
+
+            <div className="relative p-4">
+              <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-1.5 font-mono">
+                {[candidate.year, candidate.country, candidate.format]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+              <div className="text-base leading-snug mb-2 font-display">
+                {candidate.artist && (
+                  <span className="italic">{candidate.artist}</span>
+                )}
+                {candidate.artist && candidate.recordTitle && (
+                  <span className="text-white/35"> — </span>
+                )}
+                <span className="text-white/80">
+                  {candidate.recordTitle || candidate.artist}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {candidate.label && (
+                  <span className="text-[10px] text-white/50 font-mono">
+                    {candidate.label}
+                  </span>
+                )}
+                {candidate.catalogNumber && (
+                  <span className="text-[10px] text-white/35 font-mono">
+                    {candidate.catalogNumber}
+                  </span>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
