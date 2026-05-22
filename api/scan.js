@@ -1,6 +1,7 @@
 import { identifyFromImage, identifyFromText, generateCrateSuggestions } from './lib/vision.js';
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
+import { fillItunesPreviews } from './lib/itunes.js';
 import { analyzeImage } from './lib/google-vision.js';
 
 async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
@@ -25,9 +26,12 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
       : Promise.resolve(vision?.suggestedBoxes || []),
   ]);
 
-  release.tracklist = enrichedTracks;
+  // iTunes fallback: fill any still-missing preview URLs (no API key, always runs)
+  const finalTracks = await fillItunesPreviews(enrichedTracks, release.artist).catch(() => enrichedTracks);
+
+  release.tracklist = finalTracks;
   release.suggestedBoxes = suggestedBoxes;
-  release.source = enrichedTracks.some(t => t.spotifyMatch) ? 'discogs+spotify' : 'discogs';
+  release.source = finalTracks.some(t => t.spotifyMatch) ? 'discogs+spotify' : 'discogs';
 
   return release;
 }

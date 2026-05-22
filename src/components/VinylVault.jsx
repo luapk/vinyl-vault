@@ -99,6 +99,94 @@ const glassSubtle = (extra = {}) => ({
   ...extra,
 });
 
+// Module-level cache so reopening a record doesn't re-fetch + re-analyse
+const bpmCache = new Map();
+
+async function detectBPM(previewUrl) {
+  if (bpmCache.has(previewUrl)) return bpmCache.get(previewUrl);
+  try {
+    const resp = await fetch(previewUrl, { mode: 'cors' });
+    if (!resp.ok) return null;
+    const arrayBuf = await resp.arrayBuffer();
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    // Decode into a buffer, then close the live context immediately
+    const tempCtx = new AudioCtx();
+    let buffer;
+    try { buffer = await tempCtx.decodeAudioData(arrayBuf); }
+    finally { await tempCtx.close(); }
+
+    const sr = buffer.sampleRate;
+    const dur = buffer.duration;
+
+    // OfflineAudioContext with 150 Hz low-pass: isolates kick/bass transients
+    const offCtx = new OfflineAudioContext(1, Math.floor(sr * dur), sr);
+    const src = offCtx.createBufferSource();
+    src.buffer = buffer;
+    const filt = offCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 150;
+    filt.Q.value = 0.7;
+    src.connect(filt);
+    filt.connect(offCtx.destination);
+    src.start(0);
+    const filtered = await offCtx.startRendering();
+    const raw = filtered.getChannelData(0);
+
+    // RMS energy in 10 ms windows
+    const win = Math.floor(sr * 0.01);
+    const numFrames = Math.floor(raw.length / win);
+    const energy = new Float32Array(numFrames);
+    for (let i = 0; i < numFrames; i++) {
+      let s = 0;
+      const base = i * win;
+      for (let j = 0; j < win; j++) s += raw[base + j] ** 2;
+      energy[i] = Math.sqrt(s / win);
+    }
+
+    // Smooth over 50 ms
+    const smW = 5;
+    const smoothed = Float32Array.from(energy, (_, i) => {
+      const lo = Math.max(0, i - smW), hi = Math.min(numFrames - 1, i + smW);
+      let s = 0;
+      for (let k = lo; k <= hi; k++) s += energy[k];
+      return s / (hi - lo + 1);
+    });
+
+    const mean = smoothed.reduce((a, b) => a + b, 0) / smoothed.length;
+    const threshold = mean * 1.4;
+    const minGap = 25; // 250 ms at 10 ms/frame = max ~240 BPM
+
+    const peaks = [];
+    for (let i = 1; i < smoothed.length - 1; i++) {
+      if (
+        smoothed[i] > threshold &&
+        smoothed[i] >= smoothed[i - 1] &&
+        smoothed[i] >= smoothed[i + 1] &&
+        (!peaks.length || i - peaks[peaks.length - 1] >= minGap)
+      ) peaks.push(i);
+    }
+
+    if (peaks.length < 4) { bpmCache.set(previewUrl, null); return null; }
+
+    const intervals = peaks.slice(1).map((p, i) => p - peaks[i]);
+    intervals.sort((a, b) => a - b);
+    const median = intervals[Math.floor(intervals.length / 2)];
+    let bpm = Math.round(60 / (median * 0.01));
+    while (bpm < 70) bpm *= 2;
+    while (bpm > 175) bpm /= 2;
+    bpm = Math.round(bpm);
+
+    bpmCache.set(previewUrl, bpm);
+    return bpm;
+  } catch (e) {
+    console.log('[bpm]', e.message);
+    return null;
+  }
+}
+
 // ----- Main Component --------------------------------------------------------
 
 export default function VinylVault() {
@@ -194,6 +282,15 @@ export default function VinylVault() {
       setPhase("error");
     }
   };
+
+  // Called by ResultView when Web Audio BPM detection resolves for a track
+  const updateReleaseBpm = useCallback((trackIdx, bpm) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, bpm } : t);
+      return { ...prev, tracklist };
+    });
+  }, []);
 
   const saveRecord = () => {
     if (!release) return;
@@ -308,8 +405,8 @@ export default function VinylVault() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255,255,255,0.015), transparent 50%)" }} />
       </div>
 
-      {/* Header */}
-      <header className="relative z-20 px-5 md:px-10 py-5 flex items-center justify-between">
+      {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
+      <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
         <div className="flex items-center">
           <img src="/logo.png" alt="Vinyl Vault" style={{ height: 43, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
@@ -345,7 +442,7 @@ export default function VinylVault() {
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
             {phase === "disambiguation" && <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
@@ -431,11 +528,27 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
   const [imgIdx, setImgIdx] = useState(0);
+  const [bpmDetecting, setBpmDetecting] = useState(new Set());
+  const bpmTriedRef = useRef(new Set());
+
+  const releaseKey = `${release?.discogsId || release?.artist}|${release?.title}`;
+  useEffect(() => {
+    if (!release?.tracklist?.length) return;
+    release.tracklist.forEach((track, i) => {
+      if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
+      bpmTriedRef.current.add(track.previewUrl);
+      setBpmDetecting(prev => new Set([...prev, i]));
+      detectBPM(track.previewUrl).then(bpm => {
+        if (bpm != null) onBpmDetected?.(i, bpm);
+        setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
+      });
+    });
+  }, [releaseKey]);
 
   const images = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
   const displayImage = images[imgIdx] || imageUrl;
@@ -578,7 +691,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
         <GlassSection title="Tracklist" subtitle={`${release.tracklist.length} tracks`} accentRGB={accentRGB}>
           <div className="space-y-0.5">
             {release.tracklist.map((track, i) => (
-              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} />
+              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
             ))}
           </div>
         </GlassSection>
@@ -721,7 +834,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} accentRGB={accentRGB} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} />}
       {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />}
     </div>
   );
@@ -844,13 +957,43 @@ function RecordCard({ record, onSelect, onRemove, accentRGB }) {
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
   const [price, setPrice] = useState(null); // null=not loaded, false=no data, object=loaded
   const [priceLoading, setPriceLoading] = useState(false);
+  const [bpmDetecting, setBpmDetecting] = useState(new Set());
+  const [localBpms, setLocalBpms] = useState({});
+  const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
+
+  useEffect(() => {
+    if (!record?.tracklist?.length) return;
+    const pending = {};
+    let total = 0;
+
+    record.tracklist.forEach((track, i) => {
+      if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
+      bpmTriedRef.current.add(track.previewUrl);
+      total++;
+      setBpmDetecting(prev => new Set([...prev, i]));
+
+      detectBPM(track.previewUrl).then(bpm => {
+        if (bpm != null) {
+          pending[i] = bpm;
+          setLocalBpms(prev => ({ ...prev, [i]: bpm }));
+        }
+        setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
+        total--;
+        if (total === 0 && Object.keys(pending).length > 0 && onUpdate) {
+          onUpdate(record.id, {
+            tracklist: record.tracklist.map((t, j) => pending[j] != null ? { ...t, bpm: pending[j] } : t),
+          });
+        }
+      });
+    });
+  }, [record.id]);
 
   const playPreview = (url) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
@@ -944,7 +1087,7 @@ function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
             <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-3 font-mono">Tracklist</div>
             <div className="space-y-0.5">
               {record.tracklist.map((track, i) => (
-                <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} />
+                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
               ))}
             </div>
           </div>
@@ -1353,7 +1496,7 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
   );
 }
 
-function TrackRow({ track, index, accentRGB, playingPreview, onPlay }) {
+function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading }) {
   const keyColor = track.key ? camelotColor(track.key) : null;
   const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
   return (
@@ -1363,7 +1506,10 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay }) {
         <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
         <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
           {track.duration && <><span>{track.duration}</span><span>·</span></>}
-          <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
+          {bpmLoading
+            ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
+            : <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
+          }
           <span>·</span>
           <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || "—"}</span>
         </div>
@@ -1371,7 +1517,10 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay }) {
       <div className="hidden md:flex items-center gap-1 text-[11px] text-white/35 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
       <div className="hidden md:flex items-center gap-1 text-[11px] tabular-nums min-w-[72px] justify-end font-mono">
         <span className="text-white/22 text-[9px]">BPM</span>
-        <span className="text-white/65">{track.bpm != null ? track.bpm : "—"}</span>
+        {bpmLoading
+          ? <span className="text-white/30" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
+          : <span style={{ color: track.bpm != null ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.2)" }}>{track.bpm != null ? track.bpm : "—"}</span>
+        }
       </div>
       <div className="flex items-center justify-center w-10 md:w-12 h-6 md:h-7">
         {keyColor ? (
