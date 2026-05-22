@@ -144,7 +144,7 @@ export default function VinylVault() {
         setPhase("disambiguation");
       } else if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
       } else {
         throw new Error(data.error || "Unexpected response");
@@ -174,7 +174,7 @@ export default function VinylVault() {
       const data = await response.json();
       if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
       } else {
         throw new Error(data.error || "Unexpected response");
@@ -797,7 +797,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           const rotate = offset * 3 + (dragging && isActive ? dragDelta * 0.03 : 0);
           const scale = 1 - absOffset * 0.07;
           const zIndex = 10 - absOffset;
-          const opacity = offset < -2 || offset > 2 ? 0 : 1 - absOffset * 0.25;
+          const opacity = offset < -2 || offset > 2 ? 0 : 1 - absOffset * 0.15;
 
           return (
             <div
@@ -809,7 +809,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                 transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg) scale(${scale})`,
                 zIndex,
                 opacity,
-                transition: dragging ? "none" : "transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease",
+                transition: dragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease",
                 cursor: isActive ? "pointer" : "pointer",
                 transformOrigin: "center bottom",
               }}
@@ -839,7 +839,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
       </div>
 
       {/* Active record info */}
-      <div className="mt-8 text-center" style={{ animation: "fadeUp 0.35s ease-out" }} key={current.id}>
+      <div className="mt-8 text-center" style={{ animation: "fadeUp 0.18s ease-out" }} key={current.id}>
         <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-2 font-mono">
           {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
         </div>
