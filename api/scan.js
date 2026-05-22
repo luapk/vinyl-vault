@@ -16,7 +16,6 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const tracklist = release.tracklist || [];
   const nullTrack = t => ({ ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null });
 
-  // Run Spotify enrichment and crate suggestion generation in parallel
   const [enrichedTracks, suggestedBoxes] = await Promise.all([
     (hasSpotify && tracklist.length > 0)
       ? enrichTracks(tracklist, release.artist).catch(() => tracklist.map(nullTrack))
@@ -31,6 +30,14 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   release.source = enrichedTracks.some(t => t.spotifyMatch) ? 'discogs+spotify' : 'discogs';
 
   return release;
+}
+
+function toCandidate(r) {
+  return {
+    id: r.id, masterId: r.masterId, artist: r.artist,
+    recordTitle: r.title, label: r.label, catalogNumber: r.catalogNumber,
+    year: r.year, country: r.country, format: r.format, coverUrl: r.coverUrl,
+  };
 }
 
 export default async function handler(req, res) {
@@ -60,6 +67,12 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
+    // Fire Google Vision Web Detection immediately — it only needs the image,
+    // not Vision's text output, so it runs in parallel with identifyFromImage.
+    const googlePromise = (googleVisionKey && hasDiscogs)
+      ? webDetectDiscogs(image, googleVisionKey).catch(() => ({ releaseIds: [] }))
+      : Promise.resolve({ releaseIds: [] });
+
     const vision = await identifyFromImage(image, mediaType, apiKey);
     console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber, rawText: vision.rawText?.slice(0, 200) }));
 
@@ -70,58 +83,70 @@ export default async function handler(req, res) {
       });
     }
 
-    const matches = await searchDiscogs({
-      catalogNumber: vision.catalogNumber,
-      artist: vision.artist,
-      title: vision.title,
-      label: vision.label,
-      rawText: vision.rawText,
-    });
-    console.log('[scan] discogs matches:', matches.length, matches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));
+    // Run Discogs text search and collect Google Vision results in parallel
+    const [textMatches, googleResult] = await Promise.all([
+      searchDiscogs({
+        catalogNumber: vision.catalogNumber,
+        artist: vision.artist,
+        title: vision.title,
+        label: vision.label,
+        rawText: vision.rawText,
+      }),
+      googlePromise,
+    ]);
 
-    if (matches.length === 0) {
-      // Fallback: Google Cloud Vision Web Detection to find Discogs pages by image
-      if (googleVisionKey) {
-        try {
-          const { releaseIds } = await webDetectDiscogs(image, googleVisionKey);
-          if (releaseIds.length > 0) {
-            const fetched = await Promise.all(
-              releaseIds.slice(0, 3).map(id => fetchDiscogsRelease(id).catch(() => null))
-            );
-            const valid = fetched.filter(Boolean);
+    const googleIds = (googleResult.releaseIds || []).slice(0, 3).map(String);
+    console.log('[scan] text matches:', textMatches.length, textMatches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));
+    console.log('[scan] google ids:', googleIds);
 
-            if (valid.length === 1) {
-              const release = await buildRelease(valid[0], vision, hasSpotify, apiKey);
-              return res.status(200).json({ status: 'complete', release });
-            }
-            if (valid.length > 1) {
-              const candidates = valid.map(r => ({
-                id: r.id, masterId: r.masterId, artist: r.artist,
-                recordTitle: r.title, label: r.label, catalogNumber: r.catalogNumber,
-                year: r.year, country: r.country, format: r.format, coverUrl: r.coverUrl,
-              }));
-              return res.status(200).json({ status: 'disambiguation', vision, candidates });
-            }
-          }
-        } catch {
-          // fall through to vision-only result
-        }
-      }
+    // Cross-reference: IDs that appear in both sources are confirmed matches
+    const textIdSet = new Set(textMatches.map(m => String(m.id)));
+    const confirmedIds = googleIds.filter(id => textIdSet.has(id));
 
+    if (confirmedIds.length === 1) {
+      // Both sources agree on exactly one release: auto-select with high confidence
+      const discogsRelease = await fetchDiscogsRelease(confirmedIds[0]);
+      const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
+      return res.status(200).json({ status: 'complete', release });
+    }
+
+    if (confirmedIds.length > 1) {
+      // Both sources agree but on multiple: show only the confirmed subset
+      const candidates = textMatches.filter(m => confirmedIds.includes(String(m.id)));
+      return res.status(200).json({ status: 'disambiguation', vision, candidates });
+    }
+
+    // No overlap between sources. Build a merged candidate pool.
+    // Google-only IDs need to be fetched; text-search IDs are already summarised.
+    const googleOnlyIds = googleIds.filter(id => !textIdSet.has(id));
+    const googleOnlyReleases = googleOnlyIds.length > 0
+      ? (await Promise.all(googleOnlyIds.map(id => fetchDiscogsRelease(id).catch(() => null)))).filter(Boolean)
+      : [];
+
+    // Merge: text matches first, then any Google-only releases not already present
+    const seenIds = new Set(textMatches.map(m => String(m.id)));
+    const mergedCandidates = [
+      ...textMatches,
+      ...googleOnlyReleases.filter(r => !seenIds.has(String(r.id))).map(toCandidate),
+    ];
+
+    if (mergedCandidates.length === 0) {
       return res.status(200).json({
         status: 'complete',
         release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
       });
     }
 
-    if (matches.length === 1) {
-      const discogsRelease = await fetchDiscogsRelease(matches[0].id);
+    if (mergedCandidates.length === 1) {
+      const id = mergedCandidates[0].id;
+      const discogsRelease = textMatches.length === 1
+        ? await fetchDiscogsRelease(id)
+        : googleOnlyReleases[0];
       const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
       return res.status(200).json({ status: 'complete', release });
     }
 
-    // Multiple matches: let the user pick
-    return res.status(200).json({ status: 'disambiguation', vision, candidates: matches });
+    return res.status(200).json({ status: 'disambiguation', vision, candidates: mergedCandidates });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
