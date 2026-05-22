@@ -67,3 +67,48 @@ export async function identifyFromImage(image, mediaType, apiKey) {
 
   return JSON.parse(raw);
 }
+
+export async function generateCrateSuggestions(release, apiKey) {
+  const { artist, title, label, year, genres } = release;
+  const context = [
+    artist && `Artist: ${artist}`,
+    title && `Title: ${title}`,
+    label && `Label: ${label}`,
+    year && `Year: ${year}`,
+    genres?.length && `Genres: ${genres.join(', ')}`,
+  ].filter(Boolean).join('\n');
+
+  const prompt = `${context}
+
+Give 2-3 short evocative DJ crate names for this specific record. Be precise to this artist/era/sound, not generic. Good examples: "Detroit Lineage", "4am Closers", "Dub Techno Continuum", "Warp Catalogue Essentials", "Peak-Time Weapons".
+
+Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) return [];
+    const data = await response.json();
+    const text = data.content?.[0]?.text?.trim() || '[]';
+    const raw = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}

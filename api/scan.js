@@ -1,43 +1,33 @@
-import { identifyFromImage } from './lib/vision.js';
+import { identifyFromImage, generateCrateSuggestions } from './lib/vision.js';
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 
-async function buildRelease(discogsRelease, vision, hasSpotify) {
+async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const release = { ...discogsRelease };
 
-  // Merge vision editorial data that Discogs doesn't provide
-  if (vision) {
-    release.identified = true;
-    release.confidence = 'high';
-    release.suggestedBoxes = vision.suggestedBoxes || [];
-    release.notes = vision.notes || '';
-    if (!release.genres || release.genres.length === 0) {
-      release.genres = vision.genres || [];
-    }
-  } else {
-    release.identified = true;
-    release.confidence = 'high';
-    release.suggestedBoxes = [];
-    release.notes = '';
+  release.identified = true;
+  release.confidence = 'high';
+  release.notes = vision?.notes || '';
+  if (!release.genres || release.genres.length === 0) {
+    release.genres = vision?.genres || [];
   }
 
-  // Enrich tracklist with Spotify audio features
-  if (hasSpotify && release.tracklist && release.tracklist.length > 0) {
-    try {
-      release.tracklist = await enrichTracks(release.tracklist, release.artist);
-      release.source = 'discogs+spotify';
-    } catch {
-      release.tracklist = release.tracklist.map(t => ({
-        ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false,
-      }));
-      release.source = 'discogs';
-    }
-  } else {
-    release.tracklist = (release.tracklist || []).map(t => ({
-      ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false,
-    }));
-    release.source = 'discogs';
-  }
+  const tracklist = release.tracklist || [];
+  const nullTrack = t => ({ ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null });
+
+  // Run Spotify enrichment and crate suggestion generation in parallel
+  const [enrichedTracks, suggestedBoxes] = await Promise.all([
+    (hasSpotify && tracklist.length > 0)
+      ? enrichTracks(tracklist, release.artist).catch(() => tracklist.map(nullTrack))
+      : Promise.resolve(tracklist.map(nullTrack)),
+    apiKey
+      ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
+      : Promise.resolve(vision?.suggestedBoxes || []),
+  ]);
+
+  release.tracklist = enrichedTracks;
+  release.suggestedBoxes = suggestedBoxes;
+  release.source = enrichedTracks.some(t => t.spotifyMatch) ? 'discogs+spotify' : 'discogs';
 
   return release;
 }
@@ -56,7 +46,7 @@ export default async function handler(req, res) {
     if (!hasDiscogs) return res.status(503).json({ error: 'Discogs not configured' });
     try {
       const discogsRelease = await fetchDiscogsRelease(discogsId);
-      const release = await buildRelease(discogsRelease, clientVision, hasSpotify);
+      const release = await buildRelease(discogsRelease, clientVision, hasSpotify, apiKey);
       return res.status(200).json({ status: 'complete', release });
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -92,7 +82,7 @@ export default async function handler(req, res) {
 
     if (matches.length === 1) {
       const discogsRelease = await fetchDiscogsRelease(matches[0].id);
-      const release = await buildRelease(discogsRelease, vision, hasSpotify);
+      const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
       return res.status(200).json({ status: 'complete', release });
     }
 

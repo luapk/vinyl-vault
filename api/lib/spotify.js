@@ -36,7 +36,9 @@ async function searchTrack(token, artist, trackTitle) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return null;
   const data = await res.json();
-  return data.tracks?.items?.[0]?.id || null;
+  const track = data.tracks?.items?.[0];
+  if (!track) return null;
+  return { id: track.id, previewUrl: track.preview_url || null };
 }
 
 async function fetchAudioFeatures(token, trackId) {
@@ -48,7 +50,7 @@ async function fetchAudioFeatures(token, trackId) {
   return res.json();
 }
 
-const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false };
+const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null };
 
 export async function enrichTracks(tracks, artist) {
   const token = await getToken();
@@ -56,11 +58,11 @@ export async function enrichTracks(tracks, artist) {
   return Promise.all(
     tracks.map(async track => {
       try {
-        const trackId = await searchTrack(token, artist, track.title);
-        if (!trackId) return { ...track, ...noMatch };
+        const result = await searchTrack(token, artist, track.title);
+        if (!result) return { ...track, ...noMatch };
 
-        const features = await fetchAudioFeatures(token, trackId);
-        if (!features) return { ...track, ...noMatch };
+        const features = await fetchAudioFeatures(token, result.id);
+        if (!features) return { ...track, ...noMatch, previewUrl: result.previewUrl };
 
         return {
           ...track,
@@ -69,6 +71,7 @@ export async function enrichTracks(tracks, artist) {
           energy: features.energy ?? null,
           valence: features.valence ?? null,
           spotifyMatch: true,
+          previewUrl: result.previewUrl,
         };
       } catch {
         return { ...track, ...noMatch };

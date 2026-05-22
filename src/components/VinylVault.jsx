@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Camera,
   Upload,
@@ -7,6 +7,8 @@ import {
   X,
   ArrowUpRight,
   Clock,
+  Play,
+  Pause,
 } from "lucide-react";
 
 // ----- Helpers -----------------------------------------------------------
@@ -427,6 +429,29 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 }
 
 function ResultView({ release, imageUrl, accentRGB }) {
+  const audioRef = useRef(null);
+  const [playingPreview, setPlayingPreview] = useState(null);
+
+  const playPreview = (url) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (playingPreview === url) {
+      setPlayingPreview(null);
+      return;
+    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.play().catch(() => {});
+    setPlayingPreview(url);
+    audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
+  };
+
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  const displayImage = release.coverUrl || imageUrl;
+
   return (
     <div
       className="pt-4 md:pt-8 grid gap-6 md:gap-8"
@@ -465,8 +490,13 @@ function ResultView({ release, imageUrl, accentRGB }) {
               `,
             }}
           >
-            {imageUrl && (
-              <img src={imageUrl} alt={release.title} className="w-full h-full object-cover" />
+            {displayImage && (
+              <img
+                src={displayImage}
+                alt={release.title}
+                className="w-full h-full object-cover"
+                onError={(e) => { if (e.target.src !== imageUrl) e.target.src = imageUrl; }}
+              />
             )}
             <div
               className="absolute inset-0 pointer-events-none"
@@ -535,7 +565,14 @@ function ResultView({ release, imageUrl, accentRGB }) {
         >
           <div className="space-y-1">
             {release.tracklist.map((track, i) => (
-              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} />
+              <TrackRow
+                key={i}
+                track={track}
+                index={i}
+                accentRGB={accentRGB}
+                playingPreview={playingPreview}
+                onPlay={playPreview}
+              />
             ))}
           </div>
         </Section>
@@ -587,11 +624,12 @@ function ResultView({ release, imageUrl, accentRGB }) {
   );
 }
 
-function TrackRow({ track, index, accentRGB }) {
+function TrackRow({ track, index, accentRGB, playingPreview, onPlay }) {
   const keyColor = track.key ? camelotColor(track.key) : null;
+  const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
   return (
     <div
-      className="grid grid-cols-[40px_1fr_auto] md:grid-cols-[50px_1fr_auto_auto_auto] items-center gap-3 md:gap-5 px-3 md:px-5 py-3 md:py-3.5 rounded-xl transition-all group hover:bg-white/[0.03]"
+      className="grid grid-cols-[40px_1fr_auto] md:grid-cols-[50px_1fr_auto_auto_auto_32px] items-center gap-3 md:gap-5 px-3 md:px-5 py-3 md:py-3.5 rounded-xl transition-all group hover:bg-white/[0.03]"
       style={{ animation: `fadeUp 0.4s ease-out ${index * 0.05}s both` }}
     >
       <div className="text-[11px] tracking-[0.15em] text-white/50 font-medium font-mono">
@@ -635,6 +673,28 @@ function TrackRow({ track, index, accentRGB }) {
           </div>
         ) : (
           <span className="text-white/25 text-[11px] font-mono">—</span>
+        )}
+      </div>
+
+      <div className="hidden md:flex items-center justify-center">
+        {track.previewUrl ? (
+          <button
+            onClick={() => onPlay(track.previewUrl)}
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-all"
+            style={{
+              background: isPlaying ? `rgba(${accentRGB},0.2)` : "transparent",
+              border: isPlaying
+                ? `1px solid rgba(${accentRGB},0.4)`
+                : "1px solid rgba(255,255,255,0.1)",
+              color: isPlaying ? `rgb(${accentRGB})` : "rgba(255,255,255,0.3)",
+            }}
+          >
+            {isPlaying
+              ? <Pause className="w-3 h-3" />
+              : <Play className="w-3 h-3" />}
+          </button>
+        ) : (
+          <div className="w-7 h-7" />
         )}
       </div>
     </div>
