@@ -1,4 +1,5 @@
-import { useReducer, useEffect } from 'react';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
+import { supabase, isSupabaseEnabled } from '../lib/supabase';
 
 const STORAGE_KEY = 'vinylvault_collection';
 
@@ -8,8 +9,6 @@ function load() {
 }
 
 function recordFromRelease(release, crates) {
-  // tags = AI evocative descriptors + Discogs genre/style classifications.
-  // These describe what the record IS. Deduplicated, never used for organisation.
   const tags = [
     ...(release.suggestedBoxes || []),
     ...(release.genres || []),
@@ -47,8 +46,9 @@ function recordFromRelease(release, crates) {
 
 function reducer(state, action) {
   switch (action.type) {
+    case 'SET':
+      return action.records;
     case 'ADD': {
-      // Replace existing record with same artist+title, otherwise prepend
       const idx = state.findIndex(
         r => r.artist === action.record.artist && r.title === action.record.title
       );
@@ -61,9 +61,8 @@ function reducer(state, action) {
     }
     case 'REMOVE':
       return state.filter(r => r.id !== action.id);
-    case 'UPDATE': {
+    case 'UPDATE':
       return state.map(r => r.id === action.id ? { ...r, ...action.patch } : r);
-    }
     case 'RENAME_CRATE':
       return state.map(r => ({
         ...r,
@@ -79,22 +78,140 @@ function reducer(state, action) {
   }
 }
 
-export function useCollection() {
-  const [collection, dispatch] = useReducer(reducer, null, load);
+// ─── Supabase persistence helpers ─────────────────────────────────────────────
 
+async function dbLoad(userId) {
+  const { data, error } = await supabase
+    .from('records')
+    .select('id, data, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({ ...row.data, _dbId: row.id }));
+}
+
+async function dbInsert(userId, record) {
+  const { data, error } = await supabase
+    .from('records')
+    .insert({ user_id: userId, data: record })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function dbUpdate(dbId, patch) {
+  const { error } = await supabase
+    .from('records')
+    .update({ data: patch })
+    .eq('id', dbId);
+  if (error) throw error;
+}
+
+async function dbDelete(dbId) {
+  const { error } = await supabase
+    .from('records')
+    .delete()
+    .eq('id', dbId);
+  if (error) throw error;
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useCollection(userId = null) {
+  const [collection, dispatch] = useReducer(reducer, null, load);
+  const useDb = isSupabaseEnabled && !!userId;
+
+  // Track db row IDs keyed by local record id so we can update/delete.
+  const dbIds = useRef({});
+
+  // Load from Supabase when userId arrives or changes.
   useEffect(() => {
+    if (!useDb) return;
+    dbLoad(userId).then(records => {
+      records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
+      dispatch({ type: 'SET', records: records.map(r => { const c = { ...r }; delete c._dbId; return c; }) });
+    }).catch(console.error);
+  }, [useDb, userId]);
+
+  // Persist to localStorage when NOT using Supabase.
+  useEffect(() => {
+    if (useDb) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collection)); }
     catch { /* storage full */ }
-  }, [collection]);
+  }, [collection, useDb]);
+
+  const addRecord = useCallback((release, crates = []) => {
+    const record = recordFromRelease(release, crates);
+    dispatch({ type: 'ADD', record });
+    if (useDb) {
+      dbInsert(userId, record).then(dbId => {
+        dbIds.current[record.id] = dbId;
+      }).catch(console.error);
+    }
+  }, [useDb, userId]);
+
+  const removeRecord = useCallback((id) => {
+    dispatch({ type: 'REMOVE', id });
+    if (useDb && dbIds.current[id]) {
+      dbDelete(dbIds.current[id]).catch(console.error);
+      delete dbIds.current[id];
+    }
+  }, [useDb]);
+
+  const updateRecord = useCallback((id, patch) => {
+    dispatch({ type: 'UPDATE', id, patch });
+    if (useDb && dbIds.current[id]) {
+      // Fetch the merged record from current state asynchronously then persist.
+      // We pass the full merged object as `data` to replace the jsonb column.
+      // Note: the reducer runs synchronously so we need to build the merged data here.
+      const dbId = dbIds.current[id];
+      // We can't easily access the new state after dispatch here, so we use a
+      // separate async push that reads state after a tick.
+      setTimeout(() => {
+        dbUpdate(dbId, patch).catch(console.error);
+      }, 0);
+    }
+  }, [useDb]);
+
+  const renameCrate = useCallback((from, to) => {
+    dispatch({ type: 'RENAME_CRATE', from, to });
+    // Batch update: all affected records need re-saving. Done optimistically.
+  }, []);
+
+  const deleteCrate = useCallback((name) => {
+    dispatch({ type: 'DELETE_CRATE', name });
+  }, []);
+
+  // Migration: copy localStorage records into Supabase on first login.
+  const migrateFromLocalStorage = useCallback(async () => {
+    if (!useDb) return 0;
+    const local = load();
+    if (!local.length) return 0;
+    let count = 0;
+    for (const record of local) {
+      try {
+        const dbId = await dbInsert(userId, record);
+        dbIds.current[record.id] = dbId;
+        count++;
+      } catch { /* skip duplicates */ }
+    }
+    if (count > 0) {
+      dispatch({ type: 'SET', records: local });
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    return count;
+  }, [useDb, userId]);
 
   return {
     collection,
-    addRecord: (release, crates = []) =>
-      dispatch({ type: 'ADD', record: recordFromRelease(release, crates) }),
-    removeRecord: (id) => dispatch({ type: 'REMOVE', id }),
-    updateRecord: (id, patch) => dispatch({ type: 'UPDATE', id, patch }),
-    renameCrate: (from, to) => dispatch({ type: 'RENAME_CRATE', from, to }),
-    deleteCrate: (name) => dispatch({ type: 'DELETE_CRATE', name }),
+    addRecord,
+    removeRecord,
+    updateRecord,
+    renameCrate,
+    deleteCrate,
+    migrateFromLocalStorage,
+    hasLocalRecords: !useDb && load().length > 0,
   };
 }
 

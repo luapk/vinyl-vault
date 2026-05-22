@@ -3,9 +3,12 @@ import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
-  Scan, Info,
+  Scan, Info, Crown, SignOut, UserCircle,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
+import { useAuth } from "../hooks/useAuth.js";
+import AuthScreen from "./AuthScreen.jsx";
+import AdminPanel from "./AdminPanel.jsx";
 
 // ----- Helpers ---------------------------------------------------------------
 
@@ -190,7 +193,9 @@ async function detectBPM(previewUrl) {
 // ----- Main Component --------------------------------------------------------
 
 export default function VinylVault() {
-  const [appView, setAppView] = useState("scan"); // scan | collection | batch | about
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, isSupabaseEnabled } = useAuth();
+
+  const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
   const [status, setStatus] = useState("");
   const [release, setRelease] = useState(null);
@@ -203,10 +208,29 @@ export default function VinylVault() {
   const [savedId, setSavedId] = useState(null);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [migrationBanner, setMigrationBanner] = useState(false);
   // Always-fresh ref so async callbacks never read stale queue state
   const batchQueueRef = useRef([]);
 
-  const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection();
+  const userId = user?.id ?? null;
+  const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, migrateFromLocalStorage, hasLocalRecords } = useCollection(userId);
+
+  // Offer localStorage migration once on first login when local records exist.
+  useEffect(() => {
+    if (user && hasLocalRecords && isSupabaseEnabled) setMigrationBanner(true);
+  }, [user?.id]);
+
+  // Gate: show login screen when Supabase is configured but no user is logged in.
+  if (isSupabaseEnabled && !authLoading && !user) {
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
+  }
+  if (isSupabaseEnabled && authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#050508" }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(139,92,246,0.3)", borderTopColor: "rgba(139,92,246,0.9)" }} />
+      </div>
+    );
+  }
 
   const processImage = async (file, forBatch = false) => {
     if (!forBatch) {
@@ -394,6 +418,7 @@ export default function VinylVault() {
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
     { id: "batch", label: "Batch", icon: GridNine },
     { id: "about", label: "About", icon: Info },
+    ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
 
   return (
@@ -406,12 +431,12 @@ export default function VinylVault() {
       </div>
 
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
-      <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
-        <div className="flex items-center">
+      <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
+        <div className="flex items-center shrink-0">
           <img src="/logo.png" alt="Vinyl Vault" style={{ height: 43, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
 
-        <nav className="flex items-center gap-1.5">
+        <nav className="flex items-center gap-1.5 flex-wrap">
           {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -432,10 +457,44 @@ export default function VinylVault() {
             </button>
           )}
         </nav>
+
+        {/* User info + sign out — only when Supabase is active */}
+        {isSupabaseEnabled && user && (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-white/30">
+              {isAdmin && <Crown size={11} className="text-amber-400" weight="duotone" />}
+              <span className="truncate max-w-[120px]">{profile?.email || user.email}</span>
+            </div>
+            <button onClick={signOut} title="Sign out" className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 transition-colors" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+              <SignOut size={13} />
+            </button>
+          </div>
+        )}
       </header>
+
+      {/* Migration banner */}
+      {migrationBanner && (
+        <div className="relative z-20 px-5 md:px-10 pt-3">
+          <div className="max-w-7xl mx-auto p-3 rounded-xl flex items-center gap-3 text-sm"
+            style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
+            <span className="text-white/70 flex-1">You have records saved locally. Move them to your Supabase account?</span>
+            <button onClick={async () => { await migrateFromLocalStorage(); setMigrationBanner(false); }}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all"
+              style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
+              Migrate
+            </button>
+            <button onClick={() => setMigrationBanner(false)} className="text-white/30 hover:text-white/60 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main */}
       <main className="relative z-10 px-5 md:px-10 pb-20 max-w-7xl mx-auto">
+        {appView === "admin" && (
+          <AdminPanel onBack={() => setAppView("collection")} />
+        )}
         {appView === "scan" && (
           <>
             {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} />}
