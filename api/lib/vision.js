@@ -11,26 +11,23 @@ const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONL
   "country": string | null,
   "genres": [string],
   "suggestedBoxes": [string],
-  "notes": string
+  "notes": string,
+  "rawText": string
 }
 
-VINYL LABEL ANATOMY — read this carefully before extracting fields:
-The circular paper label in the centre of a vinyl disc has a strict hierarchy:
-  - label: the record company / imprint name. Often the most visually prominent text — large, stylised, at the top or centre of the label. Examples: "Warp", "Tresor", "Planet E", "Domina", "R&S", "XL". This is the PUBLISHER, not the artist. Do NOT put this in the artist field.
-  - artist: the musician or producer who made the record. Usually smaller text beneath or alongside the title.
-  - title: the release or track name.
-  - catalogNumber: an alphanumeric code printed on the label, often at the bottom or edge — e.g. "WAP63", "DOM-001", "R&S AM12 93", "TL-001". This is the MOST RELIABLE search key. Extract it even if partially obscured or rotated. It is NOT the same as the label name.
+rawText: transcribe every piece of readable text visible in the image, exactly as printed, space-separated. Include all text: artist names, release titles, label names, catalogue numbers, matrix numbers, side designations, everything. This is the most important field for search — accuracy matters more than classification.
 
-If the photo shows a generic sleeve with no text (art-only outer sleeve), look for the disc label in the image — it always has text.
-If you can read any alphanumeric catalogue number, always set catalogNumber even if uncertain of other fields.
+catalogNumber: alphanumeric release code printed on the label — e.g. "WAP63", "DOM-001", "R&S AM12 93". Often small, near the edge. Extract it even if partially obscured. If found, it is the single most reliable search key.
+
+For artist/title/label: use your knowledge if you recognise the release. If not, make your best guess from visible text — but do not force a hierarchy. Vinyl label layouts vary enormously. The largest text may be the track title, the label name, or the artist, depending on the release.
+
+If the outer sleeve has no text, look for the circular paper disc label in the image — it always has text.
 
 Context: electronic music archive. Most records: house, techno, ambient, IDM, electro, drum & bass, dub, breaks, downtempo.
 
 genres: 2-4 genre/style tags.
 suggestedBoxes: 2-3 short evocative crate names specific to THIS record. Examples: "Deep House Workouts", "4am Closers", "Detroit Lineage", "Dub Techno Continuum", "Peak-Time Weapons".
 notes: one sentence max, notable attributes or caveats.
-
-If you recognise the release, use real metadata. If unidentified, best-guess from any visible text.
 
 Return ONLY the JSON object, nothing else.`;
 

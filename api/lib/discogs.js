@@ -31,11 +31,11 @@ function buildSearchUrl(params) {
   return `${BASE}/database/search?${new URLSearchParams({ type: 'release', per_page: '5', ...params })}`;
 }
 
-export async function searchDiscogs({ catalogNumber, artist, title, label }) {
+export async function searchDiscogs({ catalogNumber, artist, title, label, rawText }) {
   const headers = authHeaders();
 
-  // Build every plausible search strategy. Vision often confuses label for artist,
-  // so we try both interpretations in parallel and merge results.
+  // Run every plausible strategy in parallel. Vision sometimes misassigns fields
+  // (e.g. track title read as label name), so we try multiple interpretations.
   const urls = new Set();
 
   if (catalogNumber) {
@@ -45,17 +45,17 @@ export async function searchDiscogs({ catalogNumber, artist, title, label }) {
     urls.add(buildSearchUrl({ artist, release_title: title }));
   }
   if (label && title) {
-    // Vision may have put the label name in the artist field or label field — try both
     urls.add(buildSearchUrl({ label, release_title: title }));
   }
   if (artist && title && artist !== label) {
-    // Treat what Vision called "artist" as a label name (common misread)
+    // Treat Vision's "artist" as a label — catches label/artist/title confusion
     urls.add(buildSearchUrl({ label: artist, release_title: title }));
   }
-  // General fuzzy: all readable text together
-  const q = [artist, title, label].filter(Boolean).join(' ');
-  if (q) {
-    urls.add(buildSearchUrl({ q }));
+  // Fuzzy: rawText is the exact transcription of visible text — more reliable than
+  // reassembling structured fields that Vision may have misassigned
+  const fuzzyQ = rawText || [artist, title, label].filter(Boolean).join(' ');
+  if (fuzzyQ) {
+    urls.add(buildSearchUrl({ q: fuzzyQ }));
   }
 
   const batches = await Promise.all(

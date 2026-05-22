@@ -72,6 +72,7 @@ export default async function handler(req, res) {
       artist: vision.artist,
       title: vision.title,
       label: vision.label,
+      rawText: vision.rawText,
     });
 
     if (matches.length === 0) {
