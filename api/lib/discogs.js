@@ -161,6 +161,7 @@ export async function fetchDiscogsRelease(id) {
     country: r.country || null,
     format: (r.formats || []).map(f => f.name).join(', ') || null,
     genres: [...(r.genres || []), ...(r.styles || [])],
+    topGenres: r.genres || [],
     tracklist,
     coverUrl: primaryImage,
     images,

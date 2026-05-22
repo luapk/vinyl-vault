@@ -115,6 +115,8 @@ export default function VinylVault() {
   const [savedId, setSavedId] = useState(null);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
+  // Always-fresh ref so async callbacks never read stale queue state
+  const batchQueueRef = useRef([]);
 
   const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection();
 
@@ -211,53 +213,80 @@ export default function VinylVault() {
     setSavedId(null);
   };
 
+  // Sync helper: keeps ref and state in lockstep so async callbacks always
+  // read the latest queue without stale-closure issues.
+  const syncQueue = (next) => {
+    batchQueueRef.current = next;
+    setBatchQueue(next);
+  };
+
   const startBatch = async (files) => {
-    const items = Array.from(files).map((file) => ({ file, status: "queued", release: null, candidates: null, vision: null, imageUrl: null }));
-    setBatchQueue(items);
+    const items = Array.from(files).map((file) => ({
+      file, status: "queued", release: null, candidates: null, vision: null, imageUrl: null,
+    }));
+    syncQueue(items);
     setAppView("batch");
     setBatchProcessing(true);
-    const updated = [...items];
-    for (let i = 0; i < updated.length; i++) {
-      updated[i] = { ...updated[i], status: "processing" };
-      setBatchQueue([...updated]);
+
+    // Work on a local copy; sync to ref+state after every mutation so that
+    // concurrent resolveBatchDisambiguation calls always see fresh data.
+    const current = items.map((item) => ({ ...item }));
+    for (let i = 0; i < current.length; i++) {
+      current[i] = { ...current[i], status: "processing" };
+      syncQueue([...current]);
       try {
-        const { dataUrl, data } = await processImage(updated[i].file, true);
-        updated[i].imageUrl = dataUrl;
+        const { dataUrl, data } = await processImage(current[i].file, true);
+        current[i].imageUrl = dataUrl;
         if (data.status === "complete") {
-          updated[i].status = "complete";
-          updated[i].release = data.release;
-          addRecord(data.release, data.release.suggestedBoxes || []);
+          current[i].status = "complete";
+          current[i].release = data.release;
+          // Auto-save with broad genre tags only, not specific crate suggestions
+          addRecord(data.release, data.release.topGenres || []);
         } else if (data.status === "disambiguation") {
-          updated[i].status = "disambiguation";
-          updated[i].candidates = data.candidates;
-          updated[i].vision = data.vision;
+          current[i].status = "disambiguation";
+          current[i].candidates = data.candidates;
+          current[i].vision = data.vision;
         } else {
-          updated[i].status = "error";
+          current[i].status = "error";
         }
-      } catch { updated[i].status = "error"; }
-      setBatchQueue([...updated]);
+      } catch {
+        current[i].status = "error";
+      }
+      syncQueue([...current]);
     }
     setBatchProcessing(false);
   };
 
   const resolveBatchDisambiguation = async (itemIdx, candidate) => {
-    const updated = [...batchQueue];
-    updated[itemIdx] = { ...updated[itemIdx], status: "processing" };
-    setBatchQueue([...updated]);
+    // Always read from ref so we never work from a stale render closure.
+    // Multiple concurrent resolves each see the latest committed queue.
+    const snapshot = [...batchQueueRef.current];
+    const vision = snapshot[itemIdx]?.vision;
+
+    snapshot[itemIdx] = { ...snapshot[itemIdx], status: "processing" };
+    syncQueue(snapshot);
+
     try {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision: updated[itemIdx].vision }),
+        body: JSON.stringify({ discogsId: candidate.id, vision }),
       });
       const data = await response.json();
+      // Re-snapshot from ref in case another resolve completed while we awaited
+      const latest = [...batchQueueRef.current];
       if (data.status === "complete") {
-        updated[itemIdx].status = "complete";
-        updated[itemIdx].release = data.release;
-        addRecord(data.release, data.release.suggestedBoxes || []);
-      } else { updated[itemIdx].status = "error"; }
-    } catch { updated[itemIdx].status = "error"; }
-    setBatchQueue([...updated]);
+        latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
+        addRecord(data.release, data.release.topGenres || []);
+      } else {
+        latest[itemIdx] = { ...latest[itemIdx], status: "error" };
+      }
+      syncQueue(latest);
+    } catch {
+      const latest = [...batchQueueRef.current];
+      latest[itemIdx] = { ...latest[itemIdx], status: "error" };
+      syncQueue(latest);
+    }
   };
 
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
