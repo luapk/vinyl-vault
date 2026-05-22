@@ -1,6 +1,7 @@
 import { identifyFromImage, generateCrateSuggestions } from './lib/vision.js';
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
+import { webDetectDiscogs } from './lib/google-vision.js';
 
 async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const release = { ...discogsRelease };
@@ -40,6 +41,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const hasDiscogs = !!process.env.DISCOGS_PERSONAL_ACCESS_TOKEN;
   const hasSpotify = !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+  const googleVisionKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
 
   // Post-disambiguation: client has picked a specific Discogs release
   if (discogsId) {
@@ -76,6 +78,34 @@ export default async function handler(req, res) {
     });
 
     if (matches.length === 0) {
+      // Fallback: Google Cloud Vision Web Detection to find Discogs pages by image
+      if (googleVisionKey) {
+        try {
+          const { releaseIds } = await webDetectDiscogs(image, googleVisionKey);
+          if (releaseIds.length > 0) {
+            const fetched = await Promise.all(
+              releaseIds.slice(0, 3).map(id => fetchDiscogsRelease(id).catch(() => null))
+            );
+            const valid = fetched.filter(Boolean);
+
+            if (valid.length === 1) {
+              const release = await buildRelease(valid[0], vision, hasSpotify, apiKey);
+              return res.status(200).json({ status: 'complete', release });
+            }
+            if (valid.length > 1) {
+              const candidates = valid.map(r => ({
+                id: r.id, masterId: r.masterId, artist: r.artist,
+                recordTitle: r.title, label: r.label, catalogNumber: r.catalogNumber,
+                year: r.year, country: r.country, format: r.format, coverUrl: r.coverUrl,
+              }));
+              return res.status(200).json({ status: 'disambiguation', vision, candidates });
+            }
+          }
+        } catch {
+          // fall through to vision-only result
+        }
+      }
+
       return res.status(200).json({
         status: 'complete',
         release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
