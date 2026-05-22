@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
-    let vision, trimmedGoogleIds = [];
+    let vision, trimmedGoogleIds = [], rawOcrText = null;
 
     if (googleVisionKey) {
       // Google Vision: accurate OCR text + web-match Discogs IDs in one API call.
@@ -75,7 +75,8 @@ export default async function handler(req, res) {
       const { ocrText, releaseIds } = await analyzeImage(image, googleVisionKey)
         .catch(() => ({ ocrText: null, releaseIds: [] }));
       trimmedGoogleIds = releaseIds;
-      console.log('[scan] google ocr:', ocrText?.slice(0, 150), '| ids:', trimmedGoogleIds);
+      rawOcrText = ocrText;
+      console.log('[scan] google ocr:', ocrText?.slice(0, 200), '| ids:', trimmedGoogleIds);
 
       // Claude interprets clean OCR text — no image confusion possible
       vision = ocrText
@@ -94,12 +95,15 @@ export default async function handler(req, res) {
       });
     }
 
+    // Use raw Google OCR text (not Claude's interpreted rawText) for Discogs search —
+    // Claude may alter or misread the catno when copying it into rawText, but the
+    // OCR string is verbatim from Google and more likely to contain the correct catno.
     const textMatches = await searchDiscogs({
       catalogNumber: vision.catalogNumber,
       artist: vision.artist,
       title: vision.title,
       label: vision.label,
-      rawText: vision.rawText,
+      rawText: rawOcrText || vision.rawText,
     });
 
     trimmedGoogleIds = trimmedGoogleIds.slice(0, 3).map(String);
