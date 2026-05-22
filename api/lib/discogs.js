@@ -147,10 +147,8 @@ export async function fetchDiscogsRelease(id) {
       duration: t.duration || null,
     }));
 
-  const primaryImage =
-    r.images?.find(img => img.type === 'primary')?.uri ||
-    r.images?.[0]?.uri ||
-    null;
+  const images = (r.images || []).map(img => img.uri).filter(Boolean);
+  const primaryImage = r.images?.find(img => img.type === 'primary')?.uri || images[0] || null;
 
   return {
     id: String(r.id),
@@ -165,5 +163,6 @@ export async function fetchDiscogsRelease(id) {
     genres: [...(r.genres || []), ...(r.styles || [])],
     tracklist,
     coverUrl: primaryImage,
+    images,
   };
 }
