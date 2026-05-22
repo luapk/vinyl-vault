@@ -426,7 +426,7 @@ export default function VinylVault() {
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
-          {appView === "scan" && (phase === "result" || phase === "disambiguation") && (
+          {appView === "scan" && phase === "result" && (
             <button onClick={reset} className="ml-1 text-[11px] tracking-[0.15em] uppercase font-mono px-3 py-1.5 rounded-full transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)", background: "transparent" }}>
               New scan
             </button>
@@ -440,7 +440,16 @@ export default function VinylVault() {
           <>
             {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
-            {phase === "disambiguation" && <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />}
+            {phase === "disambiguation" && (
+              <>
+                <div className="flex justify-center pt-4 pb-1">
+                  <button onClick={reset} className="text-[11px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "rgba(255,255,255,0.03)" }}>
+                    New scan
+                  </button>
+                </div>
+                <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />
+              </>
+            )}
             {phase === "result" && release && (
               <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} />
             )}
