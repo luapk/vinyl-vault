@@ -1,7 +1,7 @@
-import { identifyFromImage, generateCrateSuggestions } from './lib/vision.js';
+import { identifyFromImage, identifyFromText, generateCrateSuggestions } from './lib/vision.js';
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
-import { webDetectDiscogs } from './lib/google-vision.js';
+import { analyzeImage } from './lib/google-vision.js';
 
 async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const release = { ...discogsRelease };
@@ -67,14 +67,25 @@ export default async function handler(req, res) {
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
-    // Fire Google Vision Web Detection immediately — it only needs the image,
-    // not Vision's text output, so it runs in parallel with identifyFromImage.
-    const googlePromise = (googleVisionKey && hasDiscogs)
-      ? webDetectDiscogs(image, googleVisionKey).catch(() => ({ releaseIds: [] }))
-      : Promise.resolve({ releaseIds: [] });
+    let vision, trimmedGoogleIds = [];
 
-    const vision = await identifyFromImage(image, mediaType, apiKey);
-    console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber, rawText: vision.rawText?.slice(0, 200) }));
+    if (googleVisionKey) {
+      // Google Vision: accurate OCR text + web-match Discogs IDs in one API call.
+      // Use the OCR text with Claude (text-only) to avoid image-based hallucination.
+      const { ocrText, releaseIds } = await analyzeImage(image, googleVisionKey)
+        .catch(() => ({ ocrText: null, releaseIds: [] }));
+      trimmedGoogleIds = releaseIds;
+      console.log('[scan] google ocr:', ocrText?.slice(0, 150), '| ids:', trimmedGoogleIds);
+
+      // Claude interprets clean OCR text — no image confusion possible
+      vision = ocrText
+        ? await identifyFromText(ocrText, apiKey)
+        : await identifyFromImage(image, mediaType, apiKey);
+    } else {
+      vision = await identifyFromImage(image, mediaType, apiKey);
+    }
+
+    console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber }));
 
     if (!hasDiscogs) {
       return res.status(200).json({
@@ -83,25 +94,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // Run Discogs text search and collect Google Vision results in parallel
-    const [textMatches, googleResult] = await Promise.all([
-      searchDiscogs({
-        catalogNumber: vision.catalogNumber,
-        artist: vision.artist,
-        title: vision.title,
-        label: vision.label,
-        rawText: vision.rawText,
-      }),
-      googlePromise,
-    ]);
+    const textMatches = await searchDiscogs({
+      catalogNumber: vision.catalogNumber,
+      artist: vision.artist,
+      title: vision.title,
+      label: vision.label,
+      rawText: vision.rawText,
+    });
 
-    const googleIds = (googleResult.releaseIds || []).slice(0, 3).map(String);
+    trimmedGoogleIds = trimmedGoogleIds.slice(0, 3).map(String);
     console.log('[scan] text matches:', textMatches.length, textMatches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));
-    console.log('[scan] google ids:', googleIds);
+    console.log('[scan] google ids:', trimmedGoogleIds);
 
     // Cross-reference: IDs that appear in both sources are confirmed matches
     const textIdSet = new Set(textMatches.map(m => String(m.id)));
-    const confirmedIds = googleIds.filter(id => textIdSet.has(id));
+    const confirmedIds = trimmedGoogleIds.filter(id => textIdSet.has(id));
 
     if (confirmedIds.length === 1) {
       // Both sources agree on exactly one release: auto-select with high confidence
@@ -118,7 +125,7 @@ export default async function handler(req, res) {
 
     // No overlap between sources. Build a merged candidate pool.
     // Google-only IDs need to be fetched; text-search IDs are already summarised.
-    const googleOnlyIds = googleIds.filter(id => !textIdSet.has(id));
+    const googleOnlyIds = trimmedGoogleIds.filter(id => !textIdSet.has(id));
     const googleOnlyReleases = googleOnlyIds.length > 0
       ? (await Promise.all(googleOnlyIds.map(id => fetchDiscogsRelease(id).catch(() => null)))).filter(Boolean)
       : [];
