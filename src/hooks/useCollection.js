@@ -10,6 +10,7 @@ function load() {
 function recordFromRelease(release, crates) {
   return {
     id: crypto.randomUUID(),
+    discogsId: release.id || null,
     savedAt: Date.now(),
     artist: release.artist || '',
     title: release.title || '',
@@ -24,6 +25,7 @@ function recordFromRelease(release, crates) {
     source: release.source || 'discogs',
     notes: release.notes || '',
     coverUrl: release.coverUrl || null,
+    images: release.images || [],
     tracklist: (release.tracklist || []).map(t => ({
       position: t.position,
       title: t.title,

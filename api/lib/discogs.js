@@ -167,3 +167,58 @@ export async function fetchDiscogsRelease(id) {
     images,
   };
 }
+
+export async function fetchDiscogsPrice(releaseId) {
+  const headers = authHeaders();
+
+  // Fetch up to 100 active marketplace listings sorted cheapest-first.
+  // The IQR method then trims outliers so we get a bell-curve centre.
+  const listingsRes = await fetchWithRetry(
+    `${BASE}/marketplace/search?release_id=${releaseId}&sort=price&sort_order=asc&per_page=100`,
+    { headers }
+  );
+
+  if (listingsRes.ok) {
+    const data = await listingsRes.json();
+    const listings = data.listings || [];
+
+    const prices = listings
+      .map(l => l.price?.value)
+      .filter(p => typeof p === 'number' && p > 0)
+      .sort((a, b) => a - b);
+
+    if (prices.length >= 3) {
+      const q1 = prices[Math.floor(prices.length * 0.25)];
+      const q3 = prices[Math.floor(prices.length * 0.75)];
+      const iqr = q3 - q1;
+      const trimmed = prices.filter(p => p >= q1 - 1.5 * iqr && p <= q3 + 1.5 * iqr);
+      const median = trimmed[Math.floor(trimmed.length / 2)];
+      const mean = Math.round((trimmed.reduce((s, p) => s + p, 0) / trimmed.length) * 100) / 100;
+      const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
+      return {
+        currency,
+        median: Math.round(median * 100) / 100,
+        mean,
+        low: Math.round(trimmed[0] * 100) / 100,
+        high: Math.round(trimmed[trimmed.length - 1] * 100) / 100,
+        sampleSize: trimmed.length,
+        totalListings: listings.length,
+      };
+    }
+  }
+
+  // Fallback: marketplace stats gives at least the floor price
+  const statsRes = await fetchWithRetry(`${BASE}/marketplace/stats/${releaseId}`, { headers });
+  if (!statsRes.ok) return null;
+  const stats = await statsRes.json();
+  if (!stats.lowest_price) return null;
+  return {
+    currency: stats.lowest_price.currency,
+    median: null,
+    mean: null,
+    low: stats.lowest_price.value,
+    high: null,
+    sampleSize: null,
+    totalListings: stats.num_for_sale || 0,
+  };
+}
