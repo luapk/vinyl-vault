@@ -1,4 +1,4 @@
-const PROMPT = `Analyse this photo of a vinyl record sleeve. Return ONLY valid JSON (no markdown fences, no preamble) in this exact shape:
+const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONLY valid JSON (no markdown fences, no preamble) in this exact shape:
 
 {
   "identified": boolean,
@@ -14,13 +14,23 @@ const PROMPT = `Analyse this photo of a vinyl record sleeve. Return ONLY valid J
   "notes": string
 }
 
+VINYL LABEL ANATOMY — read this carefully before extracting fields:
+The circular paper label in the centre of a vinyl disc has a strict hierarchy:
+  - label: the record company / imprint name. Often the most visually prominent text — large, stylised, at the top or centre of the label. Examples: "Warp", "Tresor", "Planet E", "Domina", "R&S", "XL". This is the PUBLISHER, not the artist. Do NOT put this in the artist field.
+  - artist: the musician or producer who made the record. Usually smaller text beneath or alongside the title.
+  - title: the release or track name.
+  - catalogNumber: an alphanumeric code printed on the label, often at the bottom or edge — e.g. "WAP63", "DOM-001", "R&S AM12 93", "TL-001". This is the MOST RELIABLE search key. Extract it even if partially obscured or rotated. It is NOT the same as the label name.
+
+If the photo shows a generic sleeve with no text (art-only outer sleeve), look for the disc label in the image — it always has text.
+If you can read any alphanumeric catalogue number, always set catalogNumber even if uncertain of other fields.
+
 Context: electronic music archive. Most records: house, techno, ambient, IDM, electro, drum & bass, dub, breaks, downtempo.
 
 genres: 2-4 genre/style tags.
 suggestedBoxes: 2-3 short evocative crate names specific to THIS record. Examples: "Deep House Workouts", "4am Closers", "Detroit Lineage", "Dub Techno Continuum", "Peak-Time Weapons".
 notes: one sentence max, notable attributes or caveats.
 
-If you recognise the release, use real metadata. If unidentified, best-guess artist/title from any visible text.
+If you recognise the release, use real metadata. If unidentified, best-guess from any visible text.
 
 Return ONLY the JSON object, nothing else.`;
 

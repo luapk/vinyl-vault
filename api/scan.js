@@ -71,6 +71,7 @@ export default async function handler(req, res) {
       catalogNumber: vision.catalogNumber,
       artist: vision.artist,
       title: vision.title,
+      label: vision.label,
     });
 
     if (matches.length === 0) {

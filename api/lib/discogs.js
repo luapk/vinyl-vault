@@ -27,34 +27,63 @@ function parseDiscogsTitle(combined) {
   return { artist: combined.slice(0, idx), recordTitle: combined.slice(idx + 3) };
 }
 
-export async function searchDiscogs({ catalogNumber, artist, title }) {
+function buildSearchUrl(params) {
+  return `${BASE}/database/search?${new URLSearchParams({ type: 'release', per_page: '5', ...params })}`;
+}
+
+export async function searchDiscogs({ catalogNumber, artist, title, label }) {
   const headers = authHeaders();
 
-  let url;
+  // Build every plausible search strategy. Vision often confuses label for artist,
+  // so we try both interpretations in parallel and merge results.
+  const urls = new Set();
+
   if (catalogNumber) {
-    url = `${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&type=release&per_page=5`;
-  } else {
-    const params = new URLSearchParams({ type: 'release', per_page: '5' });
-    if (artist) params.set('artist', artist);
-    if (title) params.set('release_title', title);
-    url = `${BASE}/database/search?${params}`;
+    urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&type=release&per_page=5`);
+  }
+  if (artist && title) {
+    urls.add(buildSearchUrl({ artist, release_title: title }));
+  }
+  if (label && title) {
+    // Vision may have put the label name in the artist field or label field — try both
+    urls.add(buildSearchUrl({ label, release_title: title }));
+  }
+  if (artist && title && artist !== label) {
+    // Treat what Vision called "artist" as a label name (common misread)
+    urls.add(buildSearchUrl({ label: artist, release_title: title }));
+  }
+  // General fuzzy: all readable text together
+  const q = [artist, title, label].filter(Boolean).join(' ');
+  if (q) {
+    urls.add(buildSearchUrl({ q }));
   }
 
-  const res = await fetchWithRetry(url, { headers });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Discogs search ${res.status}: ${text.slice(0, 200)}`);
+  const batches = await Promise.all(
+    [...urls].map(async url => {
+      try {
+        const res = await fetchWithRetry(url, { headers });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.results || [];
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  // Merge and deduplicate — earlier strategies (catNo first) win on ordering
+  const seen = new Set();
+  const merged = [];
+  for (const batch of batches) {
+    for (const r of batch) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        merged.push(r);
+      }
+    }
   }
 
-  const data = await res.json();
-  let results = data.results || [];
-
-  // Cat# search returned nothing: fall back to artist+title
-  if (catalogNumber && results.length === 0 && (artist || title)) {
-    return searchDiscogs({ artist, title });
-  }
-
-  return results.slice(0, 5).map(r => {
+  return merged.slice(0, 5).map(r => {
     const { artist: a, recordTitle } = parseDiscogsTitle(r.title || '');
     return {
       id: String(r.id),
