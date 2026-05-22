@@ -61,6 +61,7 @@ export default async function handler(req, res) {
 
   try {
     const vision = await identifyFromImage(image, mediaType, apiKey);
+    console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber, rawText: vision.rawText?.slice(0, 200) }));
 
     if (!hasDiscogs) {
       return res.status(200).json({
@@ -76,6 +77,7 @@ export default async function handler(req, res) {
       label: vision.label,
       rawText: vision.rawText,
     });
+    console.log('[scan] discogs matches:', matches.length, matches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));
 
     if (matches.length === 0) {
       // Fallback: Google Cloud Vision Web Detection to find Discogs pages by image
