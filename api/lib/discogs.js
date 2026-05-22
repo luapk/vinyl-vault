@@ -59,6 +59,23 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     // Treat Vision's "artist" as a label — catches label/artist/title confusion
     urls.add(buildSearchUrl({ label: artist, release_title: title }));
   }
+  // Extract every catno-like pattern from rawText as independent catno searches.
+  // This catches cases where Vision OCR'd the catalogue number wrong in the
+  // catalogNumber field but transcribed it correctly (or differently) in rawText.
+  if (rawText) {
+    const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
+    const rawCatnos = [...rawText.matchAll(catnoPattern)].map(m => m[1]);
+    for (const c of rawCatnos) {
+      if (c !== catalogNumber) {
+        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
+        const stripped = c.replace(/[\s\-]/g, '');
+        if (stripped !== c) {
+          urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
+        }
+      }
+    }
+  }
+
   // Fuzzy: rawText is the exact transcription of visible text — more reliable than
   // reassembling structured fields that Vision may have misassigned
   const fuzzyQ = rawText || [artist, title, label].filter(Boolean).join(' ');

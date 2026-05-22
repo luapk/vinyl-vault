@@ -15,11 +15,15 @@ const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONL
   "rawText": string
 }
 
-rawText: transcribe every piece of readable text visible in the image, exactly as printed, space-separated. Include all text: artist names, release titles, label names, catalogue numbers, matrix numbers, side designations, everything. This is the most important field for search — accuracy matters more than classification.
+rawText: Transcribe every character of text visible in the image EXACTLY as printed. Read numbers digit by digit — if you see "012" write "012" not "02" or "002", if you see "PM-012" write "PM-012" not "PM-002". Include everything: release title, individual track names, label name, catalogue number, matrix text, side markings, all other text. Space-separate. This is the primary search input — character accuracy matters more than anything else.
 
-catalogNumber: alphanumeric release code printed on the label — e.g. "WAP63", "DOM-001", "R&S AM12 93". Often small, near the edge. Extract it even if partially obscured. If found, it is the single most reliable search key.
+catalogNumber: The alphanumeric release code on the label, e.g. "WAP63", "PM-012", "DOM-001", "R&S AM12 93". Often printed small near the edge or centre hole. Read it character by character — do not skip or round digits. If found, it is the single most reliable search key.
 
-For artist/title/label: use your knowledge if you recognise the release. If not, make your best guess from visible text — but do not force a hierarchy. Vinyl label layouts vary enormously. The largest text may be the track title, the label name, or the artist, depending on the release.
+title: The EP or LP name — NOT individual track names. Vinyl labels typically list several track titles (side A tracks, side B tracks). Those are tracks on the record, not the release title. The release title is the main EP/LP heading distinct from the track listing.
+
+artist: The performing artist. On minimal underground labels the imprint name (e.g. "PURPOSE MAKER", "WARP", "R&S") is the record label, not the artist. If no artist name is printed separately from the label name, return "".
+
+label: The record label or imprint name, e.g. "Purpose Maker", "Warp", "Tresor". Different from the artist.
 
 If the outer sleeve has no text, look for the circular paper disc label in the image — it always has text.
 
