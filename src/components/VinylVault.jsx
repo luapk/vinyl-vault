@@ -878,10 +878,15 @@ function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }} onClick={onClose}>
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 md:p-8" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99) 0%, rgba(10,10,16,0.99) 100%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>
-          <X size={14} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99) 0%, rgba(10,10,16,0.99) 100%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
+
+        {/* Close bar: drag handle + label. Full-width tap target, especially useful on mobile. */}
+        <button onClick={onClose} className="w-full flex flex-col items-center gap-1.5 pt-3 pb-3 transition-opacity hover:opacity-70 active:opacity-50" aria-label="Close">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+          <span className="text-[10px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(255,255,255,0.22)" }}>Close</span>
         </button>
+
+        <div className="px-6 md:px-8 pb-8">
 
         <div className="grid sm:grid-cols-[140px_1fr] gap-5 mb-6">
           <div>
@@ -999,6 +1004,7 @@ function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
         <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
           <Trash size={12} />Remove from collection
         </button>
+        </div>{/* end px-6 content wrapper */}
       </div>
     </div>
   );
