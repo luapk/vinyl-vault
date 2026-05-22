@@ -309,7 +309,7 @@ export default function VinylVault() {
       </div>
 
       {/* Header */}
-      <header className="relative z-20 px-5 md:px-10 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <header className="relative z-20 px-5 md:px-10 py-5 flex items-center justify-between">
         <div className="flex items-center">
           <img src="/logo.png" alt="Vinyl Vault" style={{ height: 43, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
@@ -359,7 +359,6 @@ export default function VinylVault() {
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
-      {appView === "scan" && phase === "idle" && <RoadmapFooter accentRGB={accentRGB} />}
     </div>
   );
 }
