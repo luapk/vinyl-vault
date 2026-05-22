@@ -310,13 +310,8 @@ export default function VinylVault() {
 
       {/* Header */}
       <header className="relative z-20 px-5 md:px-10 py-5 flex items-center justify-between" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `radial-gradient(circle at 35% 35%, rgba(${accentRGB},0.5), rgba(${accentRGB},0.05))`, border: `1px solid rgba(${accentRGB}, 0.35)`, boxShadow: `0 0 16px -4px rgba(${accentRGB},0.4)` }}>
-            <VinylRecord size={15} weight="fill" style={{ color: `rgb(${accentRGB})` }} />
-          </div>
-          <div>
-            <div className="text-[11px] tracking-[0.3em] uppercase font-medium font-mono text-white/90">Vinyl Vault</div>
-          </div>
+        <div className="flex items-center">
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 36, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5">
@@ -465,8 +460,14 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     setCrateInput("");
   };
 
-  const suggestedNotPicked = (release.suggestedBoxes || []).filter((b) => !pendingCrates.includes(b));
-  const existingNotPicked = allCrates.filter((c) => !pendingCrates.includes(c) && !(release.suggestedBoxes || []).includes(c));
+  // Release tags: AI evocative names + Discogs genres/styles (descriptive metadata)
+  const releaseTags = [
+    ...(release.suggestedBoxes || []),
+    ...(release.genres || []),
+  ].filter((t, i, arr) => arr.indexOf(t) === i);
+
+  // Crate assignment: only user-created crates from the existing collection
+  const existingNotPicked = allCrates.filter((c) => !pendingCrates.includes(c));
 
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
@@ -525,57 +526,41 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             {release.label && <Pill label="Label" value={release.label} />}
             {release.catalogNumber && <Pill label="Cat #" value={release.catalogNumber} mono />}
           </div>
-          {release.genres && release.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {release.genres.map((g, i) => (
-                <span key={i} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{g}</span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Crate assignment */}
-      <GlassSection title="File into crates" subtitle="Select before saving" accentRGB={accentRGB} icon={<Sparkle size={13} weight="fill" style={{ color: `rgb(${accentRGB})` }} />}>
+      {/* Tags — descriptive metadata, not organisational */}
+      {releaseTags.length > 0 && (
+        <GlassSection title="Tags" subtitle="Genre and feel — for discovery" accentRGB={accentRGB} icon={<Sparkle size={13} weight="fill" style={{ color: `rgb(${accentRGB})` }} />}>
+          <TagCloud tags={releaseTags} genres={release.genres || []} accentRGB={accentRGB} />
+        </GlassSection>
+      )}
+
+      {/* Crate assignment — pure organisation, user-created only */}
+      <GlassSection title="File into crates" subtitle="Where does this record live?" accentRGB={accentRGB}>
         <div className="space-y-4">
           {pendingCrates.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {pendingCrates.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: `rgba(${accentRGB},0.14)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 10px -3px rgba(${accentRGB},0.25)` }}>
-                  <Check size={11} weight="bold" />{name}<X size={10} className="opacity-55 ml-0.5" />
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.85)" }}>
+                  <Check size={11} weight="bold" />{name}<X size={10} className="opacity-50 ml-0.5" />
                 </button>
               ))}
             </div>
           )}
 
-          {suggestedNotPicked.length > 0 && (
-            <div>
-              <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-2 font-mono">Suggested</div>
-              <div className="flex flex-wrap gap-2">
-                {suggestedNotPicked.map((name) => (
-                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/25 hover:text-white/70" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)" }}>
-                    <Plus size={11} />{name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {existingNotPicked.length > 0 && (
-            <div>
-              <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-2 font-mono">Your crates</div>
-              <div className="flex flex-wrap gap-2">
-                {existingNotPicked.map((name) => (
-                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/20 hover:text-white/60" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)" }}>
-                    <Plus size={11} />{name}
-                  </button>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-2">
+              {existingNotPicked.map((name) => (
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/20 hover:text-white/60" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }}>
+                  <Plus size={11} />{name}
+                </button>
+              ))}
             </div>
           )}
 
           <div className="flex items-center gap-2">
-            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder="New crate name..." className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }} />
+            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder={existingNotPicked.length > 0 ? "Or create a new crate..." : "Create a crate..."} className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }} />
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
@@ -606,39 +591,43 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 // ----- CollectionView --------------------------------------------------------
 
 function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
+  const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
-  const [filterGenre, setFilterGenre] = useState(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
 
+  // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
-  const allGenres = [...new Set(collection.flatMap((r) => r.genres || []))].sort();
 
   const filtered = collection.filter((r) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || r.artist.toLowerCase().includes(q) || r.title.toLowerCase().includes(q) || (r.label || "").toLowerCase().includes(q) || (r.catalogNumber || "").toLowerCase().includes(q);
+    const matchSearch = !q
+      || r.artist.toLowerCase().includes(q)
+      || r.title.toLowerCase().includes(q)
+      || (r.label || "").toLowerCase().includes(q)
+      || (r.catalogNumber || "").toLowerCase().includes(q)
+      || (r.tags || []).some((t) => t.toLowerCase().includes(q));
     const matchCrate = !filterCrate || (r.crates || []).includes(filterCrate);
-    const matchGenre = !filterGenre || (r.genres || []).includes(filterGenre);
-    return matchSearch && matchCrate && matchGenre;
+    return matchSearch && matchCrate;
   });
 
-  useEffect(() => { setCarouselIdx(0); }, [search, filterCrate, filterGenre]);
+  useEffect(() => { setCarouselIdx(0); }, [search, filterCrate]);
 
   const goNext = useCallback(() => setCarouselIdx((i) => Math.min(i + 1, filtered.length - 1)), [filtered.length]);
   const goPrev = useCallback(() => setCarouselIdx((i) => Math.max(i - 1, 0)), []);
 
   useEffect(() => {
     const handler = (e) => {
-      if (viewMode !== "carousel" || detailRecord) return;
+      if (collectionMode !== "stacks" || viewMode !== "carousel" || detailRecord) return;
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [viewMode, detailRecord, goNext, goPrev]);
+  }, [collectionMode, viewMode, detailRecord, goNext, goPrev]);
 
   if (collection.length === 0) {
     return (
@@ -654,55 +643,83 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 
   return (
     <div className="pt-6 md:pt-10">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2.5 mb-5">
-        <div className="flex-1 min-w-[180px]">
-          <PredictiveSearch value={search} onChange={setSearch} collection={collection} accentRGB={accentRGB} />
-        </div>
-        <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-          {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }].map(({ id, Icon }) => (
-            <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(255,255,255,0.09)" : "transparent", color: viewMode === id ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.30)" }}>
-              <Icon size={14} />
+      {/* Mode toggle: Stacks vs Explore */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {[{ id: "stacks", label: "Stacks" }, { id: "explore", label: "Explore by tag" }].map(({ id, label }) => (
+            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+              style={collectionMode === id
+                ? { background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.85)", boxShadow: "0 1px 0 rgba(255,255,255,0.08)" }
+                : { background: "transparent", color: "rgba(255,255,255,0.35)" }}>
+              {label}
             </button>
           ))}
         </div>
-        <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-          <PencilSimple size={12} />Crates
-        </button>
-        <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-          <DownloadSimple size={12} />CSV
-        </button>
-        <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-          <Printer size={12} />Print
-        </button>
+
+        {collectionMode === "stacks" && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <PencilSimple size={12} />Crates
+            </button>
+            <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <DownloadSimple size={12} />CSV
+            </button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <Printer size={12} />Print
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Filter pills */}
-      {(allCrates.length > 0 || allGenres.length > 0) && (
-        <div className="flex flex-wrap gap-1.5 mb-5">
-          {allCrates.map((c) => (
-            <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all" style={{ background: filterCrate === c ? `rgba(${accentRGB},0.14)` : "rgba(255,255,255,0.025)", border: filterCrate === c ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(255,255,255,0.07)", color: filterCrate === c ? `rgb(${accentRGB})` : "rgba(255,255,255,0.38)" }}>{c}</button>
-          ))}
-          {allGenres.map((g) => (
-            <button key={g} onClick={() => setFilterGenre(filterGenre === g ? null : g)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.10em] uppercase font-mono transition-all" style={{ background: filterGenre === g ? "rgba(160,220,200,0.10)" : "transparent", border: filterGenre === g ? "1px solid rgba(160,220,200,0.30)" : "1px solid rgba(255,255,255,0.05)", color: filterGenre === g ? "rgb(160,220,200)" : "rgba(255,255,255,0.28)" }}>{g}</button>
-          ))}
-        </div>
+      {/* EXPLORE MODE */}
+      {collectionMode === "explore" && (
+        <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecord(r)} />
       )}
 
-      <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+      {/* STACKS MODE */}
+      {collectionMode === "stacks" && (
+        <>
+          {/* Search + layout controls */}
+          <div className="flex flex-wrap items-center gap-2.5 mb-4">
+            <div className="flex-1 min-w-[180px]">
+              <PredictiveSearch value={search} onChange={setSearch} collection={collection} accentRGB={accentRGB} />
+            </div>
+            <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }].map(({ id, Icon }) => (
+                <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(255,255,255,0.09)" : "transparent", color: viewMode === id ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.30)" }}>
+                  <Icon size={14} />
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match this filter.</div>}
+          {/* Crate filters — user crates only */}
+          {allCrates.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {allCrates.map((c) => (
+                <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                  style={{ background: filterCrate === c ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.025)", border: filterCrate === c ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.07)", color: filterCrate === c ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.38)" }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {viewMode === "carousel" && filtered.length > 0 && (
-        <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} />
-      )}
+          <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
 
-      {viewMode === "grid" && filtered.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filtered.map((record) => (
-            <RecordCard key={record.id} record={record} onSelect={() => setDetailRecord(record)} onRemove={() => onRemove(record.id)} accentRGB={accentRGB} />
-          ))}
-        </div>
+          {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
+
+          {viewMode === "carousel" && filtered.length > 0 && (
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} />
+          )}
+          {viewMode === "grid" && filtered.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {filtered.map((record) => (
+                <RecordCard key={record.id} record={record} onSelect={() => setDetailRecord(record)} onRemove={() => onRemove(record.id)} accentRGB={accentRGB} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} accentRGB={accentRGB} />}
@@ -896,10 +913,23 @@ function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
             </div>
             {record.crates && record.crates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {record.crates.map((c) => (
-                  <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
-                ))}
+              <div>
+                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {record.crates.map((c) => (
+                    <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {record.tags && record.tags.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {record.tags.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>{t}</span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1399,6 +1429,124 @@ function ErrorView({ message, onReset }) {
       <h2 className="text-2xl mb-2 font-display"><span className="italic">Couldn't read</span> that one</h2>
       <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">{message}</p>
       <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.03)" }}>Try again</button>
+    </div>
+  );
+}
+
+// ----- TagCloud --------------------------------------------------------------
+
+function TagCloud({ tags, genres, accentRGB }) {
+  const genreSet = new Set(genres);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {tags.map((tag) => {
+        const isGenre = genreSet.has(tag);
+        return (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono"
+            style={isGenre
+              ? { background: `rgba(${accentRGB},0.10)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgba(${accentRGB},0.85)` }
+              : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.52)" }
+            }
+          >
+            {!isGenre && <Sparkle size={9} weight="fill" style={{ opacity: 0.55 }} />}
+            {tag}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ----- ExploreView -----------------------------------------------------------
+
+function ExploreView({ collection, accentRGB, onSelectRecord }) {
+  const [selectedTag, setSelectedTag] = useState(null);
+
+  const tagMap = new Map();
+  for (const record of collection) {
+    for (const tag of (record.tags || [])) {
+      if (!tagMap.has(tag)) tagMap.set(tag, []);
+      tagMap.get(tag).push(record);
+    }
+  }
+  const tagEntries = [...tagMap.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  if (tagEntries.length === 0) {
+    return (
+      <div className="py-20 text-center text-white/25 text-sm font-mono">
+        No tags yet. Scan records to populate the explore view.
+      </div>
+    );
+  }
+
+  if (selectedTag) {
+    const records = tagMap.get(selectedTag) || [];
+    return (
+      <div style={{ animation: "fadeUp 0.22s ease-out" }}>
+        <button onClick={() => setSelectedTag(null)} className="inline-flex items-center gap-2 mb-6 text-[11px] font-mono text-white/35 hover:text-white/65 transition-colors">
+          <CaretLeft size={12} />All tags
+        </button>
+        <div className="mb-5">
+          <h3 className="text-2xl font-display mb-0.5">{selectedTag}</h3>
+          <div className="text-[11px] font-mono text-white/30">{records.length} record{records.length !== 1 ? "s" : ""}</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {records.map((record) => (
+            <RecordCard key={record.id} record={record} onSelect={() => onSelectRecord(record)} onRemove={() => {}} accentRGB={accentRGB} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" style={{ animation: "fadeUp 0.22s ease-out" }}>
+      {tagEntries.map(([tag, records], entryIdx) => {
+        const covers = records.filter((r) => r.coverUrl).slice(0, 4).map((r) => r.coverUrl);
+        return (
+          <button
+            key={tag}
+            onClick={() => setSelectedTag(tag)}
+            className="relative rounded-2xl overflow-hidden text-left group transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)", animation: `fadeUp 0.3s ease-out ${entryIdx * 0.04}s both` }}
+          >
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.07), transparent)` }} />
+
+            {/* Cover mosaic */}
+            <div className="aspect-square relative overflow-hidden">
+              {covers.length === 0 && (
+                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.04)` }}>
+                  <VinylRecord size={32} weight="thin" className="opacity-15" />
+                </div>
+              )}
+              {covers.length === 1 && (
+                <img src={covers[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              )}
+              {covers.length === 2 && (
+                <div className="grid grid-cols-2 h-full">
+                  {covers.map((c, i) => <img key={i} src={c} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />)}
+                </div>
+              )}
+              {covers.length >= 3 && (
+                <div className="grid grid-cols-2 grid-rows-2 h-full">
+                  <img src={covers[0]} alt="" className="w-full h-full object-cover row-span-2 group-hover:scale-105 transition-transform duration-500" />
+                  <img src={covers[1]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  {covers[2] ? <img src={covers[2]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : <div />}
+                </div>
+              )}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 55%)" }} />
+            </div>
+
+            {/* Tag name + count */}
+            <div className="relative p-3">
+              <div className="text-[12px] font-display text-white/85 leading-snug truncate">{tag}</div>
+              <div className="text-[10px] font-mono text-white/35">{records.length}</div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
