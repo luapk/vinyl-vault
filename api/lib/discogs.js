@@ -40,6 +40,14 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
 
   if (catalogNumber) {
     urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&type=release&per_page=5`);
+    // Also try normalised variants: strip/replace separators so "PM012" finds "PM-012"
+    const stripped = catalogNumber.replace(/[\s\-\.]/g, '');
+    const dashed = catalogNumber.replace(/[\s\.]/g, '-');
+    for (const variant of new Set([stripped, dashed])) {
+      if (variant !== catalogNumber) {
+        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(variant)}&type=release&per_page=5`);
+      }
+    }
   }
   if (artist && title) {
     urls.add(buildSearchUrl({ artist, release_title: title }));
