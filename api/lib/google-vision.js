@@ -8,7 +8,10 @@ function extractDiscogsReleaseIds(urls) {
   return [...ids];
 }
 
-export async function webDetectDiscogs(imageBase64, apiKey) {
+// Single API call: TEXT_DETECTION + WEB_DETECTION combined.
+// Returns { ocrText, releaseIds } so callers can use OCR for interpretation
+// and web matches for Discogs ID cross-reference.
+export async function analyzeImage(imageBase64, apiKey) {
   const response = await fetch(
     `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
     {
@@ -17,7 +20,10 @@ export async function webDetectDiscogs(imageBase64, apiKey) {
       body: JSON.stringify({
         requests: [{
           image: { content: imageBase64 },
-          features: [{ type: 'WEB_DETECTION', maxResults: 10 }],
+          features: [
+            { type: 'TEXT_DETECTION', maxResults: 1 },
+            { type: 'WEB_DETECTION', maxResults: 10 },
+          ],
         }],
       }),
     }
@@ -29,16 +35,23 @@ export async function webDetectDiscogs(imageBase64, apiKey) {
   }
 
   const data = await response.json();
-  const detection = data.responses?.[0]?.webDetection;
-  if (!detection) return { releaseIds: [] };
+  const resp = data.responses?.[0];
 
+  const ocrText = resp?.fullTextAnnotation?.text?.replace(/\n/g, ' ').trim() || null;
+
+  const detection = resp?.webDetection;
   const allUrls = [
-    ...(detection.pagesWithMatchingImages || []).map(p => p.url),
-    ...(detection.fullMatchingImages || []).map(i => i.url),
-    ...(detection.partialMatchingImages || []).map(i => i.url),
+    ...(detection?.pagesWithMatchingImages || []).map(p => p.url),
+    ...(detection?.fullMatchingImages || []).map(i => i.url),
+    ...(detection?.partialMatchingImages || []).map(i => i.url),
   ];
-
   const releaseIds = extractDiscogsReleaseIds(allUrls);
 
+  return { ocrText, releaseIds };
+}
+
+// Kept for any callers that only need web detection
+export async function webDetectDiscogs(imageBase64, apiKey) {
+  const { releaseIds } = await analyzeImage(imageBase64, apiKey);
   return { releaseIds };
 }

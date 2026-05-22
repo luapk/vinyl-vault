@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Camera, Upload, Disc3, Sparkles, X, ArrowUpRight, Clock,
-  Play, Pause, Plus, Check, ChevronLeft, ChevronRight, Search,
-  Download, Printer, List, Grid3X3, Layers, Edit2, Trash2, ScanLine,
-} from "lucide-react";
+  Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
+  Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
+  DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
+  Scan, Info,
+} from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 
 // ----- Helpers ---------------------------------------------------------------
@@ -53,18 +54,18 @@ const extractDominantColor = (imageSrc) =>
         r += pr * weight; g += pg * weight; b += pb * weight; total += weight;
       }
       if (total > 0) { r = Math.round(r / total); g = Math.round(g / total); b = Math.round(b / total); }
-      else { r = 157; g = 141; b = 241; }
+      else { r = 200; g = 200; b: 200; }
       resolve({ r, g, b });
     };
-    img.onerror = () => resolve({ r: 157, g: 141, b: 241 });
+    img.onerror = () => resolve({ r: 200, g: 200, b: 200 });
     img.src = imageSrc;
   });
 
 const camelotColor = (key) => {
-  if (!key) return "rgb(140,140,150)";
+  if (!key) return "rgb(120,120,130)";
   const num = parseInt(key, 10);
   const letter = key.slice(-1).toUpperCase();
-  if (isNaN(num) || num < 1 || num > 12) return "rgb(140,140,150)";
+  if (isNaN(num) || num < 1 || num > 12) return "rgb(120,120,130)";
   const hue = ((num - 1) * 30) % 360;
   return `hsl(${hue}, ${letter === "B" ? 70 : 55}%, ${letter === "B" ? 68 : 62}%)`;
 };
@@ -80,28 +81,130 @@ const downloadCSV = (collection) => {
   URL.revokeObjectURL(url);
 };
 
+// Glass style helpers
+const glass = (extra = {}) => ({
+  background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)",
+  backdropFilter: "blur(48px) saturate(200%)",
+  WebkitBackdropFilter: "blur(48px) saturate(200%)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 60px -20px rgba(0,0,0,0.5)",
+  ...extra,
+});
+
+const glassSubtle = (extra = {}) => ({
+  background: "rgba(255,255,255,0.03)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(255,255,255,0.07)",
+  ...extra,
+});
+
+// Module-level cache so reopening a record doesn't re-fetch + re-analyse
+const bpmCache = new Map();
+
+async function detectBPM(previewUrl) {
+  if (bpmCache.has(previewUrl)) return bpmCache.get(previewUrl);
+  try {
+    const resp = await fetch(previewUrl, { mode: 'cors' });
+    if (!resp.ok) return null;
+    const arrayBuf = await resp.arrayBuffer();
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return null;
+
+    // Decode into a buffer, then close the live context immediately
+    const tempCtx = new AudioCtx();
+    let buffer;
+    try { buffer = await tempCtx.decodeAudioData(arrayBuf); }
+    finally { await tempCtx.close(); }
+
+    const sr = buffer.sampleRate;
+    const dur = buffer.duration;
+
+    // OfflineAudioContext with 150 Hz low-pass: isolates kick/bass transients
+    const offCtx = new OfflineAudioContext(1, Math.floor(sr * dur), sr);
+    const src = offCtx.createBufferSource();
+    src.buffer = buffer;
+    const filt = offCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 150;
+    filt.Q.value = 0.7;
+    src.connect(filt);
+    filt.connect(offCtx.destination);
+    src.start(0);
+    const filtered = await offCtx.startRendering();
+    const raw = filtered.getChannelData(0);
+
+    // RMS energy in 10 ms windows
+    const win = Math.floor(sr * 0.01);
+    const numFrames = Math.floor(raw.length / win);
+    const energy = new Float32Array(numFrames);
+    for (let i = 0; i < numFrames; i++) {
+      let s = 0;
+      const base = i * win;
+      for (let j = 0; j < win; j++) s += raw[base + j] ** 2;
+      energy[i] = Math.sqrt(s / win);
+    }
+
+    // Smooth over 50 ms
+    const smW = 5;
+    const smoothed = Float32Array.from(energy, (_, i) => {
+      const lo = Math.max(0, i - smW), hi = Math.min(numFrames - 1, i + smW);
+      let s = 0;
+      for (let k = lo; k <= hi; k++) s += energy[k];
+      return s / (hi - lo + 1);
+    });
+
+    const mean = smoothed.reduce((a, b) => a + b, 0) / smoothed.length;
+    const threshold = mean * 1.4;
+    const minGap = 25; // 250 ms at 10 ms/frame = max ~240 BPM
+
+    const peaks = [];
+    for (let i = 1; i < smoothed.length - 1; i++) {
+      if (
+        smoothed[i] > threshold &&
+        smoothed[i] >= smoothed[i - 1] &&
+        smoothed[i] >= smoothed[i + 1] &&
+        (!peaks.length || i - peaks[peaks.length - 1] >= minGap)
+      ) peaks.push(i);
+    }
+
+    if (peaks.length < 4) { bpmCache.set(previewUrl, null); return null; }
+
+    const intervals = peaks.slice(1).map((p, i) => p - peaks[i]);
+    intervals.sort((a, b) => a - b);
+    const median = intervals[Math.floor(intervals.length / 2)];
+    let bpm = Math.round(60 / (median * 0.01));
+    while (bpm < 70) bpm *= 2;
+    while (bpm > 175) bpm /= 2;
+    bpm = Math.round(bpm);
+
+    bpmCache.set(previewUrl, bpm);
+    return bpm;
+  } catch (e) {
+    console.log('[bpm]', e.message);
+    return null;
+  }
+}
+
 // ----- Main Component --------------------------------------------------------
 
 export default function VinylVault() {
-  const [appView, setAppView] = useState("scan"); // scan | collection | batch
-  const [phase, setPhase] = useState("idle"); // idle | processing | disambiguation | result | error
+  const [appView, setAppView] = useState("scan"); // scan | collection | batch | about
+  const [phase, setPhase] = useState("idle");
   const [status, setStatus] = useState("");
   const [release, setRelease] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
-  const [accent, setAccent] = useState({ r: 157, g: 141, b: 241 });
+  const [accent, setAccent] = useState({ r: 200, g: 200, b: 200 });
   const [errorMsg, setErrorMsg] = useState("");
   const [candidates, setCandidates] = useState([]);
   const [visionData, setVisionData] = useState(null);
   const [pendingCrates, setPendingCrates] = useState([]);
   const [savedId, setSavedId] = useState(null);
-
-  // Batch state
-  const [batchQueue, setBatchQueue] = useState([]); // [{file, status, release, candidates, vision, imageUrl}]
-  const [batchIdx, setBatchIdx] = useState(0);
+  const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
-
-  // Camera modal
-  const [showCamera, setShowCamera] = useState(false);
+  // Always-fresh ref so async callbacks never read stale queue state
+  const batchQueueRef = useRef([]);
 
   const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection();
 
@@ -111,41 +214,37 @@ export default function VinylVault() {
       setStatus("Reading sleeve");
       setErrorMsg("");
     }
-
     try {
       const dataUrl = await resizeImage(file);
       if (!forBatch) {
         setImageUrl(dataUrl);
         const color = await extractDominantColor(dataUrl);
         setAccent(color);
+        await new Promise((r) => setTimeout(r, 400));
+        setStatus("Searching Discogs");
       }
-
       const base64Data = dataUrl.split(",")[1];
-      if (!forBatch) { await new Promise((r) => setTimeout(r, 500)); setStatus("Searching Discogs"); }
-
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
       });
-
       if (!response.ok) {
         const errorBody = await response.text();
         throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
       }
-
       const data = await response.json();
-
       if (forBatch) return { dataUrl, data };
-
       if (data.status === "disambiguation") {
         setCandidates(data.candidates);
         setVisionData(data.vision);
         setPhase("disambiguation");
       } else if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
+        const coverSrc = data.release.coverUrl || null;
+        if (coverSrc) { const c = await extractDominantColor(coverSrc); setAccent(c); }
       } else {
         throw new Error(data.error || "Unexpected response");
       }
@@ -159,7 +258,7 @@ export default function VinylVault() {
 
   const pickCandidate = async (candidate) => {
     setPhase("processing");
-    setStatus("Pulling audio features");
+    setStatus("Pulling release data");
     setErrorMsg("");
     try {
       const response = await fetch("/api/scan", {
@@ -167,15 +266,13 @@ export default function VinylVault() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
       });
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
-      }
+      if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
       if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
+        if (data.release.coverUrl) { const c = await extractDominantColor(data.release.coverUrl); setAccent(c); }
       } else {
         throw new Error(data.error || "Unexpected response");
       }
@@ -185,6 +282,15 @@ export default function VinylVault() {
       setPhase("error");
     }
   };
+
+  // Called by ResultView when Web Audio BPM detection resolves for a track
+  const updateReleaseBpm = useCallback((trackIdx, bpm) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, bpm } : t);
+      return { ...prev, tracklist };
+    });
+  }, []);
 
   const saveRecord = () => {
     if (!release) return;
@@ -196,7 +302,7 @@ export default function VinylVault() {
     setPhase("idle");
     setRelease(null);
     setImageUrl(null);
-    setAccent({ r: 157, g: 141, b: 241 });
+    setAccent({ r: 200, g: 200, b: 200 });
     setErrorMsg("");
     setCandidates([]);
     setVisionData(null);
@@ -204,157 +310,161 @@ export default function VinylVault() {
     setSavedId(null);
   };
 
-  // Batch processing
+  // Sync helper: keeps ref and state in lockstep so async callbacks always
+  // read the latest queue without stale-closure issues.
+  const syncQueue = (next) => {
+    batchQueueRef.current = next;
+    setBatchQueue(next);
+  };
+
   const startBatch = async (files) => {
     const items = Array.from(files).map((file) => ({
       file, status: "queued", release: null, candidates: null, vision: null, imageUrl: null,
     }));
-    setBatchQueue(items);
-    setBatchIdx(0);
+    syncQueue(items);
     setAppView("batch");
     setBatchProcessing(true);
 
-    const updated = [...items];
-    for (let i = 0; i < updated.length; i++) {
-      setBatchIdx(i);
-      updated[i] = { ...updated[i], status: "processing" };
-      setBatchQueue([...updated]);
+    // Work on a local copy; sync to ref+state after every mutation so that
+    // concurrent resolveBatchDisambiguation calls always see fresh data.
+    const current = items.map((item) => ({ ...item }));
+    for (let i = 0; i < current.length; i++) {
+      current[i] = { ...current[i], status: "processing" };
+      syncQueue([...current]);
       try {
-        const { dataUrl, data } = await processImage(updated[i].file, true);
-        updated[i].imageUrl = dataUrl;
+        const { dataUrl, data } = await processImage(current[i].file, true);
+        current[i].imageUrl = dataUrl;
         if (data.status === "complete") {
-          updated[i].status = "complete";
-          updated[i].release = data.release;
-          addRecord(data.release, data.release.suggestedBoxes || []);
+          current[i].status = "complete";
+          current[i].release = data.release;
+          // Auto-save with broad genre tags only, not specific crate suggestions
+          addRecord(data.release, data.release.topGenres || []);
         } else if (data.status === "disambiguation") {
-          updated[i].status = "disambiguation";
-          updated[i].candidates = data.candidates;
-          updated[i].vision = data.vision;
+          current[i].status = "disambiguation";
+          current[i].candidates = data.candidates;
+          current[i].vision = data.vision;
         } else {
-          updated[i].status = "error";
+          current[i].status = "error";
         }
       } catch {
-        updated[i].status = "error";
+        current[i].status = "error";
       }
-      setBatchQueue([...updated]);
+      syncQueue([...current]);
     }
     setBatchProcessing(false);
   };
 
   const resolveBatchDisambiguation = async (itemIdx, candidate) => {
-    const updated = [...batchQueue];
-    updated[itemIdx] = { ...updated[itemIdx], status: "processing" };
-    setBatchQueue([...updated]);
+    // Always read from ref so we never work from a stale render closure.
+    // Multiple concurrent resolves each see the latest committed queue.
+    const snapshot = [...batchQueueRef.current];
+    const vision = snapshot[itemIdx]?.vision;
+
+    snapshot[itemIdx] = { ...snapshot[itemIdx], status: "processing" };
+    syncQueue(snapshot);
+
     try {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision: updated[itemIdx].vision }),
+        body: JSON.stringify({ discogsId: candidate.id, vision }),
       });
       const data = await response.json();
+      // Re-snapshot from ref in case another resolve completed while we awaited
+      const latest = [...batchQueueRef.current];
       if (data.status === "complete") {
-        updated[itemIdx].status = "complete";
-        updated[itemIdx].release = data.release;
-        addRecord(data.release, data.release.suggestedBoxes || []);
+        latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
+        addRecord(data.release, data.release.topGenres || []);
       } else {
-        updated[itemIdx].status = "error";
+        latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
+      syncQueue(latest);
     } catch {
-      updated[itemIdx].status = "error";
+      const latest = [...batchQueueRef.current];
+      latest[itemIdx] = { ...latest[itemIdx], status: "error" };
+      syncQueue(latest);
     }
-    setBatchQueue([...updated]);
   };
 
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
   const accentRGB = `${accent.r}, ${accent.g}, ${accent.b}`;
 
+  const navItems = [
+    { id: "scan", label: "Scan", icon: Scan },
+    { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
+    { id: "batch", label: "Batch", icon: GridNine },
+    { id: "about", label: "About", icon: Info },
+  ];
+
   return (
-    <div className="min-h-screen w-full relative overflow-x-hidden" style={{ background: "#08080c", color: "#f5f5f7" }}>
-      {/* Atmospheric background */}
+    <div className="min-h-screen w-full relative overflow-x-hidden" style={{ background: "#050508", color: "#f0f0f2" }}>
+      {/* Atmospheric accent glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute transition-all duration-[2000ms]" style={{ inset: 0, background: `radial-gradient(ellipse 80% 60% at 80% 0%, rgba(${accentRGB}, 0.10), transparent 60%)` }} />
-        <div className="absolute transition-all duration-[2000ms]" style={{ inset: 0, background: `radial-gradient(ellipse 60% 50% at 10% 100%, rgba(${accentRGB}, 0.06), transparent 60%)` }} />
+        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 70% 50% at 75% -5%, rgba(${accentRGB}, 0.13), transparent 55%)` }} />
+        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 55% 45% at 15% 105%, rgba(${accentRGB}, 0.08), transparent 55%)` }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255,255,255,0.015), transparent 50%)" }} />
       </div>
 
-      {/* Header */}
-      <header className="relative z-10 px-6 md:px-10 py-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: `radial-gradient(circle at 30% 30%, rgba(${accentRGB},0.4), rgba(${accentRGB},0.05))`, border: `1px solid rgba(${accentRGB}, 0.3)` }}>
-            <Disc3 className="w-4 h-4" style={{ color: `rgb(${accentRGB})` }} />
-          </div>
-          <div>
-            <div className="text-[11px] tracking-[0.28em] uppercase font-medium font-mono">Vinyl Vault</div>
-            <div className="text-[10px] text-white/40 tracking-[0.15em] uppercase mt-0.5">Archive · Identify · Mix</div>
-          </div>
+      {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
+      <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
+        <div className="flex items-center">
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 43, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
 
-        <nav className="flex items-center gap-2">
-          {[
-            { id: "scan", label: "Scan", icon: ScanLine },
-            { id: "collection", label: `Collection${collection.length ? ` (${collection.length})` : ""}`, icon: Layers },
-            { id: "batch", label: "Batch", icon: Grid3X3 },
-          ].map(({ id, label, icon: Icon }) => (
+        <nav className="flex items-center gap-1.5">
+          {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => { setAppView(id); if (id === "scan" && appView !== "scan") reset(); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.15em] uppercase font-mono transition-all"
-              style={{
-                background: appView === id ? `rgba(${accentRGB},0.18)` : "transparent",
-                border: appView === id ? `1px solid rgba(${accentRGB},0.4)` : "1px solid rgba(255,255,255,0.08)",
-                color: appView === id ? `rgb(${accentRGB})` : "rgba(255,255,255,0.45)",
-              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+              style={appView === id
+                ? { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 12px -4px rgba(${accentRGB},0.3)` }
+                : { background: "transparent", border: "1px solid rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.4)" }
+              }
             >
-              <Icon className="w-3 h-3" />
+              <Icon size={16} weight={appView === id ? "bold" : "regular"} />
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
-          {appView === "scan" && (phase === "result" || phase === "disambiguation") && (
-            <button onClick={reset} className="text-[11px] tracking-[0.2em] uppercase text-white/50 hover:text-white transition-colors px-3 py-1.5 rounded-full border border-white/10 hover:border-white/30 font-mono ml-1">
+          {appView === "scan" && phase === "result" && (
+            <button onClick={reset} className="ml-1 text-[11px] tracking-[0.15em] uppercase font-mono px-3 py-1.5 rounded-full transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)", background: "transparent" }}>
               New scan
             </button>
           )}
         </nav>
       </header>
 
-      {/* Main content */}
-      <main className="relative z-10 px-6 md:px-10 pb-16 max-w-7xl mx-auto">
+      {/* Main */}
+      <main className="relative z-10 px-5 md:px-10 pb-20 max-w-7xl mx-auto">
         {appView === "scan" && (
           <>
             {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
             {phase === "disambiguation" && (
-              <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />
+              <>
+                <div className="flex justify-center pt-4 pb-1">
+                  <button onClick={reset} className="text-[11px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "rgba(255,255,255,0.03)" }}>
+                    New scan
+                  </button>
+                </div>
+                <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />
+              </>
             )}
             {phase === "result" && release && (
-              <ResultView
-                release={release} imageUrl={imageUrl} accentRGB={accentRGB}
-                pendingCrates={pendingCrates} setPendingCrates={setPendingCrates}
-                allCrates={allCrates} onSave={saveRecord} saved={!!savedId}
-              />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
         )}
-
         {appView === "collection" && (
-          <CollectionView
-            collection={collection} accentRGB={accentRGB}
-            onRemove={removeRecord} onUpdate={updateRecord}
-            onRenameCrate={renameCrate} onDeleteCrate={deleteCrate}
-            onDownloadCSV={() => downloadCSV(collection)}
-          />
+          <CollectionView collection={collection} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} />
         )}
-
         {appView === "batch" && (
-          <BatchView
-            queue={batchQueue} processing={batchProcessing}
-            onResolve={resolveBatchDisambiguation}
-            onBatch={startBatch} accentRGB={accentRGB}
-          />
+          <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
         )}
+        {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
-      {appView === "scan" && phase === "idle" && <RoadmapFooter />}
     </div>
   );
 }
@@ -362,58 +472,44 @@ export default function VinylVault() {
 // ----- IdleView --------------------------------------------------------------
 
 function IdleView({ onUpload, onBatch, accentRGB }) {
-  const handleFile = (e) => { const f = e.target.files?.[0]; if (f) onUpload(f); };
-  const handleBatch = (e) => { if (e.target.files?.length) onBatch(e.target.files); };
-
   return (
-    <div className="pt-8 md:pt-16">
-      <div className="max-w-3xl">
-        <div className="text-[11px] tracking-[0.3em] uppercase mb-6 text-white/40 font-mono">/* New entry */</div>
-        <h1 className="text-5xl md:text-7xl lg:text-8xl leading-[0.95] mb-6 font-display">
-          <span className="italic">Photograph</span> a sleeve.
-          <br />
-          <span className="text-white/40">We do the rest.</span>
+    <div className="pt-10 md:pt-20">
+      <div className="max-w-2xl mb-14 md:mb-20">
+        <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
+        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight">
+          Stack your wax<br />
+          <span className="text-white/35">the easy way.</span>
         </h1>
-        <p className="text-white/50 text-base md:text-lg max-w-xl leading-relaxed">
-          Identification, tracklist, BPM and Camelot key for every record. Filed into virtual crates, surfaced when you need them.
+        <p className="text-white/45 text-base md:text-lg max-w-lg leading-relaxed">
+          Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM and Camelot key attached, and the record filed exactly where you want it.
         </p>
       </div>
 
-      <div className="mt-12 md:mt-16 flex flex-col sm:flex-row gap-4">
-        {/* Single scan */}
-        <label className="relative flex-1 block rounded-3xl overflow-hidden p-8 md:p-10 cursor-pointer transition-all hover:brightness-110 active:scale-[0.995]"
-          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))", backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)", border: `1px solid rgba(${accentRGB},0.18)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.06), 0 30px 60px -20px rgba(0,0,0,0.5), 0 0 60px -20px rgba(${accentRGB},0.2)` }}>
-          <div className="flex flex-col gap-4 relative z-10">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: `radial-gradient(circle at 35% 35%, rgba(${accentRGB},0.35), transparent 70%)`, border: `1px solid rgba(${accentRGB},0.4)` }}>
-              <Disc3 className="w-6 h-6 animate-spin" style={{ color: `rgb(${accentRGB})`, animationDuration: "8s" }} />
+      <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+        <label className="relative block rounded-2xl p-7 cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={glass({ boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 32px 64px -20px rgba(0,0,0,0.6), 0 0 50px -15px rgba(${accentRGB},0.18)` })}>
+          <div className="relative z-10 flex flex-col gap-5">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.25), rgba(${accentRGB},0.05))`, border: `1px solid rgba(${accentRGB},0.3)` }}>
+              <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.25em] uppercase text-white/40 mb-1 font-mono">Single</div>
-              <div className="text-xl font-display"><span className="italic">Camera</span> or upload</div>
-            </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm self-start" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.12))`, border: `1px solid rgba(${accentRGB},0.45)`, color: "#fff" }}>
-              <Camera className="w-4 h-4" /><Upload className="w-4 h-4 opacity-60" />Tap to scan
+              <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
+              <div className="text-lg font-display">Scan a sleeve</div>
             </div>
           </div>
-          <input type="file" accept="image/*" onChange={handleFile} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }} />
+          <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
         </label>
 
-        {/* Batch scan */}
-        <label className="relative flex-1 block rounded-3xl overflow-hidden p-8 md:p-10 cursor-pointer transition-all hover:brightness-110 active:scale-[0.995]"
-          style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008))", backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 30px 60px -20px rgba(0,0,0,0.5)" }}>
-          <div className="flex flex-col gap-4 relative z-10">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)" }}>
-              <Grid3X3 className="w-6 h-6 text-white/50" />
+        <label className="relative block rounded-2xl p-7 cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={glassSubtle({ borderRadius: "1rem" })}>
+          <div className="relative z-10 flex flex-col gap-5">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <GridNine size={22} weight="light" className="text-white/45" />
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.25em] uppercase text-white/40 mb-1 font-mono">Batch</div>
-              <div className="text-xl font-display"><span className="italic">Multiple</span> records</div>
-            </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm self-start border border-white/15 text-white/60">
-              <ScanLine className="w-4 h-4" />Queue photos
+              <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
+              <div className="text-lg font-display text-white/70">Batch queue</div>
             </div>
           </div>
-          <input type="file" accept="image/*" multiple onChange={handleBatch} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }} />
+          <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
         </label>
       </div>
     </div>
@@ -424,15 +520,15 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
 
 function ProcessingView({ imageUrl, status, accentRGB }) {
   return (
-    <div className="pt-12 flex flex-col items-center">
-      <div className="relative max-w-md w-full aspect-square rounded-2xl overflow-hidden">
+    <div className="pt-16 flex flex-col items-center">
+      <div className="relative w-full max-w-[380px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)` }}>
         {imageUrl && <img src={imageUrl} alt="Scanning" className="w-full h-full object-cover" />}
-        <div className="absolute left-0 right-0 h-[3px] pointer-events-none" style={{ background: `linear-gradient(90deg, transparent, rgba(${accentRGB},1), transparent)`, boxShadow: `0 0 30px rgba(${accentRGB},0.8), 0 0 60px rgba(${accentRGB},0.5)`, animation: "scanLine 2s ease-in-out infinite" }} />
-        <div className="absolute inset-0 pointer-events-none opacity-30" style={{ backgroundImage: `linear-gradient(rgba(${accentRGB},0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(${accentRGB},0.4) 1px, transparent 1px)`, backgroundSize: "32px 32px" }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: `inset 0 0 80px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(${accentRGB},0.3)` }} />
+        <div className="absolute left-0 right-0 h-[2px] pointer-events-none" style={{ background: `linear-gradient(90deg, transparent, rgba(${accentRGB},1), transparent)`, boxShadow: `0 0 24px rgba(${accentRGB},0.9)`, animation: "scanLine 2s ease-in-out infinite" }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: `linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)`, backgroundSize: "28px 28px" }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: `inset 0 0 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.06)` }} />
       </div>
-      <div className="mt-8 text-[11px] tracking-[0.3em] uppercase flex items-center gap-3 font-mono" style={{ color: `rgb(${accentRGB})` }}>
-        <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: `rgb(${accentRGB})`, animation: "pulse 1.4s ease-in-out infinite" }} />
+      <div className="mt-7 text-[11px] tracking-[0.3em] uppercase flex items-center gap-2.5 font-mono" style={{ color: `rgb(${accentRGB})` }}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: `rgb(${accentRGB})`, animation: "pulse 1.4s ease-in-out infinite" }} />
         {status}
       </div>
     </div>
@@ -441,10 +537,30 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
+  const [imgIdx, setImgIdx] = useState(0);
+  const [bpmDetecting, setBpmDetecting] = useState(new Set());
+  const bpmTriedRef = useRef(new Set());
+
+  const releaseKey = `${release?.discogsId || release?.artist}|${release?.title}`;
+  useEffect(() => {
+    if (!release?.tracklist?.length) return;
+    release.tracklist.forEach((track, i) => {
+      if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
+      bpmTriedRef.current.add(track.previewUrl);
+      setBpmDetecting(prev => new Set([...prev, i]));
+      detectBPM(track.previewUrl).then(bpm => {
+        if (bpm != null) onBpmDetected?.(i, bpm);
+        setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
+      });
+    });
+  }, [releaseKey]);
+
+  const images = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
+  const displayImage = images[imgIdx] || imageUrl;
 
   const playPreview = (url) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
@@ -455,15 +571,9 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     setPlayingPreview(url);
     audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
   };
-
   useEffect(() => () => { audioRef.current?.pause(); }, []);
 
-  const toggleCrate = (name) => {
-    setPendingCrates((prev) =>
-      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
-    );
-  };
-
+  const toggleCrate = (name) => setPendingCrates((prev) => prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]);
   const addCustomCrate = () => {
     const name = crateInput.trim();
     if (!name || pendingCrates.includes(name)) return;
@@ -471,135 +581,129 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     setCrateInput("");
   };
 
-  const displayImage = release.coverUrl || imageUrl;
-  const suggestedNotSelected = (release.suggestedBoxes || []).filter((b) => !pendingCrates.includes(b));
-  const existingNotSelected = allCrates.filter((c) => !pendingCrates.includes(c) && !(release.suggestedBoxes || []).includes(c));
+  // Release tags: AI evocative names + Discogs genres/styles (descriptive metadata)
+  const releaseTags = [
+    ...(release.suggestedBoxes || []),
+    ...(release.genres || []),
+  ].filter((t, i, arr) => arr.indexOf(t) === i);
+
+  // Crate assignment: only user-created crates from the existing collection
+  const existingNotPicked = allCrates.filter((c) => !pendingCrates.includes(c));
 
   return (
-    <div className="pt-4 md:pt-8 grid gap-6 md:gap-8" style={{ animation: "fadeUp 0.8s ease-out" }}>
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <ConfidenceBadge confidence={release.confidence} identified={release.identified} accentRGB={accentRGB} />
-          {release.source && release.source !== "vision" && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono text-white/40" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-              {release.source === "discogs+spotify" ? "Discogs · Spotify" : "Discogs"}
-            </div>
-          )}
-          {release.notes && <div className="text-[11px] text-white/50 font-mono">{release.notes}</div>}
-        </div>
+    <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
+      {/* Meta bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <ConfidenceBadge confidence={release.confidence} identified={release.identified} accentRGB={accentRGB} />
+        {release.source && release.source !== "vision" && (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono text-white/35" style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
+            {release.source === "discogs+spotify" ? "Discogs + Spotify" : "Discogs"}
+          </div>
+        )}
+        {release.notes && <div className="text-[11px] text-white/40 font-mono">{release.notes}</div>}
       </div>
 
+      {/* Cover + details */}
       <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10">
+        {/* Image gallery */}
         <div className="relative">
-          <div className="relative w-full md:w-[320px] lg:w-[380px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 30px 80px -20px rgba(${accentRGB},0.5), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08)` }}>
-            {displayImage && <img src={displayImage} alt={release.title} className="w-full h-full object-cover" onError={(e) => { if (e.target.src !== imageUrl) e.target.src = imageUrl; }} />}
-            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.08), transparent 40%)" }} />
+          <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 90px -20px rgba(${accentRGB},0.45), 0 0 0 1px rgba(255,255,255,0.07)` }}>
+            {displayImage ? (
+              <img src={displayImage} alt={release.title} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { if (imageUrl && e.target.src !== imageUrl) e.target.src = imageUrl; }} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
+                <VinylRecord size={48} weight="thin" className="opacity-20" />
+              </div>
+            )}
+            <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.06), transparent 40%)" }} />
           </div>
-          <div className="absolute -inset-12 -z-10 blur-3xl opacity-50" style={{ background: `radial-gradient(circle, rgba(${accentRGB},0.4), transparent 60%)` }} />
-        </div>
 
-        <div className="flex flex-col justify-center">
-          <div className="text-[11px] tracking-[0.3em] uppercase text-white/40 mb-3 font-mono">
-            {[release.format, release.year, release.country].filter(Boolean).join(" · ")}
-          </div>
-          <h1 className="text-3xl md:text-5xl lg:text-6xl leading-[1.05] mb-2 font-display">
-            <span className="italic">{release.artist}</span>
-          </h1>
-          <h2 className="text-2xl md:text-3xl lg:text-4xl leading-tight mb-6 text-white/70 font-display">
-            {release.title}
-          </h2>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {release.label && <Pill label="Label" value={release.label} />}
-            {release.catalogNumber && <Pill label="Cat #" value={release.catalogNumber} mono />}
-          </div>
-          {release.genres && release.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {release.genres.map((g, i) => (
-                <span key={i} className="text-[10px] tracking-[0.15em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgb(${accentRGB})` }}>{g}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Crate assignment + save */}
-      <Section title="File into crates" subtitle="Select before saving" accentRGB={accentRGB} icon={<Sparkles className="w-3.5 h-3.5" style={{ color: `rgb(${accentRGB})` }} />}>
-        <div className="space-y-4">
-          {/* Selected crates */}
-          {pendingCrates.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {pendingCrates.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.45)`, color: `rgb(${accentRGB})` }}>
-                  <Check className="w-3 h-3" />{name}<X className="w-3 h-3 opacity-60" />
+          {/* Image strip */}
+          {images.length > 1 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+              {images.map((src, i) => (
+                <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.4, border: imgIdx === i ? `1px solid rgba(${accentRGB},0.6)` : "1px solid rgba(255,255,255,0.08)", boxShadow: imgIdx === i ? `0 0 10px -2px rgba(${accentRGB},0.4)` : "none" }}>
+                  <img src={src} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
           )}
 
-          {/* Suggested */}
-          {suggestedNotSelected.length > 0 && (
-            <div>
-              <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2 font-mono">Suggested</div>
-              <div className="flex flex-wrap gap-2">
-                {suggestedNotSelected.map((name) => (
-                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/30 hover:text-white/80" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.55)" }}>
-                    <Plus className="w-3 h-3" />{name}
-                  </button>
-                ))}
-              </div>
+          <div className="absolute -inset-10 -z-10 blur-3xl opacity-40 pointer-events-none" style={{ background: `radial-gradient(circle, rgba(${accentRGB},0.5), transparent 60%)` }} />
+        </div>
+
+        {/* Info */}
+        <div className="flex flex-col justify-center">
+          <div className="text-[10px] tracking-[0.3em] uppercase text-white/35 mb-3 font-mono">
+            {[release.format, release.year, release.country].filter(Boolean).join(" · ")}
+          </div>
+          <h1 className="text-3xl md:text-5xl leading-[1.02] mb-1.5 font-display tracking-tight">
+            <span className="italic">{release.artist}</span>
+          </h1>
+          <h2 className="text-2xl md:text-3xl leading-tight mb-5 text-white/55 font-display">
+            {release.title}
+          </h2>
+          <div className="flex flex-wrap gap-2 mb-5">
+            {release.label && <Pill label="Label" value={release.label} />}
+            {release.catalogNumber && <Pill label="Cat #" value={release.catalogNumber} mono />}
+          </div>
+        </div>
+      </div>
+
+      {/* Tags — descriptive metadata, not organisational */}
+      {releaseTags.length > 0 && (
+        <GlassSection title="Tags" subtitle="Genre and feel — for discovery" accentRGB={accentRGB} icon={<Sparkle size={13} weight="fill" style={{ color: `rgb(${accentRGB})` }} />}>
+          <TagCloud tags={releaseTags} genres={release.genres || []} accentRGB={accentRGB} />
+        </GlassSection>
+      )}
+
+      {/* Crate assignment — pure organisation, user-created only */}
+      <GlassSection title="File into crates" subtitle="Where does this record live?" accentRGB={accentRGB}>
+        <div className="space-y-4">
+          {pendingCrates.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {pendingCrates.map((name) => (
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.85)" }}>
+                  <Check size={11} weight="bold" />{name}<X size={10} className="opacity-50 ml-0.5" />
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Existing crates */}
-          {existingNotSelected.length > 0 && (
-            <div>
-              <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2 font-mono">Your crates</div>
-              <div className="flex flex-wrap gap-2">
-                {existingNotSelected.map((name) => (
-                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/30 hover:text-white/70" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>
-                    <Plus className="w-3 h-3" />{name}
-                  </button>
-                ))}
-              </div>
+          {existingNotPicked.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {existingNotPicked.map((name) => (
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/20 hover:text-white/60" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }}>
+                  <Plus size={11} />{name}
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Custom crate input */}
           <div className="flex items-center gap-2">
-            <input
-              value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addCustomCrate()}
-              placeholder="New crate name..."
-              className="flex-1 bg-white/[0.03] border border-white/10 rounded-full px-4 py-2 text-[12px] font-mono text-white/70 placeholder-white/25 outline-none focus:border-white/25"
-            />
-            <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono border border-white/15 text-white/50 hover:text-white/80 hover:border-white/30 transition-all">
-              Add
-            </button>
+            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder={existingNotPicked.length > 0 ? "Or create a new crate..." : "Create a crate..."} className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }} />
+            <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          {/* Save button */}
-          <button
-            onClick={onSave}
-            disabled={saved}
-            className="w-full py-3 rounded-2xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
+          <button onClick={onSave} disabled={saved} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
             style={saved
-              ? { background: "rgba(100,220,130,0.12)", border: "1px solid rgba(100,220,130,0.35)", color: "rgb(100,220,130)" }
-              : { background: `linear-gradient(135deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.12))`, border: `1px solid rgba(${accentRGB},0.45)`, color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }
-            }
-          >
-            {saved ? <span className="flex items-center justify-center gap-2"><Check className="w-4 h-4" />Saved to collection</span> : "Save to collection"}
+              ? { background: "rgba(120,220,140,0.10)", border: "1px solid rgba(120,220,140,0.30)", color: "rgb(120,220,140)" }
+              : { background: `linear-gradient(135deg, rgba(${accentRGB},0.22), rgba(${accentRGB},0.08))`, border: `1px solid rgba(${accentRGB},0.35)`, color: "#fff", boxShadow: `0 0 20px -6px rgba(${accentRGB},0.4)` }
+            }>
+            {saved ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved to collection</span> : "Save to collection"}
           </button>
         </div>
-      </Section>
+      </GlassSection>
 
+      {/* Tracklist */}
       {release.tracklist && release.tracklist.length > 0 && (
-        <Section title="Tracklist" subtitle={`${release.tracklist.length} tracks`} accentRGB={accentRGB}>
-          <div className="space-y-1">
+        <GlassSection title="Tracklist" subtitle={`${release.tracklist.length} tracks`} accentRGB={accentRGB}>
+          <div className="space-y-0.5">
             {release.tracklist.map((track, i) => (
-              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} />
+              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
             ))}
           </div>
-        </Section>
+        </GlassSection>
       )}
     </div>
   );
@@ -608,138 +712,139 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 // ----- CollectionView --------------------------------------------------------
 
 function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
-  const [viewMode, setViewMode] = useState("carousel"); // carousel | grid
+  const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
+  const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
-  const [filterGenre, setFilterGenre] = useState(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
-  const [editingCrate, setEditingCrate] = useState(null); // {name, newName}
   const [showCrateManager, setShowCrateManager] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
 
+  // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
-  const allGenres = [...new Set(collection.flatMap((r) => r.genres || []))].sort();
 
   const filtered = collection.filter((r) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || r.artist.toLowerCase().includes(q) || r.title.toLowerCase().includes(q) || (r.label || "").toLowerCase().includes(q) || (r.catalogNumber || "").toLowerCase().includes(q);
+    const matchSearch = !q
+      || r.artist.toLowerCase().includes(q)
+      || r.title.toLowerCase().includes(q)
+      || (r.label || "").toLowerCase().includes(q)
+      || (r.catalogNumber || "").toLowerCase().includes(q)
+      || (r.tags || []).some((t) => t.toLowerCase().includes(q));
     const matchCrate = !filterCrate || (r.crates || []).includes(filterCrate);
-    const matchGenre = !filterGenre || (r.genres || []).includes(filterGenre);
-    return matchSearch && matchCrate && matchGenre;
+    return matchSearch && matchCrate;
   });
 
-  // Keep carousel index in bounds when filter changes
-  useEffect(() => { setCarouselIdx(0); }, [search, filterCrate, filterGenre]);
+  useEffect(() => { setCarouselIdx(0); }, [search, filterCrate]);
 
   const goNext = useCallback(() => setCarouselIdx((i) => Math.min(i + 1, filtered.length - 1)), [filtered.length]);
   const goPrev = useCallback(() => setCarouselIdx((i) => Math.max(i - 1, 0)), []);
 
   useEffect(() => {
     const handler = (e) => {
-      if (viewMode !== "carousel" || detailRecord) return;
+      if (collectionMode !== "stacks" || viewMode !== "carousel" || detailRecord) return;
       if (e.key === "ArrowRight") goNext();
       if (e.key === "ArrowLeft") goPrev();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [viewMode, detailRecord, goNext, goPrev]);
+  }, [collectionMode, viewMode, detailRecord, goNext, goPrev]);
 
   if (collection.length === 0) {
     return (
-      <div className="pt-16 flex flex-col items-center text-center max-w-md mx-auto">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <Disc3 className="w-8 h-8 text-white/20" />
+      <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={glassSubtle()}>
+          <VinylRecord size={28} weight="thin" className="opacity-25" />
         </div>
-        <h2 className="text-3xl mb-3 font-display"><span className="italic">Collection</span> is empty</h2>
-        <p className="text-white/40 text-sm leading-relaxed">Scan your first record to start building your archive.</p>
+        <h2 className="text-2xl mb-2 font-display"><span className="italic">Collection</span> is empty</h2>
+        <p className="text-white/35 text-sm leading-relaxed">Scan your first record to start building your archive.</p>
       </div>
     );
   }
 
   return (
-    <div className="pt-4 md:pt-8">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search artist, title, label..." className="w-full bg-white/[0.04] border border-white/10 rounded-full pl-8 pr-4 py-2 text-[12px] font-mono text-white/70 placeholder-white/25 outline-none focus:border-white/25" />
-        </div>
-
-        {/* View toggle */}
-        <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-          {[{ id: "carousel", icon: Layers }, { id: "grid", icon: Grid3X3 }].map(({ id, icon: Icon }) => (
-            <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(255,255,255,0.1)" : "transparent", color: viewMode === id ? "#fff" : "rgba(255,255,255,0.35)" }}>
-              <Icon className="w-3.5 h-3.5" />
+    <div className="pt-6 md:pt-10">
+      {/* Mode toggle: Stacks vs Explore */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {[{ id: "stacks", label: "Stacks" }, { id: "explore", label: "Explore by tag" }].map(({ id, label }) => (
+            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+              style={collectionMode === id
+                ? { background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.85)", boxShadow: "0 1px 0 rgba(255,255,255,0.08)" }
+                : { background: "transparent", color: "rgba(255,255,255,0.35)" }}>
+              {label}
             </button>
           ))}
         </div>
 
-        <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono border border-white/10 text-white/45 hover:text-white/70 hover:border-white/25 transition-all">
-          <Edit2 className="w-3 h-3" />Crates
-        </button>
-
-        <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono border border-white/10 text-white/45 hover:text-white/70 hover:border-white/25 transition-all">
-          <Download className="w-3 h-3" />CSV
-        </button>
-
-        <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-mono border border-white/10 text-white/45 hover:text-white/70 hover:border-white/25 transition-all">
-          <Printer className="w-3 h-3" />Print
-        </button>
+        {collectionMode === "stacks" && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <PencilSimple size={12} />Crates
+            </button>
+            <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <DownloadSimple size={12} />CSV
+            </button>
+            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+              <Printer size={12} />Print
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Filter pills */}
-      {(allCrates.length > 0 || allGenres.length > 0) && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          {allCrates.map((c) => (
-            <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-3 py-1 rounded-full text-[10px] tracking-[0.15em] uppercase font-mono transition-all" style={{ background: filterCrate === c ? "rgba(157,141,241,0.18)" : "rgba(255,255,255,0.03)", border: filterCrate === c ? "1px solid rgba(157,141,241,0.4)" : "1px solid rgba(255,255,255,0.08)", color: filterCrate === c ? "rgb(157,141,241)" : "rgba(255,255,255,0.4)" }}>
-              {c}
-            </button>
-          ))}
-          {allGenres.map((g) => (
-            <button key={g} onClick={() => setFilterGenre(filterGenre === g ? null : g)} className="px-3 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all" style={{ background: filterGenre === g ? "rgba(100,200,180,0.12)" : "transparent", border: filterGenre === g ? "1px solid rgba(100,200,180,0.35)" : "1px solid rgba(255,255,255,0.06)", color: filterGenre === g ? "rgb(100,200,180)" : "rgba(255,255,255,0.28)" }}>
-              {g}
-            </button>
-          ))}
-        </div>
+      {/* EXPLORE MODE */}
+      {collectionMode === "explore" && (
+        <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecord(r)} />
       )}
 
-      <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-4 font-mono">
-        {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-      </div>
+      {/* STACKS MODE */}
+      {collectionMode === "stacks" && (
+        <>
+          {/* Search + layout controls */}
+          <div className="flex flex-wrap items-center gap-2.5 mb-4">
+            <div className="flex-1 min-w-[180px]">
+              <PredictiveSearch value={search} onChange={setSearch} collection={collection} accentRGB={accentRGB} />
+            </div>
+            <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }].map(({ id, Icon }) => (
+                <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(255,255,255,0.09)" : "transparent", color: viewMode === id ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.30)" }}>
+                  <Icon size={14} />
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {filtered.length === 0 && (
-        <div className="text-center py-16 text-white/30 text-sm font-mono">No records match this filter.</div>
+          {/* Crate filters — user crates only */}
+          {allCrates.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {allCrates.map((c) => (
+                <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                  style={{ background: filterCrate === c ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.025)", border: filterCrate === c ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.07)", color: filterCrate === c ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.38)" }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+
+          {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
+
+          {viewMode === "carousel" && filtered.length > 0 && (
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} />
+          )}
+          {viewMode === "grid" && filtered.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {filtered.map((record) => (
+                <RecordCard key={record.id} record={record} onSelect={() => setDetailRecord(record)} onRemove={() => onRemove(record.id)} accentRGB={accentRGB} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {/* Carousel view */}
-      {viewMode === "carousel" && filtered.length > 0 && (
-        <VinylCarousel
-          records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx}
-          onPrev={goPrev} onNext={goNext}
-          onSelect={(r) => setDetailRecord(r)}
-          onRemove={onRemove}
-          accentRGB={accentRGB}
-        />
-      )}
-
-      {/* Grid view */}
-      {viewMode === "grid" && filtered.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filtered.map((record) => (
-            <RecordCard key={record.id} record={record} onSelect={() => setDetailRecord(record)} onRemove={() => onRemove(record.id)} accentRGB={accentRGB} />
-          ))}
-        </div>
-      )}
-
-      {/* Detail modal */}
-      {detailRecord && (
-        <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} accentRGB={accentRGB} />
-      )}
-
-      {/* Crate manager modal */}
-      {showCrateManager && (
-        <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />
-      )}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} />}
+      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />}
     </div>
   );
 }
@@ -748,135 +853,86 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 
 function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB }) {
   const touchStartX = useRef(null);
-  const containerRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
   const [dragDelta, setDragDelta] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; setDragging(false); setDragDelta(0); };
   const onTouchMove = (e) => {
     if (touchStartX.current === null) return;
-    const delta = e.touches[0].clientX - touchStartX.current;
     setDragging(true);
-    setDragDelta(delta);
+    setDragDelta(e.touches[0].clientX - touchStartX.current);
   };
   const onTouchEnd = () => {
-    if (Math.abs(dragDelta) > 60) { dragDelta < 0 ? onNext() : onPrev(); }
-    touchStartX.current = null;
-    setDragging(false);
-    setDragDelta(0);
+    if (Math.abs(dragDelta) > 55) { dragDelta < 0 ? onNext() : onPrev(); }
+    touchStartX.current = null; setDragging(false); setDragDelta(0);
   };
 
   const current = records[index];
   if (!current) return null;
 
-  // Compute which records to show in the stack (prev, current, next, +1)
-  const stack = [-2, -1, 0, 1, 2].map((offset) => ({
-    offset,
-    record: records[index + offset] || null,
-  }));
-
   return (
-    <div className="relative select-none">
-      {/* Stack container */}
-      <div
-        ref={containerRef}
-        className="relative mx-auto"
-        style={{ height: "min(70vw, 520px)", maxWidth: "min(70vw, 520px)" }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {stack.map(({ offset, record }) => {
+    <div className="select-none">
+      <div className="relative mx-auto" style={{ height: "min(68vw, 480px)", maxWidth: "min(68vw, 480px)" }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+        {[-2, -1, 0, 1, 2].map((offset) => {
+          const record = records[index + offset];
           if (!record) return null;
+          const abs = Math.abs(offset);
           const isActive = offset === 0;
-          const absOffset = Math.abs(offset);
-
-          // Stacking physics
-          const translateX = (offset + (dragging ? dragDelta / 320 : 0)) * 52;
-          const translateY = absOffset * 8;
-          const rotate = offset * 3 + (dragging && isActive ? dragDelta * 0.03 : 0);
-          const scale = 1 - absOffset * 0.07;
-          const zIndex = 10 - absOffset;
-          const opacity = offset < -2 || offset > 2 ? 0 : 1 - absOffset * 0.25;
+          const tx = (offset + (dragging ? dragDelta / 300 : 0)) * 48;
+          const ty = abs * 7;
+          const rot = offset * 2.5 + (dragging && isActive ? dragDelta * 0.025 : 0);
+          const scale = 1 - abs * 0.065;
+          const opacity = abs > 2 ? 0 : 1 - abs * 0.15;
 
           return (
-            <div
-              key={record.id}
-              onClick={() => { if (isActive && !dragging) onSelect(record); else if (!dragging) onIndexChange(index + offset); }}
-              style={{
-                position: "absolute",
-                inset: 0,
-                transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg) scale(${scale})`,
-                zIndex,
-                opacity,
-                transition: dragging ? "none" : "transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease",
-                cursor: isActive ? "pointer" : "pointer",
-                transformOrigin: "center bottom",
-              }}
-            >
-              <div
-                className="w-full h-full rounded-2xl overflow-hidden"
-                style={{
-                  boxShadow: isActive
-                    ? `0 40px 100px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08), 0 0 60px -20px rgba(${accentRGB},0.4)`
-                    : "0 20px 60px -20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
-                }}
-              >
+            <div key={record.id} onClick={() => !dragging && (isActive ? onSelect(record) : onIndexChange(index + offset))}
+              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: dragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
+              <div className="w-full h-full rounded-2xl overflow-hidden" style={{ boxShadow: isActive ? `0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.07), 0 0 50px -15px rgba(${accentRGB},0.35)` : "0 20px 50px -15px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)" }}>
                 {record.coverUrl ? (
                   <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.12), rgba(${accentRGB},0.03))` }}>
-                    <Disc3 className="w-16 h-16 opacity-20" />
+                  <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
+                    <VinylRecord size={56} weight="thin" className="opacity-20" />
                   </div>
                 )}
-                {isActive && (
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 50%, transparent 100%)" }} />
-                )}
+                {isActive && <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 45%)" }} />}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Active record info */}
-      <div className="mt-8 text-center" style={{ animation: "fadeUp 0.35s ease-out" }} key={current.id}>
-        <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-2 font-mono">
+      {/* Info */}
+      <div className="mt-7 text-center" style={{ animation: "fadeUp 0.18s ease-out" }} key={current.id}>
+        <div className="text-[10px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
           {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
         </div>
-        <div className="text-2xl md:text-3xl leading-tight mb-1 font-display">
-          <span className="italic">{current.artist}</span>
-        </div>
-        <div className="text-lg md:text-xl text-white/60 font-display mb-3">{current.title}</div>
+        <div className="text-xl md:text-2xl leading-tight font-display"><span className="italic">{current.artist}</span></div>
+        <div className="text-base md:text-lg text-white/50 font-display mb-3">{current.title}</div>
         {current.crates && current.crates.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1.5 mb-4">
+          <div className="flex flex-wrap justify-center gap-1.5 mb-3">
             {current.crates.map((c) => (
-              <span key={c} className="text-[10px] tracking-[0.15em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgb(${accentRGB})` }}>{c}</span>
+              <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
             ))}
           </div>
         )}
-        <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 font-mono mb-6">
-          {index + 1} of {records.length} — tap to view
-        </div>
+        <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
       </div>
 
-      {/* Nav arrows */}
-      <div className="flex items-center justify-center gap-4">
-        <button onClick={onPrev} disabled={index === 0} className="w-10 h-10 rounded-full flex items-center justify-center transition-all disabled:opacity-20" style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}>
-          <ChevronLeft className="w-4 h-4" />
+      {/* Controls */}
+      <div className="flex items-center justify-center gap-4 mt-5">
+        <button onClick={onPrev} disabled={index === 0} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
+          <CaretLeft size={14} />
         </button>
-
-        {/* Dot strip */}
         <div className="flex items-center gap-1.5">
           {records.slice(Math.max(0, index - 4), Math.min(records.length, index + 5)).map((_, i) => {
             const absIdx = Math.max(0, index - 4) + i;
-            return (
-              <button key={absIdx} onClick={() => onIndexChange(absIdx)} className="rounded-full transition-all" style={{ width: absIdx === index ? 20 : 6, height: 6, background: absIdx === index ? `rgb(${accentRGB})` : "rgba(255,255,255,0.2)" }} />
-            );
+            return <button key={absIdx} onClick={() => onIndexChange(absIdx)} className="rounded-full transition-all" style={{ width: absIdx === index ? 18 : 5, height: 5, background: absIdx === index ? `rgb(${accentRGB})` : "rgba(255,255,255,0.18)" }} />;
           })}
         </div>
-
-        <button onClick={onNext} disabled={index === records.length - 1} className="w-10 h-10 rounded-full flex items-center justify-center transition-all disabled:opacity-20" style={{ border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}>
-          <ChevronRight className="w-4 h-4" />
+        <button onClick={onNext} disabled={index === records.length - 1} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
+          <CaretRight size={14} />
         </button>
       </div>
     </div>
@@ -888,92 +944,218 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 function RecordCard({ record, onSelect, onRemove, accentRGB }) {
   return (
     <div className="relative group cursor-pointer" onClick={onSelect}>
-      <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: "0 10px 40px -10px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}>
+      <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}>
         {record.coverUrl ? (
-          <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
-            <Disc3 className="w-8 h-8 opacity-20" />
+            <VinylRecord size={28} weight="thin" className="opacity-20" />
           </div>
         )}
-        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.3)" }}>
-          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 flex items-center justify-center">
-            <X className="w-3 h-3 text-white" />
+        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.35)" }}>
+          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/75 flex items-center justify-center">
+            <X size={10} weight="bold" className="text-white" />
           </button>
         </div>
       </div>
-      <div className="text-[11px] leading-snug font-display truncate">{record.artist}</div>
-      <div className="text-[10px] text-white/50 truncate font-mono">{record.title}</div>
+      <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
+      <div className="text-[10px] text-white/40 truncate font-mono">{record.title}</div>
     </div>
   );
 }
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, accentRGB }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
+  const [imgIdx, setImgIdx] = useState(0);
+  const [price, setPrice] = useState(null); // null=not loaded, false=no data, object=loaded
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [bpmDetecting, setBpmDetecting] = useState(new Set());
+  const [localBpms, setLocalBpms] = useState({});
+  const bpmTriedRef = useRef(new Set());
+  const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
+
+  useEffect(() => {
+    if (!record?.tracklist?.length) return;
+    const pending = {};
+    let total = 0;
+
+    record.tracklist.forEach((track, i) => {
+      if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
+      bpmTriedRef.current.add(track.previewUrl);
+      total++;
+      setBpmDetecting(prev => new Set([...prev, i]));
+
+      detectBPM(track.previewUrl).then(bpm => {
+        if (bpm != null) {
+          pending[i] = bpm;
+          setLocalBpms(prev => ({ ...prev, [i]: bpm }));
+        }
+        setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
+        total--;
+        if (total === 0 && Object.keys(pending).length > 0 && onUpdate) {
+          onUpdate(record.id, {
+            tracklist: record.tracklist.map((t, j) => pending[j] != null ? { ...t, bpm: pending[j] } : t),
+          });
+        }
+      });
+    });
+  }, [record.id]);
 
   const playPreview = (url) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (playingPreview === url) { setPlayingPreview(null); return; }
     const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.play().catch(() => {});
-    setPlayingPreview(url);
+    audioRef.current = audio; audio.play().catch(() => {}); setPlayingPreview(url);
     audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
   };
   useEffect(() => () => audioRef.current?.pause(), []);
 
+  const checkPrice = async () => {
+    const discogsId = record.discogsId;
+    if (!discogsId) return;
+    setPriceLoading(true);
+    try {
+      const res = await fetch(`/api/price?id=${encodeURIComponent(discogsId)}`);
+      const data = await res.json();
+      setPrice(data.totalListings === 0 && !data.low ? false : data);
+    } catch {
+      setPrice(false);
+    }
+    setPriceLoading(false);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 md:p-8" style={{ background: "linear-gradient(135deg, rgba(20,20,28,0.98), rgba(12,12,18,0.98))", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.9)" }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center border border-white/10 text-white/50 hover:text-white transition-colors">
-          <X className="w-4 h-4" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }} onClick={onClose}>
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99) 0%, rgba(10,10,16,0.99) 100%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
+
+        {/* Close bar: drag handle + label. Full-width tap target, especially useful on mobile. */}
+        <button onClick={onClose} className="w-full flex flex-col items-center gap-1.5 pt-3 pb-3 transition-opacity hover:opacity-70 active:opacity-50" aria-label="Close">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
+          <span className="text-[10px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(255,255,255,0.22)" }}>Close</span>
         </button>
 
-        <div className="grid sm:grid-cols-[160px_1fr] gap-6 mb-6">
-          <div className="aspect-square rounded-xl overflow-hidden" style={{ boxShadow: `0 20px 60px -15px rgba(${accentRGB},0.4)` }}>
-            {record.coverUrl ? (
-              <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.08)` }}>
-                <Disc3 className="w-8 h-8 opacity-20" />
+        <div className="px-6 md:px-8 pb-8">
+
+        <div className="grid sm:grid-cols-[140px_1fr] gap-5 mb-6">
+          <div>
+            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${accentRGB},0.35)` }}>
+              {images[imgIdx] ? (
+                <img src={images[imgIdx]} alt={record.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.07)` }}>
+                  <VinylRecord size={28} weight="thin" className="opacity-20" />
+                </div>
+              )}
+            </div>
+            {images.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto">
+                {images.map((src, i) => (
+                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${accentRGB},0.5)` : "1px solid transparent" }}>
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
               </div>
             )}
           </div>
           <div className="flex flex-col justify-center">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/35 mb-2 font-mono">
-              {[record.year, record.format, record.country].filter(Boolean).join(" · ")}
-            </div>
-            <div className="text-2xl leading-tight mb-1 font-display"><span className="italic">{record.artist}</span></div>
-            <div className="text-lg text-white/60 font-display mb-3">{record.title}</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
+            <div className="text-xl leading-tight mb-0.5 font-display"><span className="italic">{record.artist}</span></div>
+            <div className="text-base text-white/55 font-display mb-3">{record.title}</div>
             <div className="flex flex-wrap gap-1.5 mb-3">
               {record.label && <Pill label="Label" value={record.label} />}
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
             </div>
             {record.crates && record.crates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {record.crates.map((c) => (
-                  <span key={c} className="text-[10px] tracking-[0.15em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgb(${accentRGB})` }}>{c}</span>
-                ))}
+              <div>
+                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {record.crates.map((c) => (
+                    <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {record.tags && record.tags.length > 0 && (
+              <div className="mt-2">
+                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {record.tags.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>{t}</span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         </div>
 
         {record.tracklist && record.tracklist.length > 0 && (
-          <div className="space-y-1 mb-6">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-3 font-mono">Tracklist</div>
-            {record.tracklist.map((track, i) => (
-              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} />
-            ))}
+          <div className="mb-5">
+            <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-3 font-mono">Tracklist</div>
+            <div className="space-y-0.5">
+              {record.tracklist.map((track, i) => (
+                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
+              ))}
+            </div>
           </div>
         )}
 
-        <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono text-red-400/70 border border-red-400/20 hover:border-red-400/50 hover:text-red-400 transition-all">
-          <Trash2 className="w-3 h-3" />Remove from collection
+        {/* Price check */}
+        {record.discogsId && (
+          <div className="mb-5">
+            {price === null && (
+              <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.025)" }}>
+                {priceLoading
+                  ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "transparent" }} />Checking prices...</>
+                  : <><MagnifyingGlass size={12} />Check marketplace price</>
+                }
+              </button>
+            )}
+            {price === false && (
+              <div className="text-[11px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
+            )}
+            {price && typeof price === "object" && (
+              <div className="p-4 rounded-2xl" style={glassSubtle()}>
+                <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-3 font-mono">Marketplace price estimate</div>
+                <div className="flex flex-wrap gap-4 items-end">
+                  {price.median != null && (
+                    <div>
+                      <div className="text-[10px] text-white/30 font-mono mb-0.5">Median</div>
+                      <div className="text-2xl font-display" style={{ color: `rgb(${accentRGB})` }}>
+                        {price.currency} {price.median.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                  {price.mean != null && (
+                    <div>
+                      <div className="text-[10px] text-white/30 font-mono mb-0.5">Average</div>
+                      <div className="text-lg text-white/60 font-display">{price.currency} {price.mean.toFixed(2)}</div>
+                    </div>
+                  )}
+                  {price.low != null && price.high != null && price.low !== price.high && (
+                    <div>
+                      <div className="text-[10px] text-white/30 font-mono mb-0.5">Range</div>
+                      <div className="text-sm text-white/40 font-mono">{price.currency} {price.low.toFixed(2)} — {price.high.toFixed(2)}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="text-[10px] text-white/20 font-mono mt-2">
+                  {price.sampleSize != null
+                    ? `Based on ${price.sampleSize} listings (outliers removed from ${price.totalListings} total)`
+                    : `${price.totalListings} listing${price.totalListings !== 1 ? "s" : ""} on Discogs`
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
+          <Trash size={12} />Remove from collection
         </button>
+        </div>{/* end px-6 content wrapper */}
       </div>
     </div>
   );
@@ -985,30 +1167,29 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
 
-  const startEdit = (crate) => { setEditingName(crate); setNewName(crate); };
   const commitRename = () => {
     if (newName.trim() && newName.trim() !== editingName) onRename(editingName, newName.trim());
     setEditingName(null);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl p-6" style={{ background: "linear-gradient(135deg, rgba(20,20,28,0.98), rgba(12,12,18,0.98))", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-[11px] tracking-[0.3em] uppercase font-mono">Crate manager</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 text-white/50 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)" }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-3xl p-6" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99), rgba(10,10,16,0.99))", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-[11px] tracking-[0.3em] uppercase font-mono text-white/60">Crate manager</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}><X size={13} /></button>
         </div>
-        {crates.length === 0 && <p className="text-white/40 text-sm font-mono text-center py-4">No crates yet.</p>}
+        {crates.length === 0 && <p className="text-white/30 text-sm font-mono text-center py-4">No crates yet.</p>}
         <div className="space-y-2">
           {crates.map((crate) => (
-            <div key={crate} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div key={crate} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
               {editingName === crate ? (
-                <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 bg-white/[0.06] border border-white/15 rounded-lg px-3 py-1 text-sm font-mono outline-none" />
+                <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
               ) : (
-                <span className="flex-1 text-sm font-mono text-white/80">{crate}</span>
+                <span className="flex-1 text-sm font-mono text-white/70">{crate}</span>
               )}
-              <button onClick={() => startEdit(crate)} className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 transition-colors"><Edit2 className="w-3 h-3" /></button>
-              <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center text-red-400/40 hover:text-red-400/80 transition-colors"><Trash2 className="w-3 h-3" /></button>
+              <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+              <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
             </div>
           ))}
         </div>
@@ -1020,23 +1201,15 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
 // ----- BatchView -------------------------------------------------------------
 
 function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
-  const statusIcon = (s) => {
-    if (s === "complete") return <Check className="w-4 h-4 text-green-400" />;
-    if (s === "error") return <X className="w-4 h-4 text-red-400" />;
-    if (s === "processing") return <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `rgba(${accentRGB},0.6)`, borderTopColor: "transparent" }} />;
-    if (s === "disambiguation") return <Sparkles className="w-4 h-4 text-yellow-400" />;
-    return <div className="w-4 h-4 rounded-full border border-white/20" />;
-  };
-
   if (queue.length === 0) {
     return (
-      <div className="pt-16 flex flex-col items-center text-center max-w-md mx-auto">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <Grid3X3 className="w-8 h-8 text-white/20" />
+      <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={glassSubtle()}>
+          <GridNine size={28} weight="thin" className="opacity-25" />
         </div>
-        <h2 className="text-3xl mb-3 font-display"><span className="italic">Batch</span> scan</h2>
-        <p className="text-white/40 text-sm mb-6 leading-relaxed">Upload multiple sleeve photos to scan them all at once. Auto-saved to your collection, pauses on disambiguation.</p>
-        <label className="cursor-pointer px-5 py-2.5 rounded-full border border-white/20 hover:bg-white/5 transition-all text-sm font-mono text-white/70">
+        <h2 className="text-2xl mb-2 font-display"><span className="italic">Batch</span> scan</h2>
+        <p className="text-white/35 text-sm mb-6 leading-relaxed">Upload multiple sleeve photos. We scan them in order, auto-save confirmed matches, and pause on disambiguation.</p>
+        <label className="cursor-pointer px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.03)" }}>
           Choose photos
           <input type="file" accept="image/*" multiple onChange={(e) => e.target.files?.length && onBatch(e.target.files)} className="hidden" />
         </label>
@@ -1047,52 +1220,59 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
   const done = queue.filter((i) => i.status === "complete").length;
   const needsReview = queue.filter((i) => i.status === "disambiguation");
 
+  const statusIcon = (s) => {
+    if (s === "complete") return <Check size={15} weight="bold" className="text-green-400" />;
+    if (s === "error") return <X size={15} weight="bold" className="text-red-400/70" />;
+    if (s === "processing") return <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: `rgba(${accentRGB},0.3)`, borderTopColor: `rgb(${accentRGB})` }} />;
+    if (s === "disambiguation") return <Sparkle size={15} weight="fill" className="text-yellow-400" />;
+    return <div className="w-4 h-4 rounded-full" style={{ border: "1.5px solid rgba(255,255,255,0.15)" }} />;
+  };
+
   return (
-    <div className="pt-4 md:pt-8">
+    <div className="pt-6 md:pt-10">
       <div className="flex items-center gap-3 mb-6">
         <h2 className="text-2xl font-display"><span className="italic">Batch</span> progress</h2>
-        <span className="text-[11px] font-mono text-white/40">{done}/{queue.length} saved</span>
-        {processing && <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: `rgba(${accentRGB},0.4)`, borderTopColor: `rgb(${accentRGB})` }} />}
+        <span className="text-[11px] font-mono text-white/35">{done}/{queue.length} saved</span>
+        {processing && <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: `rgba(${accentRGB},0.25)`, borderTopColor: `rgb(${accentRGB})` }} />}
       </div>
 
       {needsReview.length > 0 && (
-        <div className="mb-6 p-4 rounded-2xl" style={{ background: "rgba(250,200,100,0.06)", border: "1px solid rgba(250,200,100,0.2)" }}>
-          <div className="text-[10px] tracking-[0.2em] uppercase text-yellow-400/70 mb-1 font-mono">{needsReview.length} needs disambiguation</div>
-          <p className="text-sm text-white/50">Scroll down to pick the correct pressing for flagged records.</p>
+        <div className="mb-5 p-4 rounded-2xl" style={{ background: "rgba(240,190,80,0.05)", border: "1px solid rgba(240,190,80,0.18)" }}>
+          <div className="text-[10px] tracking-[0.2em] uppercase text-yellow-400/60 mb-1 font-mono">{needsReview.length} needing disambiguation</div>
+          <p className="text-sm text-white/40">Scroll down to pick the correct pressing for flagged records.</p>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {queue.map((item, idx) => (
-          <div key={idx} className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div key={idx} className="rounded-2xl overflow-hidden" style={glassSubtle()}>
             <div className="flex items-center gap-4 p-4">
-              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
-                {item.imageUrl ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/5" />}
+              <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+                {item.imageUrl ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[0.03]" />}
               </div>
               <div className="flex-1 min-w-0">
                 {item.release ? (
                   <>
-                    <div className="text-sm font-display truncate">{item.release.artist} — {item.release.title}</div>
-                    <div className="text-[10px] text-white/40 font-mono">{item.release.catalogNumber || item.release.label || ""}</div>
+                    <div className="text-sm font-display truncate text-white/80">{item.release.artist} — {item.release.title}</div>
+                    <div className="text-[10px] text-white/35 font-mono">{item.release.catalogNumber || item.release.label || ""}</div>
                   </>
                 ) : item.status === "disambiguation" ? (
-                  <div className="text-sm text-yellow-400/80 font-mono">Multiple pressings found</div>
+                  <div className="text-sm text-yellow-400/70 font-mono">Multiple pressings found</div>
                 ) : (
-                  <div className="text-sm text-white/40 font-mono capitalize">{item.status}</div>
+                  <div className="text-sm text-white/35 font-mono capitalize">{item.status}</div>
                 )}
               </div>
               {statusIcon(item.status)}
             </div>
-
             {item.status === "disambiguation" && item.candidates && (
               <div className="px-4 pb-4">
-                <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2 font-mono">Pick pressing</div>
+                <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-2 font-mono">Pick pressing</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {item.candidates.map((c) => (
-                    <button key={c.id} onClick={() => onResolve(idx, c)} className="text-left p-2 rounded-xl text-[11px] transition-all hover:bg-white/5" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-                      <div className="font-mono text-white/70 truncate">{c.artist}</div>
+                    <button key={c.id} onClick={() => onResolve(idx, c)} className="text-left p-2.5 rounded-xl text-[11px] transition-all hover:bg-white/5" style={{ border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <div className="font-mono text-white/65 truncate">{c.artist}</div>
                       <div className="text-white/40 truncate">{c.recordTitle}</div>
-                      <div className="text-white/25 font-mono">{c.catalogNumber} {c.year}</div>
+                      <div className="text-white/22 font-mono text-[10px]">{c.catalogNumber} {c.year}</div>
                     </button>
                   ))}
                 </div>
@@ -1105,132 +1285,133 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
   );
 }
 
-// ----- Shared components -----------------------------------------------------
+// ----- AboutView -------------------------------------------------------------
 
-function TrackRow({ track, index, accentRGB, playingPreview, onPlay }) {
-  const keyColor = track.key ? camelotColor(track.key) : null;
-  const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
+function AboutView({ accentRGB }) {
   return (
-    <div className="grid grid-cols-[40px_1fr_auto] md:grid-cols-[50px_1fr_auto_auto_auto_32px] items-center gap-3 md:gap-5 px-3 md:px-5 py-3 rounded-xl transition-all group hover:bg-white/[0.03]" style={{ animation: `fadeUp 0.4s ease-out ${index * 0.05}s both` }}>
-      <div className="text-[11px] tracking-[0.15em] text-white/50 font-medium font-mono">{track.position}</div>
-      <div className="min-w-0">
-        <div className="text-base md:text-[17px] truncate font-display">{track.title}</div>
-        <div className="md:hidden text-[10px] tracking-[0.1em] text-white/40 mt-0.5 flex items-center gap-2 font-mono">
-          {track.duration && <span>{track.duration}</span>}
-          {track.duration && <span>·</span>}
-          <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
-          <span>·</span>
-          <span style={{ color: keyColor || "rgba(255,255,255,0.25)" }}>{track.key || "—"}</span>
+    <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
+      <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/25 font-mono">About</div>
+      <h2 className="text-4xl md:text-5xl leading-[0.95] mb-8 font-display tracking-tight">
+        Built for the crate,<br />
+        <span className="text-white/35 italic">not the cloud.</span>
+      </h2>
+
+      <div className="space-y-8">
+        <div className="space-y-4 text-white/55 leading-relaxed text-[15px]">
+          <p>
+            Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve, and within seconds you have the pressing confirmed, the tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
+          </p>
+          <p>
+            It works with your physical collection the way your collection works with you. No manual entry, no spreadsheets, no forgetting what you paid or where you found it. Just point a camera and the rest happens automatically. When there is more than one pressing in the database, you pick the right one. Everything else is handled.
+          </p>
+          <p>
+            The crate system is intentional. Instead of flat tags, Vinyl Vault organises records the way a real DJ would: by feel, era, energy, purpose. Crate names come from the music, not a dropdown. And if the suggestions are not right for how you think, you can name them yourself.
+          </p>
+        </div>
+
+        <div>
+          <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
+          <div className="space-y-3">
+            {[
+              { n: "01", title: "Photograph", desc: "Point your camera at the sleeve or label. A single photo is all it takes." },
+              { n: "02", title: "Identify", desc: "The exact pressing is matched against the global record database: label, catalogue number, year, country." },
+              { n: "03", title: "Enrich", desc: "Tracklist, BPM, and Camelot key notation are pulled automatically where available." },
+              { n: "04", title: "File", desc: "Assign the record to one or more crates, or save it unassigned and sort later. Your collection lives locally in your browser." },
+            ].map(({ n, title, desc }) => (
+              <div key={n} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
+                <div className="text-[11px] font-mono shrink-0 mt-0.5" style={{ color: `rgba(${accentRGB},0.7)` }}>{n}</div>
+                <div>
+                  <div className="text-sm font-display mb-0.5 text-white/85">{title}</div>
+                  <div className="text-[13px] text-white/40 leading-relaxed">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Release notes</div>
+          <div className="space-y-3">
+            {[
+              {
+                v: "v1.2",
+                label: "Current",
+                title: "Collection and Crates",
+                desc: "Persistent local collection, vinyl carousel browser, crate management, batch scanning, CSV export and print.",
+                accentRGB,
+              },
+              {
+                v: "v1.1",
+                label: null,
+                title: "Audio Features",
+                desc: "BPM detection and Camelot key notation on every track. Audio previews where available.",
+              },
+              {
+                v: "v1.0",
+                label: null,
+                title: "Scan and Identify",
+                desc: "The core pipeline: photograph a record, get a confirmed pressing with full tracklist and artwork.",
+              },
+            ].map(({ v, label, title, desc, accentRGB: rgb }) => (
+              <div key={v} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
+                <div className="shrink-0 text-right" style={{ minWidth: 36 }}>
+                  <div className="text-[10px] font-mono text-white/30">{v}</div>
+                  {label && <div className="text-[9px] font-mono mt-0.5" style={{ color: rgb ? `rgba(${rgb},0.7)` : "rgba(255,255,255,0.3)" }}>{label}</div>}
+                </div>
+                <div>
+                  <div className="text-sm font-display mb-0.5 text-white/80">{title}</div>
+                  <div className="text-[13px] text-white/40 leading-relaxed">{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-white/[0.06] text-[11px] text-white/20 font-mono leading-relaxed">
+          Your collection is stored locally in your browser and never leaves your device. No account required.
         </div>
       </div>
-      <div className="hidden md:flex items-center gap-1.5 text-[12px] text-white/50 tabular-nums font-mono"><Clock className="w-3 h-3" />{track.duration || "—"}</div>
-      <div className="hidden md:flex items-center gap-1.5 text-[12px] tabular-nums min-w-[80px] justify-end font-mono">
-        <span className="text-white/30 text-[10px]">BPM</span>
-        <span className="font-medium">{track.bpm != null ? track.bpm : "—"}</span>
-      </div>
-      <div className="flex items-center justify-center w-12 md:w-14 h-7 md:h-8">
-        {keyColor ? (
-          <div className="w-full h-full rounded-full flex items-center justify-center text-[11px] md:text-[12px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.12)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.35)")}`, color: keyColor }}>{track.key}</div>
-        ) : (
-          <span className="text-white/25 text-[11px] font-mono">—</span>
-        )}
-      </div>
-      <div className="hidden md:flex items-center justify-center">
-        {track.previewUrl ? (
-          <button onClick={() => onPlay(track.previewUrl)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ background: isPlaying ? `rgba(${accentRGB},0.2)` : "transparent", border: isPlaying ? `1px solid rgba(${accentRGB},0.4)` : "1px solid rgba(255,255,255,0.1)", color: isPlaying ? `rgb(${accentRGB})` : "rgba(255,255,255,0.3)" }}>
-            {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          </button>
-        ) : <div className="w-7 h-7" />}
-      </div>
     </div>
   );
 }
 
-function Section({ title, subtitle, icon, accentRGB, children }) {
-  return (
-    <section className="rounded-3xl p-6 md:p-8" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01))", backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)", border: "1px solid rgba(255,255,255,0.06)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 50px -20px rgba(0,0,0,0.4)" }}>
-      <div className="flex items-baseline justify-between mb-5 md:mb-6">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h3 className="text-[11px] tracking-[0.3em] uppercase font-medium font-mono">{title}</h3>
-        </div>
-        {subtitle && <div className="text-[10px] tracking-[0.15em] uppercase text-white/40 font-mono">{subtitle}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Pill({ label, value, mono }) {
-  return (
-    <div className="inline-flex items-baseline gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <span className="text-[9px] tracking-[0.2em] uppercase text-white/40 font-mono">{label}</span>
-      <span className={`text-sm text-white/90 ${mono ? "font-mono" : ""}`}>{value}</span>
-    </div>
-  );
-}
-
-function ConfidenceBadge({ confidence, identified, accentRGB }) {
-  const cfg = identified
-    ? { label: "Identified", dot: `rgb(${accentRGB})`, text: `rgb(${accentRGB})`, ring: `rgba(${accentRGB},0.3)` }
-    : { label: "Unverified · best guess", dot: "rgb(250,200,100)", text: "rgb(250,200,100)", ring: "rgba(250,200,100,0.3)" };
-  return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono" style={{ border: `1px solid ${cfg.ring}`, color: cfg.text, background: "rgba(255,255,255,0.02)" }}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
-      {cfg.label}
-      {identified && confidence && <span className="text-white/40">· {confidence}</span>}
-    </div>
-  );
-}
-
-function ErrorView({ message, onReset }) {
-  return (
-    <div className="pt-16 flex flex-col items-center text-center max-w-md mx-auto">
-      <div className="w-14 h-14 rounded-full flex items-center justify-center mb-5" style={{ background: "rgba(255,80,80,0.1)", border: "1px solid rgba(255,80,80,0.3)" }}>
-        <X className="w-6 h-6 text-red-300" />
-      </div>
-      <h2 className="text-3xl mb-2 font-display"><span className="italic">Couldn't read</span> that one</h2>
-      <p className="text-white/50 text-sm mb-6 break-words">{message}</p>
-      <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm border border-white/20 hover:bg-white/5 transition-all">Try again</button>
-    </div>
-  );
-}
+// ----- DisambiguationView ----------------------------------------------------
 
 function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick }) {
   return (
-    <div className="pt-8 md:pt-12" style={{ animation: "fadeUp 0.6s ease-out" }}>
+    <div className="pt-8 md:pt-12" style={{ animation: "fadeUp 0.5s ease-out" }}>
       <div className="mb-10">
-        <div className="text-[11px] tracking-[0.3em] uppercase text-white/40 mb-4 font-mono">/* Multiple pressings found */</div>
-        <h2 className="text-4xl md:text-5xl leading-[1.05] mb-3 font-display"><span className="italic">Pick a pressing</span></h2>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Multiple pressings found</div>
+        <h2 className="text-4xl md:text-5xl leading-[1.02] mb-3 font-display tracking-tight"><span className="italic">Pick a pressing</span></h2>
         {vision && (
-          <p className="text-white/40 text-sm font-mono">
-            Read as: <span className="text-white/70">{vision.artist}{vision.title ? ` — ${vision.title}` : ""}</span>
-            {vision.catalogNumber && <span className="text-white/40"> · {vision.catalogNumber}</span>}
+          <p className="text-white/35 text-sm font-mono">
+            Read as: <span className="text-white/60">{vision.artist}{vision.title ? ` — ${vision.title}` : ""}</span>
+            {vision.catalogNumber && <span className="text-white/30"> · {vision.catalogNumber}</span>}
           </p>
         )}
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {candidates.map((candidate, i) => (
-          <button key={candidate.id} onClick={() => onPick(candidate)} className="text-left rounded-2xl overflow-hidden transition-all group relative" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))", backdropFilter: "blur(40px) saturate(180%)", WebkitBackdropFilter: "blur(40px) saturate(180%)", border: `1px solid rgba(${accentRGB},0.15)`, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 50px -20px rgba(0,0,0,0.4)", animation: `fadeUp 0.4s ease-out ${i * 0.07}s both` }}>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), transparent)` }} />
+          <button key={candidate.id} onClick={() => onPick(candidate)} className="text-left rounded-2xl overflow-hidden transition-all group relative" style={{ ...glassSubtle(), animation: `fadeUp 0.35s ease-out ${i * 0.06}s both` }}>
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.08), transparent)` }} />
             <div className="relative aspect-square overflow-hidden">
               {candidate.coverUrl ? (
                 <img src={candidate.coverUrl} alt={candidate.recordTitle || candidate.artist} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.07)` }}><Disc3 className="w-12 h-12 opacity-15" /></div>
+                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.05)` }}><VinylRecord size={40} weight="thin" className="opacity-15" /></div>
               )}
               <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)" }} />
             </div>
             <div className="relative p-4">
-              <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
-              <div className="text-base leading-snug mb-2 font-display">
-                {candidate.artist && <span className="italic">{candidate.artist}</span>}
-                {candidate.artist && candidate.recordTitle && <span className="text-white/35"> — </span>}
-                <span className="text-white/80">{candidate.recordTitle || candidate.artist}</span>
+              <div className="text-[10px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
+              <div className="text-sm leading-snug mb-2 font-display">
+                {candidate.artist && <span className="italic text-white/80">{candidate.artist}</span>}
+                {candidate.artist && candidate.recordTitle && <span className="text-white/25"> / </span>}
+                <span className="text-white/60">{candidate.recordTitle || candidate.artist}</span>
               </div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                {candidate.label && <span className="text-[10px] text-white/50 font-mono">{candidate.label}</span>}
-                {candidate.catalogNumber && <span className="text-[10px] text-white/35 font-mono">{candidate.catalogNumber}</span>}
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                {candidate.label && <span className="text-[10px] text-white/40 font-mono">{candidate.label}</span>}
+                {candidate.catalogNumber && <span className="text-[10px] text-white/25 font-mono">{candidate.catalogNumber}</span>}
               </div>
             </div>
           </button>
@@ -1240,23 +1421,283 @@ function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick })
   );
 }
 
-function RoadmapFooter() {
+// ----- Shared components -----------------------------------------------------
+
+// ----- PredictiveSearch -----------------------------------------------------
+
+function PredictiveSearch({ value, onChange, collection, accentRGB }) {
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
+
+  const q = value.toLowerCase().trim();
+
+  const suggestions = q.length < 1 ? [] : (() => {
+    const seen = new Set();
+    const results = [];
+    const add = (label, text) => {
+      const key = `${label}:${text}`;
+      if (!seen.has(key) && text.toLowerCase().includes(q)) { seen.add(key); results.push({ label, text }); }
+    };
+    // Artists and titles first (most likely search targets), then label/catno
+    for (const r of collection) {
+      add("Artist", r.artist);
+      add("Title", r.title);
+    }
+    for (const r of collection) {
+      if (r.label) add("Label", r.label);
+      if (r.catalogNumber) add("Cat #", r.catalogNumber);
+    }
+    // Starts-with matches bubble to top
+    results.sort((a, b) => {
+      const aStarts = a.text.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStarts = b.text.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStarts - bStarts;
+    });
+    return results.slice(0, 8);
+  })();
+
+  const pick = (text) => { onChange(text); setOpen(false); inputRef.current?.blur(); };
+
+  const handleKey = (e) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, suggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); pick(suggestions[highlighted].text); }
+    else if (e.key === "Escape") { setOpen(false); }
+  };
+
+  useEffect(() => { setHighlighted(0); }, [suggestions.length]);
+
+  return (
+    <div className="relative">
+      <MagnifyingGlass size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none z-10" />
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={handleKey}
+        placeholder="Search artist, title, label, cat #..."
+        className="w-full rounded-full pl-8 pr-4 py-2 text-[12px] font-mono text-white/65 placeholder-white/20 outline-none transition-all"
+        style={{ background: "rgba(255,255,255,0.04)", border: open && suggestions.length > 0 ? `1px solid rgba(${accentRGB},0.3)` : "1px solid rgba(255,255,255,0.08)" }}
+      />
+      {value && (
+        <button onClick={() => { onChange(""); setOpen(false); inputRef.current?.focus(); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition-colors">
+          <X size={11} />
+        </button>
+      )}
+      {open && suggestions.length > 0 && (
+        <div ref={listRef} className="absolute top-full left-0 right-0 mt-1.5 rounded-2xl overflow-hidden z-30" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.98), rgba(12,12,20,0.98))", border: "1px solid rgba(255,255,255,0.09)", boxShadow: "0 20px 50px -10px rgba(0,0,0,0.8)" }}>
+          {suggestions.map((s, i) => (
+            <button key={i} onMouseDown={() => pick(s.text)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all"
+              style={{ background: i === highlighted ? `rgba(${accentRGB},0.10)` : "transparent" }}
+              onMouseEnter={() => setHighlighted(i)}>
+              <span className="text-[9px] tracking-[0.18em] uppercase font-mono shrink-0" style={{ color: `rgba(${accentRGB},0.55)`, minWidth: 36 }}>{s.label}</span>
+              <span className="text-[12px] font-mono text-white/70 truncate">{s.text}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading }) {
+  const keyColor = track.key ? camelotColor(track.key) : null;
+  const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
+  return (
+    <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
+      <div className="text-[10px] tracking-[0.12em] text-white/35 font-mono">{track.position}</div>
+      <div className="min-w-0">
+        <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
+        <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
+          {track.duration && <><span>{track.duration}</span><span>·</span></>}
+          {bpmLoading
+            ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
+            : <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
+          }
+          <span>·</span>
+          <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || "—"}</span>
+        </div>
+      </div>
+      <div className="hidden md:flex items-center gap-1 text-[11px] text-white/35 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
+      <div className="hidden md:flex items-center gap-1 text-[11px] tabular-nums min-w-[72px] justify-end font-mono">
+        <span className="text-white/22 text-[9px]">BPM</span>
+        {bpmLoading
+          ? <span className="text-white/30" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
+          : <span style={{ color: track.bpm != null ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.2)" }}>{track.bpm != null ? track.bpm : "—"}</span>
+        }
+      </div>
+      <div className="flex items-center justify-center w-10 md:w-12 h-6 md:h-7">
+        {keyColor ? (
+          <div className="w-full h-full rounded-full flex items-center justify-center text-[10px] md:text-[11px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
+        ) : <span className="text-white/20 text-[10px] font-mono">—</span>}
+      </div>
+      <div className="hidden md:flex items-center justify-center">
+        {track.previewUrl ? (
+          <button onClick={() => onPlay(track.previewUrl)} className="w-6 h-6 rounded-full flex items-center justify-center transition-all" style={{ background: isPlaying ? `rgba(${accentRGB},0.18)` : "transparent", border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(255,255,255,0.09)", color: isPlaying ? `rgb(${accentRGB})` : "rgba(255,255,255,0.25)" }}>
+            {isPlaying ? <Pause size={9} weight="fill" /> : <Play size={9} weight="fill" />}
+          </button>
+        ) : <div className="w-6 h-6" />}
+      </div>
+    </div>
+  );
+}
+
+function GlassSection({ title, subtitle, icon, accentRGB, children }) {
+  return (
+    <section className="rounded-2xl p-5 md:p-7" style={glass()}>
+      <div className="flex items-baseline justify-between mb-5">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h3 className="text-[10px] tracking-[0.3em] uppercase font-medium font-mono text-white/55">{title}</h3>
+        </div>
+        {subtitle && <div className="text-[10px] tracking-[0.12em] uppercase text-white/25 font-mono">{subtitle}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Pill({ label, value, mono }) {
+  return (
+    <div className="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <span className="text-[9px] tracking-[0.2em] uppercase text-white/30 font-mono">{label}</span>
+      <span className={`text-[13px] text-white/80 ${mono ? "font-mono" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function ConfidenceBadge({ confidence, identified, accentRGB }) {
+  const isOk = identified;
+  return (
+    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono"
+      style={{ border: `1px solid ${isOk ? `rgba(${accentRGB},0.28)` : "rgba(240,190,80,0.28)"}`, color: isOk ? `rgb(${accentRGB})` : "rgb(240,190,80)", background: "rgba(255,255,255,0.015)" }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: isOk ? `rgb(${accentRGB})` : "rgb(240,190,80)" }} />
+      {isOk ? "Identified" : "Unverified"}
+      {isOk && confidence && <span className="text-white/30">· {confidence}</span>}
+    </div>
+  );
+}
+
+function ErrorView({ message, onReset }) {
+  return (
+    <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "rgba(220,80,80,0.08)", border: "1px solid rgba(220,80,80,0.22)" }}>
+        <X size={22} weight="light" className="text-red-300/70" />
+      </div>
+      <h2 className="text-2xl mb-2 font-display"><span className="italic">Couldn't read</span> that one</h2>
+      <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">{message}</p>
+      <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.03)" }}>Try again</button>
+    </div>
+  );
+}
+
+// ----- TagCloud --------------------------------------------------------------
+
+function TagCloud({ tags, genres, accentRGB }) {
+  const genreSet = new Set(genres);
+  return (
+    <div className="flex flex-wrap gap-2">
+      {tags.map((tag) => {
+        const isGenre = genreSet.has(tag);
+        return (
+          <span
+            key={tag}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono"
+            style={isGenre
+              ? { background: `rgba(${accentRGB},0.10)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgba(${accentRGB},0.85)` }
+              : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.52)" }
+            }
+          >
+            {!isGenre && <Sparkle size={9} weight="fill" style={{ opacity: 0.55 }} />}
+            {tag}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ----- ExploreView -----------------------------------------------------------
+
+function ExploreView({ collection, accentRGB, onSelectRecord }) {
+  const [selectedTag, setSelectedTag] = useState(null);
+
+  const tagMap = new Map();
+  for (const record of collection) {
+    for (const tag of (record.tags || [])) {
+      if (!tagMap.has(tag)) tagMap.set(tag, []);
+      tagMap.get(tag).push(record);
+    }
+  }
+  const tagEntries = [...tagMap.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  if (tagEntries.length === 0) {
+    return (
+      <div className="py-20 text-center text-white/25 text-sm font-mono">
+        No tags yet. Scan records to populate the explore view.
+      </div>
+    );
+  }
+
+  if (selectedTag) {
+    const records = tagMap.get(selectedTag) || [];
+    return (
+      <div style={{ animation: "fadeUp 0.22s ease-out" }}>
+        <button onClick={() => setSelectedTag(null)} className="inline-flex items-center gap-2 mb-6 text-[11px] font-mono text-white/35 hover:text-white/65 transition-colors">
+          <CaretLeft size={12} />All tags
+        </button>
+        <div className="mb-5">
+          <h3 className="text-2xl font-display mb-0.5">{selectedTag}</h3>
+          <div className="text-[11px] font-mono text-white/30">{records.length} record{records.length !== 1 ? "s" : ""}</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {records.map((record) => (
+            <RecordCard key={record.id} record={record} onSelect={() => onSelectRecord(record)} onRemove={() => {}} accentRGB={accentRGB} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2.5" style={{ animation: "fadeUp 0.22s ease-out" }}>
+      {tagEntries.map(([tag, records]) => (
+        <button
+          key={tag}
+          onClick={() => setSelectedTag(tag)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-mono transition-all hover:scale-[1.03] active:scale-[0.97]"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)" }}
+        >
+          {tag}
+          <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.28)" }}>{records.length}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RoadmapFooter({ accentRGB }) {
   const items = [
-    { label: "Phase 1", title: "Scan & Identify", desc: "Vision · Discogs · Spotify · Done", active: true },
-    { label: "Phase 2", title: "Collection", desc: "Save · crates · carousel · export · You are here", active: true },
+    { label: "Phase 1", title: "Scan and Identify", desc: "Vision · Discogs · Spotify · Done", done: true },
+    { label: "Phase 2", title: "Collection", desc: "Save · crates · carousel · export · Done", done: true },
     { label: "Phase 3", title: "Record Boxes", desc: "Virtual crates · drag · multi-box assignment" },
     { label: "Phase 4", title: "DJ Mode", desc: "Camelot wheel · BPM filter · set builder" },
-    { label: "Phase 5", title: "Archetype Engine", desc: "Claude clustering · pinnable lenses" },
+    { label: "Phase 5", title: "Archetype Engine", desc: "Clustering · pinnable lenses" },
   ];
   return (
-    <footer className="relative z-10 px-6 md:px-10 pb-16 max-w-7xl mx-auto mt-20 md:mt-32">
-      <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-6 font-mono">/* Roadmap */</div>
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <footer className="relative z-10 px-5 md:px-10 pb-16 max-w-7xl mx-auto mt-24 md:mt-36">
+      <div className="text-[10px] tracking-[0.3em] uppercase text-white/20 mb-5 font-mono">Roadmap</div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {items.map((item, i) => (
-          <div key={i} className="p-4 rounded-2xl" style={{ background: item.active ? "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))" : "transparent", border: item.active ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(255,255,255,0.04)", opacity: item.active ? 1 : 0.55 }}>
-            <div className="text-[9px] tracking-[0.25em] uppercase text-white/40 mb-2 font-mono">{item.label}</div>
-            <div className="text-base md:text-lg leading-tight mb-1 font-display">{item.title}</div>
-            <div className="text-[11px] text-white/40 leading-snug">{item.desc}</div>
+          <div key={i} className="p-4 rounded-2xl" style={{ background: item.done ? "rgba(255,255,255,0.035)" : "transparent", border: item.done ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(255,255,255,0.04)", opacity: item.done ? 1 : 0.45 }}>
+            <div className="text-[9px] tracking-[0.25em] uppercase mb-2 font-mono" style={{ color: item.done ? `rgba(${accentRGB},0.6)` : "rgba(255,255,255,0.25)" }}>{item.label}</div>
+            <div className="text-sm md:text-base leading-tight mb-1 font-display text-white/80">{item.title}</div>
+            <div className="text-[11px] text-white/30 leading-snug">{item.desc}</div>
           </div>
         ))}
       </div>

@@ -79,6 +79,71 @@ export async function identifyFromImage(image, mediaType, apiKey) {
   return JSON.parse(raw);
 }
 
+const TEXT_PROMPT = (ocrText) => `The following text was extracted by OCR from a vinyl record label. Use it to identify the release.
+
+OCR text: "${ocrText}"
+
+Return ONLY valid JSON (no markdown fences) in this exact shape:
+
+{
+  "identified": boolean,
+  "confidence": "high" | "medium" | "low",
+  "artist": string,
+  "title": string,
+  "label": string | null,
+  "catalogNumber": string | null,
+  "year": number | null,
+  "country": string | null,
+  "genres": [string],
+  "suggestedBoxes": [string],
+  "notes": string,
+  "rawText": string
+}
+
+title: The EP or LP name. Track names listed on labels are individual tracks, not the release title.
+artist: The performing artist. Label imprint names (e.g. "PURPOSE MAKER", "WARP") are labels, not artists. Return "" if no artist is printed separately.
+label: The record label or imprint.
+catalogNumber: The alphanumeric release code, e.g. "PM-012", "WAP63". Read digits exactly as given.
+rawText: Copy the OCR text verbatim.
+
+Use your knowledge to identify the release if you recognise it. Context: electronic music archive — house, techno, ambient, IDM, electro, drum & bass, dub, downtempo.
+genres: 2-4 tags. suggestedBoxes: 2-3 evocative crate names. notes: one sentence max.
+
+Return ONLY the JSON object.`;
+
+export async function identifyFromText(ocrText, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: TEXT_PROMPT(ocrText) }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Anthropic API error: ${errText.slice(0, 300)}`);
+  }
+
+  const data = await response.json();
+  const textBlock = data.content?.find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No text response from Vision');
+
+  let raw = textBlock.text.trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  return JSON.parse(raw);
+}
+
 export async function generateCrateSuggestions(release, apiKey) {
   const { artist, title, label, year, genres } = release;
   const context = [

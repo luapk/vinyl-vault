@@ -31,14 +31,23 @@ async function getToken() {
 }
 
 async function searchTrack(token, artist, trackTitle) {
-  const q = `track:${trackTitle} artist:${artist}`;
+  // Only include artist filter when we have one — empty artist: produces malformed queries
+  const q = artist ? `track:${trackTitle} artist:${artist}` : `track:${trackTitle}`;
   const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=3`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.log(`[spotify] search ${res.status} for "${q}"`);
+    return null;
+  }
   const data = await res.json();
   const track = data.tracks?.items?.[0];
-  if (!track) return null;
-  return { id: track.id, previewUrl: track.preview_url || null };
+  if (!track) {
+    console.log(`[spotify] no results for "${q}"`);
+    return null;
+  }
+  const preview = track.preview_url || null;
+  console.log(`[spotify] hit: id=${track.id} preview=${preview ? 'YES' : 'NULL'}`);
+  return { id: track.id, previewUrl: preview };
 }
 
 async function fetchAudioFeatures(token, trackId) {
@@ -46,8 +55,13 @@ async function fetchAudioFeatures(token, trackId) {
     `https://api.spotify.com/v1/audio-features/${trackId}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!res.ok) return null;
-  return res.json();
+  if (!res.ok) {
+    console.log(`[spotify] features=${res.status}`);
+    return null;
+  }
+  const f = await res.json();
+  console.log(`[spotify] features: bpm=${Math.round(f.tempo)} key=${f.key} mode=${f.mode}`);
+  return f;
 }
 
 const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null };

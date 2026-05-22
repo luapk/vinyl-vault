@@ -8,8 +8,16 @@ function load() {
 }
 
 function recordFromRelease(release, crates) {
+  // tags = AI evocative descriptors + Discogs genre/style classifications.
+  // These describe what the record IS. Deduplicated, never used for organisation.
+  const tags = [
+    ...(release.suggestedBoxes || []),
+    ...(release.genres || []),
+  ].filter((t, i, arr) => arr.indexOf(t) === i);
+
   return {
     id: crypto.randomUUID(),
+    discogsId: release.id || null,
     savedAt: Date.now(),
     artist: release.artist || '',
     title: release.title || '',
@@ -19,11 +27,13 @@ function recordFromRelease(release, crates) {
     country: release.country || null,
     format: release.format || null,
     genres: release.genres || [],
+    tags,
     identified: release.identified ?? true,
     confidence: release.confidence || 'high',
     source: release.source || 'discogs',
     notes: release.notes || '',
     coverUrl: release.coverUrl || null,
+    images: release.images || [],
     tracklist: (release.tracklist || []).map(t => ({
       position: t.position,
       title: t.title,
@@ -31,7 +41,6 @@ function recordFromRelease(release, crates) {
       bpm: t.bpm || null,
       key: t.key || null,
     })),
-    suggestedBoxes: release.suggestedBoxes || [],
     crates,
   };
 }
