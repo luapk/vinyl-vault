@@ -87,6 +87,16 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   return release;
 }
 
+const visionFallback = (vision) => ({
+  ...vision,
+  tracklist: [],
+  source: 'vision',
+  coverUrl: null,
+  identified: false,
+  confidence: 'low',
+  notes: 'No matching Discogs release found',
+});
+
 function toCandidate(r) {
   return {
     id: r.id, masterId: r.masterId, artist: r.artist,
@@ -213,17 +223,24 @@ export default async function handler(req, res) {
 
     if (mergedCandidates.length === 1) {
       const sole = mergedCandidates[0];
-      // If the single remaining candidate scores clearly negative, surface it
-      // as disambiguation rather than silently auto-selecting a bad match.
       const soleScore = scoreCandidate(sole, vision);
+      // A clearly wrong-artist result (catno collision from a different label) is
+      // worse than returning the raw Vision reading — skip the bad Discogs match.
       if (soleScore < -1 && (vision.artist || vision.title)) {
-        return res.status(200).json({ status: 'disambiguation', vision, candidates: mergedCandidates });
+        return res.status(200).json({ status: 'complete', release: visionFallback(vision) });
       }
       const discogsRelease = rawMerged.indexOf(sole) < textMatches.length
         ? await fetchDiscogsRelease(sole.id)
         : googleOnlyReleases.find(r => String(r.id) === String(sole.id)) || await fetchDiscogsRelease(sole.id);
       const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
       return res.status(200).json({ status: 'complete', release });
+    }
+
+    // Multiple candidates: if they ALL clearly mismatch the vision artist/title,
+    // skip the disambiguation screen and return the Vision reading instead.
+    const allBad = mergedCandidates.every(c => scoreCandidate(c, vision) < -1);
+    if (allBad && (vision.artist || vision.title)) {
+      return res.status(200).json({ status: 'complete', release: visionFallback(vision) });
     }
 
     return res.status(200).json({ status: 'disambiguation', vision, candidates: mergedCandidates });

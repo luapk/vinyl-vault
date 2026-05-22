@@ -39,14 +39,19 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
   const urls = new Set();
 
   if (catalogNumber) {
+    // Broad catno-only search (may return false collisions from other labels)
     urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&type=release&per_page=5`);
-    // Also try normalised variants: strip/replace separators so "PM012" finds "PM-012"
+    // Normalised variants: strip/replace separators so "PM012" finds "PM-012"
     const stripped = catalogNumber.replace(/[\s\-\.]/g, '');
     const dashed = catalogNumber.replace(/[\s\.]/g, '-');
     for (const variant of new Set([stripped, dashed])) {
       if (variant !== catalogNumber) {
         urls.add(`${BASE}/database/search?catno=${encodeURIComponent(variant)}&type=release&per_page=5`);
       }
+    }
+    // Combined catno + artist: much more targeted, avoids cross-label collisions
+    if (artist) {
+      urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&artist=${encodeURIComponent(artist)}&type=release&per_page=5`);
     }
   }
   if (artist && title) {
