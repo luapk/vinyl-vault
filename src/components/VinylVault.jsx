@@ -337,10 +337,14 @@ export default function VinylVault() {
     return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
   }
   if (isSupabaseEnabled && authLoading) {
+    if (showWalkthrough) {
+      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#050508" }}>
-        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.6)" }} />
-        <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Connecting...</span>
+        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 64, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
+        <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.5)" }} />
+        <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>Connecting...</span>
       </div>
     );
   }
@@ -588,7 +592,7 @@ export default function VinylVault() {
         <div className="relative z-20 px-5 md:px-10 pt-3">
           <div className="max-w-7xl mx-auto p-3 rounded-xl flex items-center gap-3 text-sm"
             style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
-            <span className="text-white/70 flex-1">You have records saved locally. Move them to your Supabase account?</span>
+            <span className="text-white/70 flex-1">You have records saved locally. Move them to your profile account?</span>
             <button onClick={async () => { await migrateFromLocalStorage(); setMigrationBanner(false); }}
               className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all"
               style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
@@ -635,7 +639,7 @@ export default function VinylVault() {
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
-      {false && showWalkthrough && appView === 'scan' && (
+      {showWalkthrough && appView === 'scan' && (
         <WalkthroughOverlay onDismiss={() => {
           localStorage.setItem('walkthroughSeen', '1');
           setShowWalkthrough(false);
