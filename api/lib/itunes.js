@@ -1,15 +1,45 @@
 const BASE = 'https://itunes.apple.com';
 
+function stripParens(s) {
+  return s.replace(/\s*\([^)]*\)/g, '').trim();
+}
+
+function bestMatch(results, trackTitle) {
+  if (!results.length) return null;
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const target = norm(trackTitle);
+  // Prefer exact or close title match
+  const sorted = results
+    .filter(r => r.previewUrl)
+    .sort((a, b) => {
+      const aScore = norm(a.trackName || '').includes(target) ? 0 : 1;
+      const bScore = norm(b.trackName || '').includes(target) ? 0 : 1;
+      return aScore - bScore;
+    });
+  return sorted[0]?.previewUrl || null;
+}
+
 async function searchTrackPreview(artist, trackTitle) {
-  const q = encodeURIComponent(`${artist} ${trackTitle}`.trim());
-  try {
-    const res = await fetch(`${BASE}/search?term=${q}&entity=song&media=music&limit=5`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data.results || []).find(r => r.previewUrl)?.previewUrl || null;
-  } catch {
-    return null;
+  const strategies = [
+    `${artist} ${trackTitle}`,
+    trackTitle,
+    stripParens(trackTitle),
+  ].filter((s, i, arr) => s && arr.indexOf(s) === i);
+
+  for (const q of strategies) {
+    try {
+      const res = await fetch(
+        `${BASE}/search?term=${encodeURIComponent(q)}&entity=song&media=music&limit=10`
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const url = bestMatch(data.results || [], trackTitle);
+      if (url) return url;
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 export async function fillItunesPreviews(tracks, artist) {

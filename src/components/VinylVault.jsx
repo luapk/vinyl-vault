@@ -108,9 +108,19 @@ const bpmCache = new Map();
 async function detectBPM(previewUrl) {
   if (bpmCache.has(previewUrl)) return bpmCache.get(previewUrl);
   try {
-    const resp = await fetch(previewUrl, { mode: 'cors' });
-    if (!resp.ok) return null;
-    const arrayBuf = await resp.arrayBuffer();
+    let arrayBuf;
+    try {
+      const resp = await fetch(previewUrl, { mode: 'cors' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      arrayBuf = await resp.arrayBuffer();
+    } catch {
+      // CORS or network block: route through server-side proxy
+      const proxyResp = await fetch(
+        `/api/audio-proxy?url=${encodeURIComponent(previewUrl)}`
+      );
+      if (!proxyResp.ok) return null;
+      arrayBuf = await proxyResp.arrayBuffer();
+    }
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return null;
@@ -531,6 +541,13 @@ export default function VinylVault() {
 // ----- IdleView --------------------------------------------------------------
 
 function IdleView({ onUpload, onBatch, accentRGB }) {
+  const [showCamera, setShowCamera] = useState(false);
+
+  const handleCapture = (file) => {
+    setShowCamera(false);
+    onUpload(file);
+  };
+
   return (
     <div className="pt-10 md:pt-20">
       <div className="max-w-2xl mb-14 md:mb-20">
@@ -545,8 +562,9 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
-        <label className="relative block rounded-2xl p-7 cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={glass({ boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 32px 64px -20px rgba(0,0,0,0.6), 0 0 50px -15px rgba(${accentRGB},0.18)` })}>
-          <div className="relative z-10 flex flex-col gap-5">
+        {/* Camera / scan card */}
+        <div className="relative rounded-2xl p-7 transition-all hover:brightness-110 active:scale-[0.98]" style={glass({ boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 32px 64px -20px rgba(0,0,0,0.6), 0 0 50px -15px rgba(${accentRGB},0.18)` })}>
+          <div className="flex flex-col gap-5">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.25), rgba(${accentRGB},0.05))`, border: `1px solid rgba(${accentRGB},0.3)` }}>
               <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
             </div>
@@ -555,9 +573,12 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
               <div className="text-lg font-display">Scan a sleeve</div>
             </div>
           </div>
-          <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
-        </label>
+          {/* Primary: open camera viewfinder */}
+          <button onClick={() => setShowCamera(true)} className="absolute inset-0 w-full h-full rounded-2xl" aria-label="Open camera" />
+          {/* Secondary: choose from library (small link below the card) */}
+        </div>
 
+        {/* Upload from library -- shown below camera card on small screens, as a separate option */}
         <label className="relative block rounded-2xl p-7 cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={glassSubtle({ borderRadius: "1rem" })}>
           <div className="relative z-10 flex flex-col gap-5">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
@@ -571,6 +592,17 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
           <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
         </label>
       </div>
+
+      {/* "or choose from library" fallback for the scan card */}
+      <div className="mt-3 max-w-2xl">
+        <label className="inline-flex items-center gap-1.5 text-[11px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
+          <Upload size={11} />
+          or choose a photo from library
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
+        </label>
+      </div>
+
+      {showCamera && <CameraModal onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
     </div>
   );
 }
@@ -1736,6 +1768,124 @@ function ExploreView({ collection, accentRGB, onSelectRecord }) {
           <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.28)" }}>{records.length}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function CameraModal({ onCapture, onClose }) {
+  const videoRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+  const [flash, setFlash] = useState(false);
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    }).then(stream => {
+      if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => setReady(true);
+      }
+    }).catch(err => {
+      if (mounted) setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : err.message);
+    });
+    return () => {
+      mounted = false;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  const capture = () => {
+    if (!videoRef.current || !ready) return;
+    setFlash(true);
+    setTimeout(() => setFlash(false), 180);
+    const v = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = v.videoWidth;
+    canvas.height = v.videoHeight;
+    canvas.getContext('2d').drawImage(v, 0, 0);
+    canvas.toBlob(blob => {
+      if (blob) onCapture(new File([blob], 'scan.jpg', { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.92);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: '#000' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+
+      {/* Flash overlay */}
+      {flash && <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'rgba(255,255,255,0.7)', animation: 'none' }} />}
+
+      {/* Close */}
+      <button onClick={onClose} className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full flex items-center justify-center text-white"
+        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)' }}>
+        <X size={18} />
+      </button>
+
+      {/* Video feed */}
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        <video ref={videoRef} autoPlay playsInline muted
+          className="w-full h-full object-cover"
+          style={{ display: ready ? 'block' : 'none' }} />
+
+        {!ready && !error && (
+          <div className="text-white/50 text-sm font-mono flex flex-col items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 animate-spin"
+              style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: 'rgba(255,255,255,0.7)' }} />
+            Starting camera...
+          </div>
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center gap-4 px-8 text-center">
+            <div className="text-white/60 text-sm font-mono">{error}</div>
+            <label className="px-5 py-2.5 rounded-full text-sm font-mono text-white/70 cursor-pointer"
+              style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}>
+              Choose photo instead
+              <input type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) onCapture(f); }} />
+            </label>
+          </div>
+        )}
+
+        {/* Framing guide: corner brackets on a centred square */}
+        {ready && (
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="relative" style={{ width: 'min(80vw, 80vh)', height: 'min(80vw, 80vh)' }}>
+              {/* Dimming outside the guide area */}
+              <div className="absolute inset-0" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)' }} />
+              {/* Corner brackets */}
+              {[['top-0 left-0', 'border-t border-l'],
+                ['top-0 right-0', 'border-t border-r'],
+                ['bottom-0 left-0', 'border-b border-l'],
+                ['bottom-0 right-0', 'border-b border-r']].map(([pos, border]) => (
+                <div key={pos} className={`absolute ${pos} w-7 h-7 ${border}`}
+                  style={{ borderColor: 'rgba(255,255,255,0.8)', borderWidth: 2 }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Capture button */}
+      {ready && (
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 z-10">
+          <p className="text-[10px] tracking-[0.2em] uppercase font-mono text-white/40">
+            Align sleeve within the guide
+          </p>
+          <button onClick={capture}
+            className="w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '3px solid rgba(255,255,255,0.5)', boxShadow: '0 0 0 4px rgba(255,255,255,0.15)' }}>
+            <Camera size={24} style={{ color: '#111' }} weight="bold" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
