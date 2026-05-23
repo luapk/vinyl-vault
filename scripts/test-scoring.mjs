@@ -590,6 +590,477 @@ test('R: score edges', 'null sim (empty fields) does not penalise', {
   correctId: '1',
 });
 
+// ─── Category S: Truncated / partial artist name ──────────────────────────────
+
+test('S: truncated artist', 'First word of two-word artist only', {
+  vision: { artist: 'Aphex', title: 'Come to Daddy', label: 'Warp' },
+  candidates: [
+    c('1', 'Aphex Twin', 'Come to Daddy', 'Warp Records'),
+    c('2', 'Various Artists', 'Come to Daddy Compilation', 'Warp Records'),
+  ],
+  correctId: '1',
+});
+
+test('S: truncated artist', 'Artist truncated mid-word — substring includes saves it', {
+  vision: { artist: 'Aphex T', title: 'Drukqs', label: 'Warp' },
+  candidates: [
+    c('1', 'Aphex Twin', 'Drukqs', 'Warp Records'),
+    c('2', 'Aphex', 'Drukqs', 'Not Warp'),
+  ],
+  correctId: '1',
+});
+
+test('S: truncated artist', 'Only surname readable', {
+  vision: { artist: 'Craig', title: 'Landcruising', label: 'Planet E' },
+  candidates: [
+    c('1', 'Carl Craig', 'Landcruising', 'Planet E'),
+    c('2', 'Various', 'Landcruising Remixes', 'Planet E'),
+  ],
+  correctId: '1',
+});
+
+test('S: truncated artist', 'Known short-form alias on label', {
+  vision: { artist: 'UR', title: 'Electronic Warfare', label: null },
+  candidates: [
+    c('1', 'UR', 'Electronic Warfare', 'Underground Resistance'),
+    c('2', 'Underground Resistance', 'Electronic Warfare', 'Underground Resistance'),
+  ],
+  correctId: '1',
+});
+
+test('S: truncated artist', 'Single initial — too short to penalise, title decides', {
+  vision: { artist: 'J', title: 'The Bells', label: 'Axis' },
+  candidates: [
+    c('1', 'Jeff Mills', 'The Bells', 'Axis'),
+    c('2', 'Joey Beltram', 'Energy Flash', 'R&S Records'),
+  ],
+  correctId: '1',
+});
+
+test('S: truncated artist', 'Partial label word bleeds into artist — triggers unreliable', {
+  vision: { artist: 'Warp Re', title: 'Surfing on Sine Waves', label: 'Warp' },
+  candidates: [
+    c('1', 'Polygon Window', 'Surfing on Sine Waves', 'Warp Records'),
+    c('2', 'Warp Records', 'Surfing on Sine Waves', 'Warp Records'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category T: Truncated / clipped title ────────────────────────────────────
+
+test('T: truncated title', 'Title ends at word boundary, shorter than real title', {
+  vision: { artist: 'Burial', title: 'Rival Deal', label: 'Hyperdub' },
+  candidates: [
+    c('1', 'Burial', 'Rival Dealer', 'Hyperdub'),
+    c('2', 'Various', 'Rival Deal', 'Other Label'),
+  ],
+  correctId: '1',
+});
+
+test('T: truncated title', 'Last word missing from four-word title', {
+  vision: { artist: 'Massive Attack', title: 'Unfinished Sympathy', label: 'Wild Bunch' },
+  candidates: [
+    c('1', 'Massive Attack', 'Unfinished Sympathy', 'Wild Bunch Records'),
+    c('2', 'Massive Attack', 'Unfinished', 'Wild Bunch Records'),
+  ],
+  correctId: '1',
+});
+
+test('T: truncated title', 'Title truncated mid-word — prefix still matches via includes', {
+  vision: { artist: 'Autechre', title: 'Amber', label: 'Warp' },
+  candidates: [
+    c('1', 'Autechre', 'Amber', 'Warp Records'),
+    c('2', 'Autechre', 'Ambergris', 'Warp Records'),
+  ],
+  correctId: '1',
+});
+
+test('T: truncated title', 'Only first keyword of long title', {
+  vision: { artist: 'Carl Craig', title: 'More Songs', label: 'Planet E' },
+  candidates: [
+    c('1', 'Carl Craig', 'More Songs About Food and Revolutionary Art', 'Planet E'),
+    c('2', 'Carl Craig', 'More Hits', 'Planet E'),
+  ],
+  correctId: '1',
+});
+
+test('T: truncated title', 'EP suffix stripped by OCR', {
+  vision: { artist: 'Floorplan', title: 'Never Grow Old', label: null },
+  candidates: [
+    c('1', 'Floorplan', 'Never Grow Old EP', 'Motor City Drum Ensemble'),
+    c('2', 'Floorplan', 'Paradise', 'Motor City Drum Ensemble'),
+  ],
+  correctId: '1',
+});
+
+test('T: truncated title', 'Long title clipped to ~half — word overlap carries it', {
+  vision: { artist: 'The Orb', title: 'Adventures Beyond', label: null },
+  candidates: [
+    c('1', 'The Orb', 'Adventures Beyond the Ultraworld', 'Big Life'),
+    c('2', 'The Orb', 'Adventures in Clubland', 'Big Life'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category U: OCR character substitutions ──────────────────────────────────
+
+test('U: ocr substitution', '1 substituted for i — word still mostly matches', {
+  vision: { artist: 'Aphex Tw1n', title: 'Windowlicker', label: 'Warp' },
+  candidates: [
+    c('1', 'Aphex Twin', 'Windowlicker', 'Warp Records'),
+    c('2', 'AFX', 'Windowlicker', 'Warp Records'),
+  ],
+  correctId: '1',
+});
+
+test('U: ocr substitution', '0 substituted for O in artist', {
+  vision: { artist: 'M0del 500', title: "No UFO's", label: 'Metroplex' },
+  candidates: [
+    c('1', 'Model 500', "No UFO's", 'Metroplex'),
+    c('2', 'Model 500', 'Nitro', 'Metroplex'),
+  ],
+  correctId: '1',
+});
+
+test('U: ocr substitution', 'Extra space inserted mid-word in artist', {
+  vision: { artist: 'Plasti kman', title: 'Spastik', label: null },
+  candidates: [
+    c('1', 'Plastikman', 'Spastik', 'Novamute'),
+    c('2', 'Plaster', 'Spastik', 'Other Label'),
+  ],
+  correctId: '1',
+});
+
+test('U: ocr substitution', 'Repeated letter in artist name', {
+  vision: { artist: 'Burrial', title: 'Archangel', label: 'Hyperdub' },
+  candidates: [
+    c('1', 'Burial', 'Archangel', 'Hyperdub'),
+    c('2', 'Various', 'Archangel', 'Hyperdub'),
+  ],
+  correctId: '1',
+});
+
+test('U: ocr substitution', 'S substituted for 5 in catalog-style artist name', {
+  vision: { artist: 'Model S00', title: 'Starlight', label: 'Metroplex' },
+  candidates: [
+    c('1', 'Model 500', 'Starlight', 'Metroplex'),
+    c('2', 'Model 500', 'Nitro', 'Metroplex'),
+  ],
+  correctId: '1',
+});
+
+test('U: ocr substitution', 'Both artist and title have single char errors — title saves it', {
+  vision: { artist: 'Pla5tikman', title: 'Consumed', label: null },
+  candidates: [
+    c('1', 'Plastikman', 'Consumed', 'Novamute'),
+    c('2', 'Random Act', 'Consumed', 'Other Label'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category V: Track title read as release title ────────────────────────────
+
+test('V: track as release title', 'Track name matches EP title — no conflict', {
+  vision: { artist: 'Rhythim Is Rhythim', title: 'Strings of Life', label: 'Transmat' },
+  candidates: [
+    c('1', 'Rhythim Is Rhythim', 'Strings of Life', 'Transmat'),
+    c('2', 'Derrick May', 'Beyond the Dance', 'Transmat'),
+  ],
+  correctId: '1',
+});
+
+test('V: track as release title', 'B-side track name read as title, artist strong enough', {
+  vision: { artist: 'Jeff Mills', title: 'Gamma Player', label: 'Axis' },
+  candidates: [
+    c('1', 'Jeff Mills', 'Gamma Player', 'Axis'),
+    c('2', 'Jeff Mills', 'The Bells', 'Axis'),
+  ],
+  correctId: '1',
+});
+
+test('V: track as release title', 'Track with remix suffix in title field — ties go to first candidate', {
+  vision: { artist: 'Drexciya', title: 'Aquabahn (Techno Mix)', label: 'Submerge' },
+  candidates: [
+    c('1', 'Drexciya', 'Aquabahn', 'Submerge'),
+    c('2', 'Drexciya', 'Aquabahn (Techno Mix)', 'Submerge'),
+  ],
+  correctId: '1',  // both score 9 (includes = 0.8 and exact = 1.0 both hit +4 threshold); stable sort preserves order
+});
+
+test('V: track as release title', 'Exact title match beats partial match when label differs', {
+  vision: { artist: 'Basic Channel', title: 'Phylyps Trak', label: 'Basic Channel' },
+  candidates: [
+    c('1', 'Basic Channel', 'Phylyps Trak II', 'Rhythm & Sound'),  // wrong label
+    c('2', 'Basic Channel', 'Phylyps Trak', 'Basic Channel'),       // exact title + matching label
+  ],
+  correctId: '2',  // label overlap is unreliable (artist=label), but title exact match wins
+});
+
+test('V: track as release title', 'Side label track listing first line taken as title', {
+  vision: { artist: 'Underground Resistance', title: 'Frictional Nevada', label: 'UR' },
+  candidates: [
+    c('1', 'Underground Resistance', 'Frictional Nevada', 'Underground Resistance'),
+    c('2', 'Underground Resistance', 'Galaxy 2 Galaxy', 'Underground Resistance'),
+  ],
+  correctId: '1',
+});
+
+test('V: track as release title', 'Untitled track read, matches untitled release', {
+  vision: { artist: 'Actress', title: 'Untitled', label: 'Werkdiscs' },
+  candidates: [
+    c('1', 'Actress', 'Untitled', 'Werkdiscs'),
+    c('2', 'Actress', 'Untitled 2', 'Werkdiscs'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category W: Noise / junk text in fields ──────────────────────────────────
+
+test('W: junk in fields', 'SIDE A read as title — artist carries the match', {
+  vision: { artist: 'Juan Atkins', title: 'SIDE A', label: 'Metroplex' },
+  candidates: [
+    c('1', 'Juan Atkins', 'Skyway', 'Metroplex'),
+    c('2', 'Model 500', 'No UFOs', 'Metroplex'),
+  ],
+  correctId: '1',
+});
+
+test('W: junk in fields', '33 1/3 RPM speed marking read as title', {
+  vision: { artist: 'Derrick May', title: '33 1/3', label: 'Transmat' },
+  candidates: [
+    c('1', 'Derrick May', 'Nude Photo', 'Transmat'),
+    c('2', 'Derrick May', 'Strings of Life', 'Transmat'),
+  ],
+  correctId: '1',
+});
+
+test('W: junk in fields', 'STEREO printed large, read as artist', {
+  vision: { artist: 'STEREO', title: 'Mentasm', label: 'R&S Records' },
+  candidates: [
+    c('1', 'Second Phase', 'Mentasm', 'R&S Records'),
+    c('2', 'Joey Beltram', 'Mentasm', 'R&S Records'),
+  ],
+  correctId: '1',
+});
+
+test('W: junk in fields', 'Matrix runout text in title — no title signal, artist+label decide', {
+  vision: { artist: 'Plastikman', title: 'NVMLT-001 A1 PORKY', label: 'Novamute' },
+  candidates: [
+    c('1', 'Plastikman', 'Spastik', 'Novamute'),
+    c('2', 'Plastikman', 'Consumed', 'Novamute'),
+  ],
+  correctId: '1',
+});
+
+test('W: junk in fields', 'PROMOTIONAL COPY NOT FOR SALE bleeds into artist', {
+  vision: { artist: 'PROMOTIONAL COPY', title: 'Strings of Life', label: 'Transmat' },
+  candidates: [
+    c('1', 'Rhythim Is Rhythim', 'Strings of Life', 'Transmat'),
+    c('2', 'Various', 'Strings of Life Remixes', 'Transmat'),
+  ],
+  correctId: '1',
+});
+
+test('W: junk in fields', 'MADE IN UK read as label — no label signal but artist+title strong', {
+  vision: { artist: 'Aphex Twin', title: 'Windowlicker', label: 'MADE IN UK' },
+  candidates: [
+    c('1', 'Aphex Twin', 'Windowlicker', 'Warp Records'),
+    c('2', 'Aphex Twin', 'Come to Daddy', 'Warp Records'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category X: Single word from a multi-word name ──────────────────────────
+
+test('X: single keyword', 'Last name only — first name dropped', {
+  vision: { artist: 'Mills', title: 'The Bells', label: 'Axis' },
+  candidates: [
+    c('1', 'Jeff Mills', 'The Bells', 'Axis'),
+    c('2', 'Robert Mills', 'The Bells', 'Other Label'),
+  ],
+  correctId: '1',
+});
+
+test('X: single keyword', 'First word of title only — artist disambiguates', {
+  vision: { artist: 'Burial', title: 'Rival', label: null },
+  candidates: [
+    c('1', 'Burial', 'Rival Dealer', 'Hyperdub'),
+    c('2', 'Various', 'Rival', 'Some Label'),
+  ],
+  correctId: '1',
+});
+
+test('X: single keyword', '"Attack" as full artist name', {
+  vision: { artist: 'Attack', title: 'Teardrop', label: null },
+  candidates: [
+    c('1', 'Massive Attack', 'Teardrop', 'Virgin'),
+    c('2', 'Heart Attack', 'Teardrop', 'Other Label'),
+  ],
+  correctId: '1',
+});
+
+test('X: single keyword', '"Resistance" as full artist name', {
+  vision: { artist: 'Resistance', title: 'Electronic Warfare', label: null },
+  candidates: [
+    c('1', 'Underground Resistance', 'Electronic Warfare', 'Underground Resistance'),
+    c('2', 'Resistance D', 'Electronic Warfare', 'Some Label'),
+  ],
+  correctId: '1',
+});
+
+test('X: single keyword', 'Generic single word title needs artist + label', {
+  vision: { artist: 'Surgeon', title: 'Magneze', label: 'Downwards' },
+  candidates: [
+    c('1', 'Surgeon', 'Magneze', 'Downwards'),
+    c('2', 'Surgeon', 'Badger Bite', 'Downwards'),
+    c('3', 'Various', 'Magneze', 'Other'),
+  ],
+  correctId: '1',
+});
+
+test('X: single keyword', 'Title word is common — artist is the only reliable signal', {
+  vision: { artist: 'Drexciya', title: 'Journey', label: null },
+  candidates: [
+    c('1', 'Drexciya', 'Journey of the Deep Sea Dweller', 'Clone'),
+    c('2', 'Various', 'Journey', 'Some Compilations'),
+    c('3', 'Drexciya', 'Neptune\'s Lair', 'Tresor'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category Y: Format / pressing info in fields ─────────────────────────────
+
+test('Y: format as title', '"12 Inch" printed on label read as title', {
+  vision: { artist: 'Juan Atkins', title: '12 Inch', label: 'Metroplex' },
+  candidates: [
+    c('1', 'Juan Atkins', 'Skyway', 'Metroplex'),
+    c('2', 'Model 500', 'Off To Battle', 'Metroplex'),
+  ],
+  correctId: '1',
+});
+
+test('Y: format as title', '"EP" only as title — too short, artist + label decide', {
+  vision: { artist: 'Bicep', title: 'EP', label: 'Feel My Bicep' },
+  candidates: [
+    c('1', 'Bicep', 'Feel My Bicep EP', 'Feel My Bicep'),
+    c('2', 'Bicep', 'Glue', 'Feel My Bicep'),
+  ],
+  correctId: '1',
+});
+
+test('Y: format as title', '"Original Mix" as title — subtitle leaked into title field', {
+  vision: { artist: 'Floorplan', title: 'Original Mix', label: null },
+  candidates: [
+    c('1', 'Floorplan', 'Never Grow Old', 'Motor City Drum Ensemble'),
+    c('2', 'Floorplan', 'Paradise', 'Motor City Drum Ensemble'),
+  ],
+  correctId: '1',
+});
+
+test('Y: format as title', '"White Label" printed as title', {
+  vision: { artist: 'Surgeon', title: 'White Label', label: 'Downwards' },
+  candidates: [
+    c('1', 'Surgeon', 'Force + Form', 'Downwards'),
+    c('2', 'Regis', 'Gymnastics', 'Downwards'),
+  ],
+  correctId: '1',
+});
+
+test('Y: format as title', '"Maxi Single" as title with correct artist', {
+  vision: { artist: 'Daft Punk', title: 'Maxi Single', label: 'Virgin' },
+  candidates: [
+    c('1', 'Daft Punk', 'Da Funk', 'Virgin'),
+    c('2', 'Daft Punk', 'Around the World', 'Virgin'),
+  ],
+  correctId: '1',
+});
+
+test('Y: format as title', 'RPM marking "45 RPM" as title, label strong', {
+  vision: { artist: '', title: '45 RPM', label: 'Trax Records' },
+  candidates: [
+    c('1', 'Larry Heard', 'Can You Feel It', 'Trax Records'),
+    c('2', 'Various', 'Trax Sampler', 'Not Trax'),
+  ],
+  correctId: '1',
+});
+
+// ─── Category Z: Multi-field degradation ──────────────────────────────────────
+
+test('Z: multi-field degraded', 'Truncated artist + truncated title — substring includes still wins', {
+  vision: { artist: 'Aphex', title: 'Selected Ambient', label: 'Warp' },
+  candidates: [
+    c('1', 'Aphex Twin', 'Selected Ambient Works Volume II', 'Warp Records'),
+    c('2', 'Aphex Twin', 'Selected Ambient Works 85-92', 'Warp Records'),
+    c('3', 'Various', 'Selected Ambient', 'Warp Records'),
+  ],
+  correctId: '1',  // "Aphex Twin" includes "Aphex" (0.8 -> +4) beats "Various" (0 -> -3); tied with '2', stable sort picks first
+});
+
+test('Z: multi-field degraded', 'OCR error in artist + partial title — title sim barely passes', {
+  vision: { artist: 'Bur1al', title: 'Archangel', label: 'Hyperdub' },
+  candidates: [
+    c('1', 'Burial', 'Archangel', 'Hyperdub'),
+    c('2', 'Various', 'Archangel', 'Hyperdub'),
+  ],
+  correctId: '1',
+});
+
+test('Z: multi-field degraded', 'Track title + empty artist + correct label', {
+  vision: { artist: '', title: 'Gamma Player', label: 'Axis' },
+  candidates: [
+    c('1', 'Jeff Mills', 'Gamma Player', 'Axis'),
+    c('2', 'Jeff Mills', 'The Bells', 'Axis'),
+  ],
+  correctId: '1',
+});
+
+test('Z: multi-field degraded', 'Only label readable — no artist no title', {
+  vision: { artist: '', title: '', label: 'Tresor' },
+  candidates: [
+    c('1', 'Surgeon', 'Force + Form', 'Tresor'),
+    c('2', 'Various', 'Tresor Compilation', 'Not Tresor'),
+  ],
+  correctId: '1',
+});
+
+test('Z: multi-field degraded', 'Artist and title completely swapped — known limitation, triggers fallback', {
+  vision: { artist: 'Strings of Life', title: 'Rhythim Is Rhythim', label: 'Transmat' },
+  candidates: [
+    c('1', 'Rhythim Is Rhythim', 'Strings of Life', 'Transmat'),
+    c('2', 'Derrick May', 'Strings of Life', 'Transmat'),
+  ],
+  correctId: null,
+  expectFallback: true,  // swapped fields: every candidate scores -3 (artist cross-match); allBad triggers fallback
+});
+
+test('Z: multi-field degraded', 'Year text mixed into title field', {
+  vision: { artist: 'Plastikman', title: 'Spastik 1993', label: null },
+  candidates: [
+    c('1', 'Plastikman', 'Spastik', 'Novamute'),
+    c('2', 'Plastikman', 'Spastik 1993 Edition', 'Novamute'),
+  ],
+  correctId: '1',
+});
+
+test('Z: multi-field degraded', 'Everything slightly off but correct candidate still best', {
+  vision: { artist: 'Basik Channel', title: 'Phylyps Track', label: 'Basik' },
+  candidates: [
+    c('1', 'Basic Channel', 'Phylyps Trak', 'Basic Channel'),
+    c('2', 'Basic Channel', 'Enforcement', 'Basic Channel'),
+    c('3', 'Various', 'Phylyps Trak Remixes', 'Basic Channel'),
+  ],
+  correctId: '1',
+});
+
+test('Z: multi-field degraded', 'All fields empty — no signal, no fallback triggered', {
+  vision: { artist: '', title: '', label: null },
+  candidates: [
+    c('1', 'Aphex Twin', 'Drukqs', 'Warp Records'),
+  ],
+  correctId: '1',
+  expectFallback: false,
+});
+
 // ─── Results ──────────────────────────────────────────────────────────────────
 
 const total = passed + failed;
