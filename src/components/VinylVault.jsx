@@ -818,6 +818,19 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
+  const [labelSelectMode, setLabelSelectMode] = useState(false);
+  const [selectedForLabels, setSelectedForLabels] = useState(new Set());
+  const [showBatchLabelModal, setShowBatchLabelModal] = useState(false);
+
+  const toggleLabelSelect = (id) => {
+    setSelectedForLabels(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const enterLabelMode = () => { setLabelSelectMode(true); setSelectedForLabels(new Set()); };
+  const exitLabelMode = () => { setLabelSelectMode(false); setSelectedForLabels(new Set()); };
 
   // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
@@ -878,15 +891,33 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 
         {collectionMode === "stacks" && (
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-              <PencilSimple size={12} />Crates
-            </button>
-            <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-              <DownloadSimple size={12} />CSV
-            </button>
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
-              <Printer size={12} />Print
-            </button>
+            {!labelSelectMode ? (
+              <>
+                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                  <PencilSimple size={12} />Crates
+                </button>
+                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                  <DownloadSimple size={12} />CSV
+                </button>
+                <button onClick={enterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                  <Printer size={12} />Labels
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-[11px] font-mono text-white/40">{selectedForLabels.size} selected</span>
+                <button
+                  onClick={() => setShowBatchLabelModal(true)}
+                  disabled={selectedForLabels.size === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all"
+                  style={{ border: `1px solid rgba(${accentRGB},${selectedForLabels.size > 0 ? '0.4' : '0.12'})`, color: selectedForLabels.size > 0 ? `rgb(${accentRGB})` : 'rgba(255,255,255,0.2)', background: selectedForLabels.size > 0 ? `rgba(${accentRGB},0.12)` : 'transparent', cursor: selectedForLabels.size === 0 ? 'not-allowed' : 'pointer' }}>
+                  <Printer size={12} />Preview Labels
+                </button>
+                <button onClick={exitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -930,12 +961,21 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={toggleLabelSelect} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {filtered.map((record) => (
-                <RecordCard key={record.id} record={record} onSelect={() => setDetailRecord(record)} onRemove={() => onRemove(record.id)} accentRGB={accentRGB} />
+                <RecordCard
+                  key={record.id}
+                  record={record}
+                  onSelect={labelSelectMode ? null : () => setDetailRecord(record)}
+                  onRemove={labelSelectMode ? null : () => onRemove(record.id)}
+                  accentRGB={accentRGB}
+                  selectMode={labelSelectMode}
+                  selected={selectedForLabels.has(record.id)}
+                  onToggleSelect={() => toggleLabelSelect(record.id)}
+                />
               ))}
             </div>
           )}
@@ -944,13 +984,20 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 
       {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} />}
       {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />}
+      {showBatchLabelModal && (
+        <BatchLabelModal
+          records={filtered.filter(r => selectedForLabels.has(r.id))}
+          accentRGB={accentRGB}
+          onClose={() => setShowBatchLabelModal(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB }) {
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, selectMode = false, selectedIds = new Set(), onToggleSelect }) {
   const touchStartX = useRef(null);
   const [dragDelta, setDragDelta] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -1019,6 +1066,22 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
       </div>
 
+      {selectMode && current && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => onToggleSelect(current.id)}
+            className="flex items-center gap-2 px-5 py-2 rounded-full text-[11px] font-mono transition-all"
+            style={{
+              background: selectedIds.has(current.id) ? `rgba(${accentRGB},0.18)` : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${selectedIds.has(current.id) ? `rgba(${accentRGB},0.45)` : 'rgba(255,255,255,0.12)'}`,
+              color: selectedIds.has(current.id) ? `rgb(${accentRGB})` : 'rgba(255,255,255,0.45)',
+            }}>
+            <Check size={11} weight="bold" />
+            {selectedIds.has(current.id) ? 'Selected for batch' : 'Add to batch'}
+          </button>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex items-center justify-center gap-4 mt-5">
         <button onClick={onPrev} disabled={index === 0} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
@@ -1040,10 +1103,10 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 
 // ----- RecordCard (grid) -----------------------------------------------------
 
-function RecordCard({ record, onSelect, onRemove, accentRGB }) {
+function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect }) {
   return (
-    <div className="relative group cursor-pointer" onClick={onSelect}>
-      <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}>
+    <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect}>
+      <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}>
         {record.coverUrl ? (
           <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
         ) : (
@@ -1051,11 +1114,19 @@ function RecordCard({ record, onSelect, onRemove, accentRGB }) {
             <VinylRecord size={28} weight="thin" className="opacity-20" />
           </div>
         )}
-        <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.35)" }}>
-          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/75 flex items-center justify-center">
-            <X size={10} weight="bold" className="text-white" />
-          </button>
-        </div>
+        {!selectMode && (
+          <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.35)" }}>
+            <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/75 flex items-center justify-center">
+              <X size={10} weight="bold" className="text-white" />
+            </button>
+          </div>
+        )}
+        {selectMode && (
+          <div className="absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
+            style={{ background: selected ? `rgb(${accentRGB})` : 'rgba(0,0,0,0.5)', borderColor: selected ? `rgb(${accentRGB})` : 'rgba(255,255,255,0.4)' }}>
+            {selected && <Check size={9} weight="bold" style={{ color: '#000' }} />}
+          </div>
+        )}
       </div>
       <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
       <div className="text-[10px] text-white/40 truncate font-mono">{record.title}</div>
@@ -1076,7 +1147,6 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   const [localHots, setLocalHots] = useState(() =>
     Object.fromEntries((record.tracklist || []).map((t, i) => [i, t.hot || false]))
   );
-  const [showLabelModal, setShowLabelModal] = useState(false);
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
 
@@ -1141,7 +1211,6 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   };
 
   return (
-    <>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }} onClick={onClose}>
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99) 0%, rgba(10,10,16,0.99) 100%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
 
@@ -1267,9 +1336,6 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
         )}
 
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.025)" }}>
-            <Printer size={12} />Print label
-          </button>
           <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
             <Trash size={12} />Remove from collection
           </button>
@@ -1277,14 +1343,6 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
         </div>{/* end px-6 content wrapper */}
       </div>
     </div>
-    {showLabelModal && (
-      <LabelModal
-        record={{ ...record, tracklist: (record.tracklist || []).map((t, i) => ({ ...t, hot: localHots[i] ?? t.hot ?? false })) }}
-        accentRGB={accentRGB}
-        onClose={() => setShowLabelModal(false)}
-      />
-    )}
-    </>
   );
 }
 
@@ -2072,6 +2130,89 @@ function drawLabel(ctx, record, W, H, accentRGB) {
   ctx.textAlign = 'right';
   ctx.fillText('VINYL VAULT', W - pad, H - 18);
   ctx.textAlign = 'left';
+}
+
+function BatchLabelModal({ records, accentRGB, onClose }) {
+  const canvasRefs = useRef([]);
+  const W = 1000, H = 640;
+
+  useEffect(() => {
+    records.forEach((record, i) => {
+      const canvas = canvasRefs.current[i];
+      if (!canvas) return;
+      canvas.width = W;
+      canvas.height = H;
+      drawLabel(canvas.getContext('2d'), record, W, H, accentRGB);
+    });
+  }, [records.map(r => r.id).join(','), accentRGB]);
+
+  const downloadAll = () => {
+    records.forEach((record, i) => {
+      const canvas = canvasRefs.current[i];
+      if (!canvas) return;
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.download = `label-${(record.artist + '-' + record.title).replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+      }, i * 200);
+    });
+  };
+
+  const printAll = () => {
+    const win = window.open('', '_blank');
+    const imgs = records.map((record, i) => {
+      const canvas = canvasRefs.current[i];
+      return canvas ? `<div style="page-break-inside:avoid;margin-bottom:16px"><img src="${canvas.toDataURL('image/png')}" style="width:100%;max-width:700px;display:block" /><div style="font-family:monospace;font-size:11px;color:#666;margin-top:4px">${record.artist} - ${record.title}</div></div>` : '';
+    }).join('');
+    win.document.write(`<html><head><title>Vinyl Vault Labels</title><style>body{margin:24px;background:#fff}@media print{body{margin:0}}</style></head><body>${imgs}<script>window.onload=()=>{window.print();window.close()}<\/script></body></html>`);
+    win.document.close();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(16px)' }}
+      onClick={onClose}>
+      <div className="relative w-full max-w-3xl max-h-[90vh] rounded-3xl overflow-hidden flex flex-col"
+        style={{ background: 'linear-gradient(160deg, rgba(22,22,30,0.99), rgba(10,10,16,0.99))', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 100px -20px rgba(0,0,0,0.95)' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
+          <div>
+            <div className="text-[10px] tracking-[0.3em] uppercase font-mono text-white/35">Batch Labels</div>
+            <div className="text-white/60 text-sm font-mono mt-0.5">{records.length} record{records.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={downloadAll}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all"
+              style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.3)`, color: `rgb(${accentRGB})` }}>
+              <DownloadSimple size={13} />Download All
+            </button>
+            <button onClick={printAll}
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all"
+              style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.5)', background: 'transparent' }}>
+              <Printer size={13} />Print
+            </button>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-all"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              <X size={14} className="text-white/50" />
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto px-6 pb-6 flex flex-col gap-4">
+          {records.map((record, i) => (
+            <div key={record.id}>
+              <div className="text-[10px] font-mono text-white/30 mb-1.5">{record.artist} - {record.title}</div>
+              <div className="w-full rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)', aspectRatio: '1000 / 640' }}>
+                <canvas ref={el => canvasRefs.current[i] = el} style={{ width: '100%', height: '100%', display: 'block' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LabelModal({ record, accentRGB, onClose }) {
