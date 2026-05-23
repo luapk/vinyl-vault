@@ -299,7 +299,7 @@ export default function VinylVault() {
   // Always-fresh ref so async callbacks never read stale queue state
   const batchQueueRef = useRef([]);
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'there';
+  const displayName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || 'there';
   // Stable greeting chosen once when user first becomes known (stored in a ref)
   const greetingRef = useRef(null);
   if (user && greetingRef.current === null) {
@@ -586,20 +586,14 @@ export default function VinylVault() {
 
       {/* Migration banner */}
       {migrationBanner && (
-        <div className="relative z-20 px-5 md:px-10 pt-3">
-          <div className="max-w-7xl mx-auto p-3 rounded-xl flex items-center gap-3 text-sm"
-            style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
-            <span className="text-white/70 flex-1">You have records saved locally. Move them to your profile account?</span>
-            <button onClick={async () => { await migrateFromLocalStorage(); setMigrationBanner(false); }}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all"
-              style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
-              Migrate
-            </button>
-            <button onClick={() => setMigrationBanner(false)} className="text-white/30 hover:text-white/60 transition-colors">
-              <X size={14} />
-            </button>
-          </div>
-        </div>
+        <MigrationBanner
+          onMigrate={async () => {
+            const count = await migrateFromLocalStorage();
+            if (count > 0) setMigrationBanner(false);
+            return count;
+          }}
+          onDismiss={() => setMigrationBanner(false)}
+        />
       )}
 
       {/* Main */}
@@ -659,6 +653,45 @@ export default function VinylVault() {
 
 // ----- SaveConfirmation (pill toast, audio does the heavy lifting) -----------
 
+function MigrationBanner({ onMigrate, onDismiss }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function handle() {
+    setBusy(true);
+    try {
+      const count = await onMigrate();
+      if (count > 0) return;
+      setResult('Could not move records. Check your connection and try again.');
+    } catch {
+      setResult('Something went wrong. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="relative z-20 px-5 md:px-10 pt-3">
+      <div className="max-w-7xl mx-auto p-3 rounded-xl flex flex-wrap items-center gap-3 text-sm"
+        style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
+        <span className="text-white/70 flex-1 min-w-0">
+          {result || 'You have records saved locally. Move them to your profile account?'}
+        </span>
+        {!result && (
+          <button onClick={handle} disabled={busy}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all disabled:opacity-50"
+            style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
+            {busy ? 'Moving...' : 'Move records'}
+          </button>
+        )}
+        <button onClick={onDismiss} className="text-white/30 hover:text-white/60 transition-colors">
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SaveConfirmation({ release, accentRGB }) {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => { const t = setTimeout(() => setLeaving(true), 1600); return () => clearTimeout(t); }, []);
@@ -709,15 +742,12 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
     <div className="pt-10 md:pt-20 flex flex-col items-center">
       {/* Heading section - left-aligned */}
       <div className="w-full max-w-2xl mb-14 md:mb-20">
-        {greeting && (
-          <div className="text-white/50 text-sm font-mono mb-3" style={{ animation: 'fadeUp 0.4s ease-out' }}>
-            {greeting}
-          </div>
-        )}
         <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
-        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left">
-          Stack your wax<br />
-          <span className="text-white/35">the easy way.</span>
+        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
+          {greeting
+            ? <>{greeting.split('.')[0]}.<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>
+            : <>Stack your wax<br /><span className="text-white/35">the easy way.</span></>
+          }
         </h1>
         <p className="text-white/45 text-base md:text-lg max-w-lg leading-relaxed">
           Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM and Camelot key attached, and the record filed exactly where you want it.
@@ -1733,7 +1763,7 @@ function AccountModal({ user, profile, onClose, onSignOut }) {
     setMsg('');
     try {
       const { supabase } = await import('../lib/supabase.js');
-      const { error } = await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', user.id);
+      const { error } = await supabase.auth.updateUser({ data: { display_name: displayName.trim() } });
       if (error) throw error;
       setMsg('Name updated.');
     } catch {

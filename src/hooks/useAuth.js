@@ -62,11 +62,12 @@ export function useAuth() {
 
   const signUp = useCallback(async (email, password, displayName) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: displayName || '' } },
+    });
     if (error) throw error;
-    if (data?.user && displayName) {
-      await supabase.from('profiles').upsert({ id: data.user.id, email, display_name: displayName });
-    }
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
