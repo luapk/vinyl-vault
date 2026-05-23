@@ -1545,8 +1545,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
           </div>
         )}
 
-        {/* Price check */}
-        {record.discogsId && (
+        {/* Price check - temporarily hidden */}
+        {false && record.discogsId && (
           <div className="mb-5">
             {price === null && (
               <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.025)" }}>
