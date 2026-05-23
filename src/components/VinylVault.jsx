@@ -322,8 +322,9 @@ export default function VinylVault() {
   }
   if (isSupabaseEnabled && authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#050508" }}>
-        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(139,92,246,0.3)", borderTopColor: "rgba(139,92,246,0.9)" }} />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#050508" }}>
+        <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.6)" }} />
+        <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Loading...</span>
       </div>
     );
   }
@@ -2748,13 +2749,13 @@ function WalkthroughOverlay({ onDismiss, accentRGB }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
     >
       <div
         className="w-full max-w-sm rounded-3xl p-8 flex flex-col items-center text-center"
         style={{
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 32px 64px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08)',
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.07) 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 32px 64px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.15)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
           animation: 'fadeUp 0.3s ease-out',
