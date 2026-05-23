@@ -336,7 +336,8 @@ export default function VinylVault() {
 
   const saveRecord = () => {
     if (!release) return;
-    addRecord(release, pendingCrates);
+    const toSave = !release.coverUrl && imageUrl ? { ...release, coverUrl: imageUrl } : release;
+    addRecord(toSave, pendingCrates);
     setSavedId(`${release.artist}|${release.title}`);
   };
 
@@ -379,8 +380,8 @@ export default function VinylVault() {
         if (data.status === "complete") {
           current[i].status = "complete";
           current[i].release = data.release;
-          // Auto-save with broad genre tags only, not specific crate suggestions
-          addRecord(data.release, data.release.topGenres || []);
+          const batchRelease = !data.release.coverUrl && dataUrl ? { ...data.release, coverUrl: dataUrl } : data.release;
+          addRecord(batchRelease, data.release.topGenres || []);
         } else if (data.status === "disambiguation") {
           current[i].status = "disambiguation";
           current[i].candidates = data.candidates;
@@ -416,7 +417,9 @@ export default function VinylVault() {
       const latest = [...batchQueueRef.current];
       if (data.status === "complete") {
         latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
-        addRecord(data.release, data.release.topGenres || []);
+        const disambigScanUrl = latest[itemIdx].imageUrl;
+        const disambigRelease = !data.release.coverUrl && disambigScanUrl ? { ...data.release, coverUrl: disambigScanUrl } : data.release;
+        addRecord(disambigRelease, data.release.topGenres || []);
       } else {
         latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
