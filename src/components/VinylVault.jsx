@@ -102,6 +102,47 @@ const glassSubtle = (extra = {}) => ({
   ...extra,
 });
 
+// Synthesise a soft confirmation chime using Web Audio API.
+// Three cycling styles so the user can compare feels on first few saves.
+function playSaveChime(style) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const tone = (freq, start, dur, peak = 0.22) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(peak, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.start(start);
+      osc.stop(start + dur + 0.05);
+    };
+
+    const now = ctx.currentTime;
+    if (style === 0) {
+      // Soft ascending two-note (E5 then B5): clean, quick, like macOS
+      tone(659, now, 0.30, 0.20);
+      tone(988, now + 0.11, 0.45, 0.17);
+    } else if (style === 1) {
+      // Bell: single A5 with an octave harmonic, long sustain
+      tone(880, now, 0.80, 0.16);
+      tone(1760, now, 0.40, 0.05);
+    } else {
+      // Three-note scale C5-E5-G5: positive, iOS-like
+      tone(523, now,        0.22, 0.18);
+      tone(659, now + 0.09, 0.22, 0.18);
+      tone(784, now + 0.18, 0.42, 0.16);
+    }
+    setTimeout(() => ctx.close().catch(() => {}), 1400);
+  } catch {}
+}
+
 // Module-level cache so reopening a record doesn't re-fetch + re-analyse
 const bpmCache = new Map();
 
@@ -216,6 +257,8 @@ export default function VinylVault() {
   const [visionData, setVisionData] = useState(null);
   const [pendingCrates, setPendingCrates] = useState([]);
   const [savedId, setSavedId] = useState(null);
+  const [saveAnim, setSaveAnim] = useState(null); // { style: 0|1|2, release }
+  const saveStyleRef = useRef(0);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [migrationBanner, setMigrationBanner] = useState(false);
@@ -339,6 +382,11 @@ export default function VinylVault() {
     const toSave = !release.coverUrl && imageUrl ? { ...release, coverUrl: imageUrl } : release;
     addRecord(toSave, pendingCrates);
     setSavedId(`${release.artist}|${release.title}`);
+    const style = saveStyleRef.current;
+    saveStyleRef.current = (saveStyleRef.current + 1) % 3;
+    playSaveChime(style);
+    setSaveAnim({ release: toSave });
+    setTimeout(() => setSaveAnim(null), 2200);
   };
 
   const reset = () => {
@@ -544,6 +592,45 @@ export default function VinylVault() {
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
+      {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
+    </div>
+  );
+}
+
+// ----- SaveConfirmation (pill toast, audio does the heavy lifting) -----------
+
+function SaveConfirmation({ release, accentRGB }) {
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setLeaving(true), 1600); return () => clearTimeout(t); }, []);
+
+  return (
+    <div style={{
+      position: 'fixed', top: 68, left: '50%', zIndex: 300, pointerEvents: 'none',
+      animation: leaving
+        ? 'bannerOut 0.32s cubic-bezier(0.4,0,1,1) forwards'
+        : 'bannerIn 0.36s cubic-bezier(0.34,1.4,0.64,1) forwards',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px 9px 10px',
+        borderRadius: 48, whiteSpace: 'nowrap', maxWidth: 'min(88vw, 340px)',
+        background: 'rgba(8,8,14,0.90)', backdropFilter: 'blur(32px)',
+        WebkitBackdropFilter: 'blur(32px)',
+        border: `1px solid rgba(${accentRGB},0.36)`,
+        boxShadow: `0 8px 32px -8px rgba(0,0,0,0.75), 0 0 22px -6px rgba(${accentRGB},0.40)`,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+          background: `rgba(${accentRGB},0.16)`, border: `1px solid rgba(${accentRGB},0.38)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: `rgb(${accentRGB})`,
+        }}>
+          <Check size={14} weight="bold" />
+        </div>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
+          <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 1.5 }}>Added to collection</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
+        </div>
+        <VinylRecord size={15} weight="fill" style={{ color: `rgba(${accentRGB},0.65)`, flexShrink: 0, marginLeft: 2 }} />
+      </div>
     </div>
   );
 }
@@ -1013,23 +1100,47 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 // ----- VinylCarousel ---------------------------------------------------------
 
 function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {} }) {
-  const touchStartX = useRef(null);
-  const [dragDelta, setDragDelta] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const startXRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const didDragRef = useRef(false);
+  const rafRef = useRef(null);
+  const [visualDelta, setVisualDelta] = useState(0);
 
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; setDragging(false); setDragDelta(0); };
-  const onTouchMove = (e) => {
-    if (touchStartX.current === null) return;
-    setDragging(true);
-    setDragDelta(e.touches[0].clientX - touchStartX.current);
+  const onTouchStart = (e) => {
+    startXRef.current = e.touches[0].clientX;
+    startTimeRef.current = performance.now();
+    didDragRef.current = false;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    setVisualDelta(0);
   };
-  const onTouchEnd = () => {
-    if (Math.abs(dragDelta) > 55) { dragDelta < 0 ? onNext() : onPrev(); }
-    touchStartX.current = null; setDragging(false); setDragDelta(0);
+
+  const onTouchMove = (e) => {
+    if (startXRef.current === null) return;
+    const delta = e.touches[0].clientX - startXRef.current;
+    if (Math.abs(delta) > 6) didDragRef.current = true;
+    if (!didDragRef.current) return;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => setVisualDelta(delta));
+  };
+
+  const onTouchEnd = (e) => {
+    if (startXRef.current === null) return;
+    const lastX = e.changedTouches[0].clientX;
+    const delta = lastX - startXRef.current;
+    const velocity = delta / Math.max(performance.now() - startTimeRef.current, 1);
+    const wasDrag = didDragRef.current;
+    startXRef.current = null;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    setVisualDelta(0);
+    if (!wasDrag) return;
+    // Advance on distance or velocity threshold (velocity in px/ms)
+    if (delta < -40 || velocity < -0.22) onNext();
+    else if (delta > 40 || velocity > 0.22) onPrev();
   };
 
   const current = records[index];
   if (!current) return null;
+  const isDragging = visualDelta !== 0;
 
   return (
     <div className="select-none">
@@ -1040,15 +1151,15 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           if (!record) return null;
           const abs = Math.abs(offset);
           const isActive = offset === 0;
-          const tx = (offset + (dragging ? dragDelta / 300 : 0)) * 48;
+          const tx = (offset + (isDragging ? visualDelta / 280 : 0)) * 48;
           const ty = abs * 7;
-          const rot = offset * 2.5 + (dragging && isActive ? dragDelta * 0.025 : 0);
+          const rot = offset * 2.5 + (isDragging && isActive ? visualDelta * 0.025 : 0);
           const scale = 1 - abs * 0.065;
           const opacity = abs > 2 ? 0 : 1 - abs * 0.15;
 
           return (
-            <div key={record.id} onClick={() => !dragging && (isActive ? onSelect(record) : onIndexChange(index + offset))}
-              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: dragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
+            <div key={record.id} onClick={() => !didDragRef.current && (isActive ? onSelect(record) : onIndexChange(index + offset))}
+              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
               <div className="w-full h-full rounded-2xl overflow-hidden" style={{ boxShadow: isActive ? `0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.07), 0 0 50px -15px rgba(${accentRGB},0.35)` : "0 20px 50px -15px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)" }}>
                 {record.coverUrl ? (
                   <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />

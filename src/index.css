@@ -62,3 +62,11 @@ body {
 .crate-cube {
   animation: spinCube 6s linear infinite;
 }
+@keyframes bannerIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(0.90); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)      scale(1); }
+}
+@keyframes bannerOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0)      scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(-10px)  scale(0.94); }
+}
