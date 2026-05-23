@@ -68,9 +68,11 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const tracklist = release.tracklist || [];
   const nullTrack = t => ({ ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null });
 
+  const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
+
   const [enrichedTracks, suggestedBoxes] = await Promise.all([
     (hasSpotify && tracklist.length > 0)
-      ? enrichTracks(tracklist, release.artist).catch(() => tracklist.map(nullTrack))
+      ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => tracklist.map(nullTrack))
       : Promise.resolve(tracklist.map(nullTrack)),
     apiKey
       ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
@@ -78,7 +80,7 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   ]);
 
   // iTunes fallback: fill any still-missing preview URLs (no API key, always runs)
-  const finalTracks = await fillItunesPreviews(enrichedTracks, release.artist).catch(() => enrichedTracks);
+  const finalTracks = await fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks);
 
   release.tracklist = finalTracks;
   release.suggestedBoxes = suggestedBoxes;

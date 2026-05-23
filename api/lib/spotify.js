@@ -49,7 +49,7 @@ function titleSim(a, b) {
   return base;
 }
 
-async function searchTrack(token, artist, trackTitle) {
+async function searchTrack(token, artist, trackTitle, releaseYear) {
   const q = artist ? `track:${trackTitle} artist:${artist}` : `track:${trackTitle}`;
   const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=5`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -66,9 +66,24 @@ async function searchTrack(token, artist, trackTitle) {
 
   // Score each candidate: require title similarity >= 0.5 to avoid wrong-song matches
   const scored = items
-    .map(t => ({ t, sim: titleSim(trackTitle, t.name) }))
-    .filter(({ sim }) => sim >= 0.5)
-    .sort((a, b) => b.sim - a.sim);
+    .map(t => {
+      const sim = titleSim(trackTitle, t.name);
+      if (sim < 0.5) return null;
+
+      let s = sim;
+
+      // Year proximity: penalise re-recordings from a different era
+      if (releaseYear && t.album?.release_date) {
+        const trackYear = parseInt(t.album.release_date.slice(0, 4), 10);
+        const gap = Math.abs(trackYear - releaseYear);
+        if (gap <= 2) s += 0.3;
+        else if (gap > 15) s -= 0.4;
+      }
+
+      return { t, s };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.s - a.s);
 
   if (!scored.length) {
     console.log(`[spotify] no confident title match for "${trackTitle}" in results`);
@@ -77,7 +92,7 @@ async function searchTrack(token, artist, trackTitle) {
 
   const track = scored[0].t;
   const preview = track.preview_url || null;
-  console.log(`[spotify] hit: id=${track.id} sim=${scored[0].sim.toFixed(2)} preview=${preview ? 'YES' : 'NULL'}`);
+  console.log(`[spotify] hit: id=${track.id} score=${scored[0].s.toFixed(2)} preview=${preview ? 'YES' : 'NULL'}`);
   return { id: track.id, previewUrl: preview };
 }
 
@@ -97,13 +112,14 @@ async function fetchAudioFeatures(token, trackId) {
 
 const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null };
 
-export async function enrichTracks(tracks, artist) {
+export async function enrichTracks(tracks, artist, releaseContext = {}) {
   const token = await getToken();
+  const { releaseYear } = releaseContext;
 
   return Promise.all(
     tracks.map(async track => {
       try {
-        const result = await searchTrack(token, artist, track.title);
+        const result = await searchTrack(token, artist, track.title, releaseYear);
         if (!result) return { ...track, ...noMatch };
 
         const features = await fetchAudioFeatures(token, result.id);

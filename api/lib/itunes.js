@@ -28,14 +28,12 @@ function titleScore(a, b) {
   const wb = nb.split(' ').filter(w => w.length > 2);
   let s = 0;
 
-  // Word overlap
   if (wa.length && wb.length) {
     const overlap = wa.filter(w => wb.includes(w)).length;
     const coverage = overlap / Math.max(wa.length, wb.length);
     s += coverage >= 0.8 ? 3 : coverage >= 0.5 ? 2 : coverage >= 0.25 ? 1 : 0;
   }
 
-  // Substring match, penalised by length ratio (avoids "Rain" matching "Purple Rain")
   if ((na.includes(nb) || nb.includes(na)) && s < 3) {
     const ratio = Math.min(na.length, nb.length) / Math.max(na.length, nb.length);
     s = Math.max(s, ratio >= 0.7 ? 2 : 1);
@@ -44,13 +42,13 @@ function titleScore(a, b) {
   return s;
 }
 
-function scoreMatch(result, artist, trackTitle, discogsDurationStr) {
+function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear, releaseTitle) {
   const ts = titleScore(trackTitle, result.trackName || '');
-  if (ts === 0) return 0; // no title similarity at all: skip immediately
+  if (ts === 0) return 0;
 
   let score = ts;
 
-  // Artist bonus (not a hard requirement — covers and VA releases exist)
+  // Artist similarity (bonus, not required)
   const na = norm(artist || ''), nb = norm(result.artistName || '');
   if (na && nb) {
     if (na === nb || na.includes(nb) || nb.includes(na)) score += 2;
@@ -61,26 +59,41 @@ function scoreMatch(result, artist, trackTitle, discogsDurationStr) {
     }
   }
 
-  // Duration validation — hard reject if clearly different, bonus if close
+  // Duration: tighter threshold — different versions/arrangements differ here
   if (discogsDurationStr && result.trackTimeMillis) {
     const discogsSecs = parseDurationSecs(discogsDurationStr);
     if (discogsSecs) {
       const diff = Math.abs(result.trackTimeMillis / 1000 - discogsSecs);
-      if (diff > 90) return -1; // clearly wrong track
-      score += diff < 10 ? 2 : diff < 30 ? 1 : 0;
+      if (diff > 45) return -1; // hard reject: clearly a different version
+      score += diff < 5 ? 3 : diff < 15 ? 2 : diff < 30 ? 1 : 0;
     }
+  }
+
+  // Release year proximity: penalises re-recordings from a different era
+  if (releaseYear && result.releaseDate) {
+    const itunesYear = new Date(result.releaseDate).getFullYear();
+    const gap = Math.abs(itunesYear - releaseYear);
+    if (gap <= 2) score += 2;       // same era: strong positive
+    else if (gap <= 5) score += 1;
+    else if (gap > 15) score -= 2;  // clearly a later re-recording: penalise hard
+  }
+
+  // Album/collection title match: different versions usually sit on different albums
+  if (releaseTitle && result.collectionName) {
+    const albumScore = titleScore(releaseTitle, result.collectionName);
+    if (albumScore >= 3) score += 2;
+    else if (albumScore >= 1) score += 1;
   }
 
   return score;
 }
 
-// Minimum confidence: title must meaningfully match (score >= 2)
 const MIN_SCORE = 2;
 
-function bestMatch(results, artist, trackTitle, discogsDuration) {
+function bestMatch(results, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) {
   const candidates = results
     .filter(r => r.previewUrl)
-    .map(r => ({ r, s: scoreMatch(r, artist, trackTitle, discogsDuration) }))
+    .map(r => ({ r, s: scoreMatch(r, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) }))
     .filter(({ s }) => s >= MIN_SCORE)
     .sort((a, b) => b.s - a.s);
 
@@ -92,7 +105,7 @@ function bestMatch(results, artist, trackTitle, discogsDuration) {
   };
 }
 
-async function searchTrackPreview(artist, trackTitle, discogsDuration) {
+async function searchTrackPreview(artist, trackTitle, discogsDuration, releaseYear, releaseTitle) {
   const strategies = [
     `${artist} ${trackTitle}`,
     trackTitle,
@@ -106,7 +119,7 @@ async function searchTrackPreview(artist, trackTitle, discogsDuration) {
       );
       if (!res.ok) continue;
       const data = await res.json();
-      const match = bestMatch(data.results || [], artist, trackTitle, discogsDuration);
+      const match = bestMatch(data.results || [], artist, trackTitle, discogsDuration, releaseYear, releaseTitle);
       if (match) return match;
     } catch {
       continue;
@@ -115,14 +128,18 @@ async function searchTrackPreview(artist, trackTitle, discogsDuration) {
   return null;
 }
 
-export async function fillItunesPreviews(tracks, artist) {
+export async function fillItunesPreviews(tracks, artist, releaseContext = {}) {
   const needsFill = tracks.some(t => !t.previewUrl);
   if (!needsFill) return tracks;
+
+  const { releaseYear, releaseTitle } = releaseContext;
 
   return Promise.all(
     tracks.map(async track => {
       if (track.previewUrl) return track;
-      const match = await searchTrackPreview(artist, track.title, track.duration).catch(() => null);
+      const match = await searchTrackPreview(
+        artist, track.title, track.duration, releaseYear, releaseTitle
+      ).catch(() => null);
       if (!match) return track;
       return {
         ...track,
