@@ -102,6 +102,47 @@ const glassSubtle = (extra = {}) => ({
   ...extra,
 });
 
+// Synthesise a soft confirmation chime using Web Audio API.
+// Three cycling styles so the user can compare feels on first few saves.
+function playSaveChime(style) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const tone = (freq, start, dur, peak = 0.22) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(peak, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.start(start);
+      osc.stop(start + dur + 0.05);
+    };
+
+    const now = ctx.currentTime;
+    if (style === 0) {
+      // Soft ascending two-note (E5 then B5): clean, quick, like macOS
+      tone(659, now, 0.30, 0.20);
+      tone(988, now + 0.11, 0.45, 0.17);
+    } else if (style === 1) {
+      // Bell: single A5 with an octave harmonic, long sustain
+      tone(880, now, 0.80, 0.16);
+      tone(1760, now, 0.40, 0.05);
+    } else {
+      // Three-note scale C5-E5-G5: positive, iOS-like
+      tone(523, now,        0.22, 0.18);
+      tone(659, now + 0.09, 0.22, 0.18);
+      tone(784, now + 0.18, 0.42, 0.16);
+    }
+    setTimeout(() => ctx.close().catch(() => {}), 1400);
+  } catch {}
+}
+
 // Module-level cache so reopening a record doesn't re-fetch + re-analyse
 const bpmCache = new Map();
 
@@ -250,6 +291,8 @@ export default function VinylVault() {
   const [visionData, setVisionData] = useState(null);
   const [pendingCrates, setPendingCrates] = useState([]);
   const [savedId, setSavedId] = useState(null);
+  const [saveAnim, setSaveAnim] = useState(null); // { style: 0|1|2, release }
+  const saveStyleRef = useRef(0);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [migrationBanner, setMigrationBanner] = useState(false);
@@ -379,8 +422,14 @@ export default function VinylVault() {
 
   const saveRecord = () => {
     if (!release) return;
-    addRecord(release, pendingCrates);
+    const toSave = !release.coverUrl && imageUrl ? { ...release, coverUrl: imageUrl } : release;
+    addRecord(toSave, pendingCrates);
     setSavedId(`${release.artist}|${release.title}`);
+    const style = saveStyleRef.current;
+    saveStyleRef.current = (saveStyleRef.current + 1) % 3;
+    playSaveChime(style);
+    setSaveAnim({ release: toSave });
+    setTimeout(() => setSaveAnim(null), 2200);
   };
 
   const reset = () => {
@@ -422,8 +471,8 @@ export default function VinylVault() {
         if (data.status === "complete") {
           current[i].status = "complete";
           current[i].release = data.release;
-          // Auto-save with broad genre tags only, not specific crate suggestions
-          addRecord(data.release, data.release.topGenres || []);
+          const batchRelease = !data.release.coverUrl && dataUrl ? { ...data.release, coverUrl: dataUrl } : data.release;
+          addRecord(batchRelease, data.release.topGenres || []);
         } else if (data.status === "disambiguation") {
           current[i].status = "disambiguation";
           current[i].candidates = data.candidates;
@@ -459,7 +508,9 @@ export default function VinylVault() {
       const latest = [...batchQueueRef.current];
       if (data.status === "complete") {
         latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
-        addRecord(data.release, data.release.topGenres || []);
+        const disambigScanUrl = latest[itemIdx].imageUrl;
+        const disambigRelease = !data.release.coverUrl && disambigScanUrl ? { ...data.release, coverUrl: disambigScanUrl } : data.release;
+        addRecord(disambigRelease, data.release.topGenres || []);
       } else {
         latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
@@ -477,7 +528,6 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
-    { id: "batch", label: "Batch", icon: GridNine },
     { id: "about", label: "About", icon: Info },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
@@ -552,7 +602,7 @@ export default function VinylVault() {
       )}
 
       {/* Main */}
-      <main className="relative z-10 px-5 md:px-10 pb-20 max-w-7xl mx-auto">
+      <main className="relative px-5 md:px-10 pb-20 max-w-7xl mx-auto">
         {appView === "admin" && (
           <AdminPanel onBack={() => setAppView("collection")} />
         )}
@@ -592,6 +642,45 @@ export default function VinylVault() {
         }} accentRGB={accentRGB} />
       )}
 
+      {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
+    </div>
+  );
+}
+
+// ----- SaveConfirmation (pill toast, audio does the heavy lifting) -----------
+
+function SaveConfirmation({ release, accentRGB }) {
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setLeaving(true), 1600); return () => clearTimeout(t); }, []);
+
+  return (
+    <div style={{
+      position: 'fixed', top: 68, left: '50%', zIndex: 300, pointerEvents: 'none',
+      animation: leaving
+        ? 'bannerOut 0.32s cubic-bezier(0.4,0,1,1) forwards'
+        : 'bannerIn 0.36s cubic-bezier(0.34,1.4,0.64,1) forwards',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px 9px 10px',
+        borderRadius: 48, whiteSpace: 'nowrap', maxWidth: 'min(88vw, 340px)',
+        background: 'rgba(8,8,14,0.90)', backdropFilter: 'blur(32px)',
+        WebkitBackdropFilter: 'blur(32px)',
+        border: `1px solid rgba(${accentRGB},0.36)`,
+        boxShadow: `0 8px 32px -8px rgba(0,0,0,0.75), 0 0 22px -6px rgba(${accentRGB},0.40)`,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+          background: `rgba(${accentRGB},0.16)`, border: `1px solid rgba(${accentRGB},0.38)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: `rgb(${accentRGB})`,
+        }}>
+          <Check size={14} weight="bold" />
+        </div>
+        <div style={{ overflow: 'hidden', minWidth: 0 }}>
+          <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 1.5 }}>Added to collection</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
+        </div>
+        <VinylRecord size={15} weight="fill" style={{ color: `rgba(${accentRGB},0.65)`, flexShrink: 0, marginLeft: 2 }} />
+      </div>
     </div>
   );
 }
@@ -866,6 +955,45 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
 // ----- CollectionView --------------------------------------------------------
 
+// ----- Crate colour system ---------------------------------------------------
+
+const CRATE_PALETTE = [
+  { id: 'cyan',    hex: '#22d3ee' },
+  { id: 'amber',   hex: '#f59e0b' },
+  { id: 'rose',    hex: '#f43f5e' },
+  { id: 'violet',  hex: '#8b5cf6' },
+  { id: 'emerald', hex: '#10b981' },
+];
+
+function loadCrateColors() {
+  try { return JSON.parse(localStorage.getItem('vinylvault_crate_colors') || '{}'); }
+  catch { return {}; }
+}
+
+function RotatingCube({ color, size = 9 }) {
+  const c = color || 'rgba(255,255,255,0.4)';
+  const half = size / 2;
+  const face = {
+    position: 'absolute', width: size, height: size,
+    background: `${c}14`, border: `1px solid ${c}`,
+    top: 0, left: 0, boxSizing: 'border-box',
+  };
+  return (
+    <div style={{ width: size, height: size, perspective: size * 5, flexShrink: 0 }}>
+      <div className="crate-cube" style={{ width: size, height: size, position: 'relative', transformStyle: 'preserve-3d' }}>
+        <div style={{ ...face, transform: `translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(180deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(-90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateX(-90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateX(90deg) translateZ(${half}px)` }} />
+      </div>
+    </div>
+  );
+}
+
+// ----- CollectionView --------------------------------------------------------
+
 function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
@@ -877,6 +1005,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
   const [labelSelectMode, setLabelSelectMode] = useState(false);
   const [selectedForLabels, setSelectedForLabels] = useState(new Set());
   const [showBatchLabelModal, setShowBatchLabelModal] = useState(false);
+  const [crateColors, setCrateColorsState] = useState(loadCrateColors);
 
   const toggleLabelSelect = (id) => {
     setSelectedForLabels(prev => {
@@ -887,6 +1016,15 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
   };
   const enterLabelMode = () => { setLabelSelectMode(true); setSelectedForLabels(new Set()); };
   const exitLabelMode = () => { setLabelSelectMode(false); setSelectedForLabels(new Set()); };
+
+  const setCrateColor = (name, hex) => {
+    setCrateColorsState(prev => {
+      const next = { ...prev };
+      if (hex) next[name] = hex; else delete next[name];
+      localStorage.setItem('vinylvault_crate_colors', JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
@@ -1003,12 +1141,23 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
           {/* Crate filters — user crates only */}
           {allCrates.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
-              {allCrates.map((c) => (
-                <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
-                  style={{ background: filterCrate === c ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.025)", border: filterCrate === c ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.07)", color: filterCrate === c ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.38)" }}>
-                  {c}
-                </button>
-              ))}
+              {allCrates.map((c) => {
+                const col = crateColors[c] || null;
+                const active = filterCrate === c;
+                return (
+                  <button key={c} onClick={() => setFilterCrate(active ? null : c)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={{
+                      background: active ? (col ? `${col}22` : 'rgba(255,255,255,0.10)') : (col ? `${col}0d` : 'rgba(255,255,255,0.025)'),
+                      border: active ? `1px solid ${col || 'rgba(255,255,255,0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(255,255,255,0.07)'}`,
+                      color: active ? (col || 'rgba(255,255,255,0.88)') : (col ? col + 'bb' : 'rgba(255,255,255,0.38)'),
+                      boxShadow: active && col ? `0 0 14px -3px ${col}66` : 'none',
+                    }}>
+                    <RotatingCube color={col || 'rgba(255,255,255,0.4)'} size={8} />
+                    {c}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -1017,7 +1166,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={toggleLabelSelect} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={toggleLabelSelect} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1038,8 +1187,8 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} />}
-      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} />}
+      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -1053,24 +1202,48 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, selectMode = false, selectedIds = new Set(), onToggleSelect }) {
-  const touchStartX = useRef(null);
-  const [dragDelta, setDragDelta] = useState(0);
-  const [dragging, setDragging] = useState(false);
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect }) {
+  const startXRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const didDragRef = useRef(false);
+  const rafRef = useRef(null);
+  const [visualDelta, setVisualDelta] = useState(0);
 
-  const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; setDragging(false); setDragDelta(0); };
-  const onTouchMove = (e) => {
-    if (touchStartX.current === null) return;
-    setDragging(true);
-    setDragDelta(e.touches[0].clientX - touchStartX.current);
+  const onTouchStart = (e) => {
+    startXRef.current = e.touches[0].clientX;
+    startTimeRef.current = performance.now();
+    didDragRef.current = false;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    setVisualDelta(0);
   };
-  const onTouchEnd = () => {
-    if (Math.abs(dragDelta) > 55) { dragDelta < 0 ? onNext() : onPrev(); }
-    touchStartX.current = null; setDragging(false); setDragDelta(0);
+
+  const onTouchMove = (e) => {
+    if (startXRef.current === null) return;
+    const delta = e.touches[0].clientX - startXRef.current;
+    if (Math.abs(delta) > 6) didDragRef.current = true;
+    if (!didDragRef.current) return;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => setVisualDelta(delta));
+  };
+
+  const onTouchEnd = (e) => {
+    if (startXRef.current === null) return;
+    const lastX = e.changedTouches[0].clientX;
+    const delta = lastX - startXRef.current;
+    const velocity = delta / Math.max(performance.now() - startTimeRef.current, 1);
+    const wasDrag = didDragRef.current;
+    startXRef.current = null;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    setVisualDelta(0);
+    if (!wasDrag) return;
+    // Advance on distance or velocity threshold (velocity in px/ms)
+    if (delta < -40 || velocity < -0.22) onNext();
+    else if (delta > 40 || velocity > 0.22) onPrev();
   };
 
   const current = records[index];
   if (!current) return null;
+  const isDragging = visualDelta !== 0;
 
   return (
     <div className="select-none">
@@ -1081,15 +1254,15 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           if (!record) return null;
           const abs = Math.abs(offset);
           const isActive = offset === 0;
-          const tx = (offset + (dragging ? dragDelta / 300 : 0)) * 48;
+          const tx = (offset + (isDragging ? visualDelta / 280 : 0)) * 48;
           const ty = abs * 7;
-          const rot = offset * 2.5 + (dragging && isActive ? dragDelta * 0.025 : 0);
+          const rot = offset * 2.5 + (isDragging && isActive ? visualDelta * 0.025 : 0);
           const scale = 1 - abs * 0.065;
           const opacity = abs > 2 ? 0 : 1 - abs * 0.15;
 
           return (
-            <div key={record.id} onClick={() => !dragging && (isActive ? onSelect(record) : onIndexChange(index + offset))}
-              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: dragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
+            <div key={record.id} onClick={() => !didDragRef.current && (isActive ? onSelect(record) : onIndexChange(index + offset))}
+              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
               <div className="w-full h-full rounded-2xl overflow-hidden" style={{ boxShadow: isActive ? `0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.07), 0 0 50px -15px rgba(${accentRGB},0.35)` : "0 20px 50px -15px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)" }}>
                 {record.coverUrl ? (
                   <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
@@ -1114,9 +1287,21 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <div className="text-base md:text-lg text-white/50 font-display mb-3">{current.title}</div>
         {current.crates && current.crates.length > 0 && (
           <div className="flex flex-wrap justify-center gap-1.5 mb-3">
-            {current.crates.map((c) => (
-              <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
-            ))}
+            {current.crates.map((c) => {
+              const col = crateColors[c] || null;
+              return (
+                <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                  style={{
+                    background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
+                    border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
+                    color: col || `rgba(${accentRGB},0.9)`,
+                    boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                  }}>
+                  <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
+                  {c}
+                </span>
+              );
+            })}
           </div>
         )}
         <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
@@ -1192,7 +1377,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {} }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
@@ -1203,8 +1388,15 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   const [localHots, setLocalHots] = useState(() =>
     Object.fromEntries((record.tracklist || []).map((t, i) => [i, t.hot || false]))
   );
+  const [localAccent, setLocalAccent] = useState(accentRGB);
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
+
+  useEffect(() => {
+    const src = images[0] || record.coverUrl;
+    if (!src) return;
+    extractDominantColor(src).then(({ r, g, b }) => setLocalAccent(`${r},${g},${b}`)).catch(() => {});
+  }, [record.coverUrl]);
 
   useEffect(() => {
     if (!record?.tracklist?.length) return;
@@ -1280,11 +1472,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
 
         <div className="grid sm:grid-cols-[140px_1fr] gap-5 mb-6">
           <div>
-            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${accentRGB},0.35)` }}>
+            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${localAccent},0.35)` }}>
               {images[imgIdx] ? (
                 <img src={images[imgIdx]} alt={record.title} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.07)` }}>
+                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${localAccent},0.07)` }}>
                   <VinylRecord size={28} weight="thin" className="opacity-20" />
                 </div>
               )}
@@ -1292,7 +1484,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
             {images.length > 1 && (
               <div className="flex gap-1.5 overflow-x-auto">
                 {images.map((src, i) => (
-                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${accentRGB},0.5)` : "1px solid transparent" }}>
+                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${localAccent},0.5)` : "1px solid transparent" }}>
                     <img src={src} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
@@ -1311,9 +1503,21 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
               <div>
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {record.crates.map((c) => (
-                    <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
-                  ))}
+                  {record.crates.map((c) => {
+                    const col = crateColors[c] || null;
+                    return (
+                      <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                        style={{
+                          background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
+                          border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
+                          color: col || `rgba(${localAccent},0.9)`,
+                          boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                        }}>
+                        <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
+                        {c}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1322,7 +1526,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {record.tags.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>{t}</span>
+                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},0.07)`, border: `1px solid rgba(${localAccent},0.16)`, color: `rgba(${localAccent},0.65)` }}>{t}</span>
                   ))}
                 </div>
               </div>
@@ -1404,7 +1608,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
 
 // ----- CrateManagerModal -----------------------------------------------------
 
-function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
+function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = {}, onSetColor }) {
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
 
@@ -1422,17 +1626,50 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
         </div>
         {crates.length === 0 && <p className="text-white/30 text-sm font-mono text-center py-4">No crates yet.</p>}
         <div className="space-y-2">
-          {crates.map((crate) => (
-            <div key={crate} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              {editingName === crate ? (
-                <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
-              ) : (
-                <span className="flex-1 text-sm font-mono text-white/70">{crate}</span>
-              )}
-              <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
-              <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
-            </div>
-          ))}
+          {crates.map((crate) => {
+            const activeColor = crateColors[crate] || null;
+            return (
+              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${activeColor ? activeColor + '44' : 'rgba(255,255,255,0.06)'}`, boxShadow: activeColor ? `0 0 16px -6px ${activeColor}55` : 'none' }}>
+                <div className="flex items-center gap-2.5 p-3">
+                  <RotatingCube color={activeColor || 'rgba(255,255,255,0.35)'} size={10} />
+                  {editingName === crate ? (
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
+                  ) : (
+                    <span className="flex-1 text-sm font-mono" style={{ color: activeColor || 'rgba(255,255,255,0.70)' }}>{crate}</span>
+                  )}
+                  <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                  <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
+                </div>
+                {/* Colour picker */}
+                <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                  <span className="text-[9px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
+                  {CRATE_PALETTE.map(({ id, hex }) => {
+                    const isActive = activeColor === hex;
+                    return (
+                      <button key={id} onClick={() => onSetColor(crate, isActive ? null : hex)}
+                        title={id}
+                        style={{
+                          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                          background: hex,
+                          border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.12)',
+                          boxShadow: isActive ? `0 0 8px ${hex}` : 'none',
+                          transition: 'all 0.15s',
+                          transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                        }}
+                      />
+                    );
+                  })}
+                  {activeColor && (
+                    <button onClick={() => onSetColor(crate, null)}
+                      className="text-[9px] font-mono tracking-wide ml-1 transition-all"
+                      style={{ color: 'rgba(255,255,255,0.22)', borderBottom: '1px solid rgba(255,255,255,0.10)', lineHeight: '1.1' }}>
+                      clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
