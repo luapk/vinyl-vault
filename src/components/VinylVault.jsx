@@ -316,6 +316,22 @@ export default function VinylVault() {
     if (user && hasLocalRecords && isSupabaseEnabled) setMigrationBanner(true);
   }, [user?.id]);
 
+  const updateReleaseBpm = useCallback((trackIdx, bpm) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, bpm } : t);
+      return { ...prev, tracklist };
+    });
+  }, []);
+
+  const toggleReleaseHot = useCallback((trackIdx) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, hot: !t.hot } : t);
+      return { ...prev, tracklist };
+    });
+  }, []);
+
   // Gate: show login screen when Supabase is configured but no user is logged in.
   if (isSupabaseEnabled && !authLoading && !user) {
     return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
@@ -403,23 +419,6 @@ export default function VinylVault() {
       setPhase("error");
     }
   };
-
-  // Called by ResultView when Web Audio BPM detection resolves for a track
-  const updateReleaseBpm = useCallback((trackIdx, bpm) => {
-    setRelease(prev => {
-      if (!prev) return prev;
-      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, bpm } : t);
-      return { ...prev, tracklist };
-    });
-  }, []);
-
-  const toggleReleaseHot = useCallback((trackIdx) => {
-    setRelease(prev => {
-      if (!prev) return prev;
-      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, hot: !t.hot } : t);
-      return { ...prev, tracklist };
-    });
-  }, []);
 
   const saveRecord = () => {
     if (!release) return;
