@@ -1150,7 +1150,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
                     style={{
                       background: active ? (col ? `${col}22` : 'rgba(255,255,255,0.10)') : (col ? `${col}0d` : 'rgba(255,255,255,0.025)'),
                       border: active ? `1px solid ${col || 'rgba(255,255,255,0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(255,255,255,0.07)'}`,
-                      color: active ? (col || 'rgba(255,255,255,0.88)') : (col ? col + 'bb' : 'rgba(255,255,255,0.38)'),
+                      color: active ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.38)',
                       boxShadow: active && col ? `0 0 14px -3px ${col}66` : 'none',
                     }}>
                     <RotatingCube color={col || 'rgba(255,255,255,0.4)'} size={8} />
@@ -1294,7 +1294,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                   style={{
                     background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
                     border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
-                    color: col || `rgba(${accentRGB},0.9)`,
+                    color: 'rgba(255,255,255,0.65)',
                     boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
                   }}>
                   <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
@@ -1510,7 +1510,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                         style={{
                           background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
                           border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
-                          color: col || `rgba(${localAccent},0.9)`,
+                          color: 'rgba(255,255,255,0.65)',
                           boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
                         }}>
                         <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
@@ -1635,7 +1635,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                   {editingName === crate ? (
                     <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
                   ) : (
-                    <span className="flex-1 text-sm font-mono" style={{ color: activeColor || 'rgba(255,255,255,0.70)' }}>{crate}</span>
+                    <span className="flex-1 text-sm font-mono" style={{ color: 'rgba(255,255,255,0.70)' }}>{crate}</span>
                   )}
                   {editingName === crate ? (
                     <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>

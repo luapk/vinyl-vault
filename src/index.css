@@ -60,7 +60,7 @@ body {
   to   { transform: rotateX(22deg) rotateY(360deg); }
 }
 .crate-cube {
-  animation: spinCube 6s linear infinite;
+  /* animation intentionally removed */
 }
 @keyframes bannerIn {
   from { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(0.90); }
