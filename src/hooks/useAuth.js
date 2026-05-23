@@ -35,7 +35,7 @@ export function useAuth() {
         setProfile(p);
       }
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
