@@ -28,8 +28,23 @@ function scoreCandidate(candidate, vision) {
     return hits / Math.max(wa.length, wb.length);
   };
 
+  // Detect unreliable artist fields: vision reads imprint name as artist (label=artist),
+  // or uses a genre word as an artist name — both produce false +4 bonuses.
+  const GENRE_WORDS = new Set([
+    'techno', 'house', 'ambient', 'dnb', 'jungle', 'garage', 'trance',
+    'hardcore', 'rave', 'dub', 'electronic', 'electro', 'dance', 'music',
+    'funk', 'soul', 'jazz', 'rap', 'disco', 'breakbeat', 'breaks',
+  ]);
+  const normVA = norm(vision.artist || '');
+  const normVL = norm(vision.label || '');
+  // Artist is unreliable when it's the same word(s) as the label (vision confused
+  // the imprint name as an artist) — check exact equality AND substring containment
+  // to catch "Warp Records" vs "Warp" and "R&S" vs "R&S Records".
+  const labelArtistOverlap = normVL && (normVA === normVL || normVA.includes(normVL) || normVL.includes(normVA));
+  const artistReliable = normVA && !labelArtistOverlap && !GENRE_WORDS.has(normVA);
+
   let score = 0;
-  const artistSim = sim(candidate.artist, vision.artist);
+  const artistSim = artistReliable ? sim(candidate.artist, vision.artist) : null;
   const titleSim  = sim(candidate.recordTitle ?? candidate.title, vision.title);
   const labelSim  = sim(candidate.label, vision.label);
 

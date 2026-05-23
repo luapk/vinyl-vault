@@ -326,6 +326,14 @@ export default function VinylVault() {
     });
   }, []);
 
+  const toggleReleaseHot = useCallback((trackIdx) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+      const tracklist = prev.tracklist.map((t, i) => i === trackIdx ? { ...t, hot: !t.hot } : t);
+      return { ...prev, tracklist };
+    });
+  }, []);
+
   const saveRecord = () => {
     if (!release) return;
     addRecord(release, pendingCrates);
@@ -520,7 +528,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
@@ -628,7 +636,7 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -791,7 +799,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
         <GlassSection title="Tracklist" subtitle={`${release.tracklist.length} tracks`} accentRGB={accentRGB}>
           <div className="space-y-0.5">
             {release.tracklist.map((track, i) => (
-              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
+              <TrackRow key={i} track={track} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={onHotToggle} />
             ))}
           </div>
         </GlassSection>
@@ -858,7 +866,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
       {/* Mode toggle: Stacks vs Explore */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          {[{ id: "stacks", label: "Stacks" }, { id: "explore", label: "Explore by tag" }].map(({ id, label }) => (
+          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore by tag" }].map(({ id, label }) => (
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.85)", boxShadow: "0 1px 0 rgba(255,255,255,0.08)" }
@@ -1065,6 +1073,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
   const [priceLoading, setPriceLoading] = useState(false);
   const [bpmDetecting, setBpmDetecting] = useState(new Set());
   const [localBpms, setLocalBpms] = useState({});
+  const [localHots, setLocalHots] = useState(() =>
+    Object.fromEntries((record.tracklist || []).map((t, i) => [i, t.hot || false]))
+  );
+  const [showLabelModal, setShowLabelModal] = useState(false);
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
 
@@ -1118,7 +1130,18 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
     setPriceLoading(false);
   };
 
+  const toggleHot = (trackIdx) => {
+    const newHot = !localHots[trackIdx];
+    setLocalHots(prev => ({ ...prev, [trackIdx]: newHot }));
+    if (onUpdate) {
+      onUpdate(record.id, {
+        tracklist: (record.tracklist || []).map((t, i) => i === trackIdx ? { ...t, hot: newHot } : t),
+      });
+    }
+  };
+
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }} onClick={onClose}>
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl" style={{ background: "linear-gradient(160deg, rgba(22,22,30,0.99) 0%, rgba(10,10,16,0.99) 100%)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
 
@@ -1187,7 +1210,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
             <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-3 font-mono">Tracklist</div>
             <div className="space-y-0.5">
               {record.tracklist.map((track, i) => (
-                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} />
+                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null, hot: localHots[i] ?? track.hot ?? false }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={toggleHot} />
               ))}
             </div>
           </div>
@@ -1243,12 +1266,25 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
           </div>
         )}
 
-        <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
-          <Trash size={12} />Remove from collection
-        </button>
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
+          <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.025)" }}>
+            <Printer size={12} />Print label
+          </button>
+          <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
+            <Trash size={12} />Remove from collection
+          </button>
+        </div>
         </div>{/* end px-6 content wrapper */}
       </div>
     </div>
+    {showLabelModal && (
+      <LabelModal
+        record={{ ...record, tracklist: (record.tracklist || []).map((t, i) => ({ ...t, hot: localHots[i] ?? t.hot ?? false })) }}
+        accentRGB={accentRGB}
+        onClose={() => setShowLabelModal(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -1596,7 +1632,7 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
   );
 }
 
-function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading }) {
+function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading, onHotToggle }) {
   const keyColor = track.key ? camelotColor(track.key) : null;
   const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
 
@@ -1616,17 +1652,30 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading 
   return (
     <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
       <div className="text-[10px] tracking-[0.12em] text-white/35 font-mono">{track.position}</div>
-      <div className="min-w-0">
-        <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
-        {/* Mobile: duration + BPM + key inline */}
-        <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
-          {track.duration && <><span>{track.duration}</span><span>·</span></>}
-          {bpmLoading
-            ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
-            : <span>{track.bpm != null ? `${track.bpm} BPM` : ""}</span>
-          }
-          {track.bpm != null && <span>·</span>}
-          <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || ""}</span>
+      <div className="min-w-0 flex items-start gap-1.5">
+        {/* Hot toggle: clickable when onHotToggle provided, display-only when track.hot */}
+        {(onHotToggle || track.hot) && (
+          <button
+            onClick={onHotToggle ? () => onHotToggle(index) : undefined}
+            className="shrink-0 leading-none transition-opacity"
+            style={{ fontSize: 13, opacity: track.hot ? 1 : 0.18, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
+            title={onHotToggle ? (track.hot ? "Unmark as hot" : "Mark as hot") : undefined}
+          >
+            🔥
+          </button>
+        )}
+        <div className="min-w-0">
+          <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
+          {/* Mobile: duration + BPM + key inline */}
+          <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
+            {track.duration && <><span>{track.duration}</span><span>·</span></>}
+            {bpmLoading
+              ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
+              : <span>{track.bpm != null ? `${track.bpm} BPM` : ""}</span>
+            }
+            {track.bpm != null && <span>·</span>}
+            <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || ""}</span>
+          </div>
         </div>
       </div>
       {/* Mobile play button — sits in the "auto" third column */}
@@ -1926,6 +1975,199 @@ function CameraModal({ onCapture, onClose }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ----- Label printing --------------------------------------------------------
+
+function truncateLabelText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 0 && ctx.measureText(t + '...').width > maxWidth) t = t.slice(0, -1);
+  return t + '...';
+}
+
+function drawLabel(ctx, record, W, H, accentRGB) {
+  const parts = (accentRGB || '200,200,200').split(',').map(Number);
+  const [r, g, b] = parts;
+  const accent = `rgb(${r},${g},${b})`;
+
+  ctx.fillStyle = '#0a0a10';
+  ctx.fillRect(0, 0, W, H);
+
+  // Left accent bar
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, 0, 8, H);
+
+  const pad = 48;
+  const cx = pad + 8;
+  const cw = W - cx - pad;
+
+  // Artist
+  ctx.font = 'bold 62px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.textAlign = 'left';
+  ctx.fillText(truncateLabelText(ctx, record.artist || '', cw), cx, 104);
+
+  // Title
+  ctx.font = 'italic 38px Georgia, serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.52)';
+  ctx.fillText(truncateLabelText(ctx, record.title || '', cw), cx, 156);
+
+  // Meta
+  const meta = [record.label, record.year, record.catalogNumber].filter(Boolean).join('  ·  ');
+  ctx.font = '13px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.26)';
+  ctx.fillText(meta, cx, 194);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx, 216);
+  ctx.lineTo(W - pad, 216);
+  ctx.stroke();
+
+  // Tracklist
+  const tracks = record.tracklist || [];
+  const trackH = 35;
+  const startY = 240;
+  const maxTracks = Math.floor((H - startY - 36) / trackH);
+
+  tracks.slice(0, maxTracks).forEach((track, i) => {
+    const y = startY + i * trackH + 20;
+    const isHot = track.hot;
+
+    ctx.font = '12px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.24)';
+    ctx.textAlign = 'left';
+    ctx.fillText(track.position || String(i + 1), cx, y);
+
+    const fireX = cx + 26;
+    if (isHot) {
+      ctx.font = '14px serif';
+      ctx.fillText('🔥', fireX, y);
+    }
+
+    const titleX = cx + 50;
+    const bpmW = track.bpm ? 72 : 0;
+    const maxTitleW = cw - 50 - bpmW - 8;
+    ctx.font = isHot ? `bold 17px -apple-system, sans-serif` : `17px -apple-system, sans-serif`;
+    ctx.fillStyle = isHot ? accent : 'rgba(255,255,255,0.78)';
+    ctx.fillText(truncateLabelText(ctx, track.title || '', maxTitleW), titleX, y);
+
+    if (track.bpm) {
+      ctx.font = 'bold 13px monospace';
+      ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+      ctx.textAlign = 'right';
+      ctx.fillText(`${track.bpm} BPM`, W - pad, y);
+      ctx.textAlign = 'left';
+    }
+  });
+
+  // Branding
+  ctx.font = '11px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.textAlign = 'right';
+  ctx.fillText('VINYL VAULT', W - pad, H - 18);
+  ctx.textAlign = 'left';
+}
+
+function LabelModal({ record, accentRGB, onClose }) {
+  const canvasRef = useRef(null);
+  const [gelatoStatus, setGelatoStatus] = useState(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const W = 1000, H = 640;
+    canvas.width = W;
+    canvas.height = H;
+    drawLabel(canvas.getContext('2d'), record, W, H, accentRGB);
+  }, [record.id, accentRGB]);
+
+  const download = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.download = `label-${(record.artist + '-' + record.title).replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+
+  const orderGelato = async () => {
+    setGelatoStatus('ordering');
+    try {
+      const canvas = canvasRef.current;
+      const imageData = canvas.toDataURL('image/png').split(',')[1];
+      const res = await fetch('/api/gelato-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData, record: { artist: record.artist, title: record.title } }),
+      });
+      const data = await res.json();
+      setGelatoStatus(data.error === 'not_configured' ? 'unavailable' : 'success');
+    } catch {
+      setGelatoStatus('unavailable');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(14px)' }}
+      onClick={onClose}>
+      <div className="relative w-full max-w-2xl rounded-3xl overflow-hidden"
+        style={{ background: 'linear-gradient(160deg, rgba(22,22,30,0.99), rgba(10,10,16,0.99))', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 40px 100px -20px rgba(0,0,0,0.95)' }}
+        onClick={e => e.stopPropagation()}>
+
+        <button onClick={onClose} className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+          <X size={14} className="text-white/50" />
+        </button>
+
+        <div className="p-6 md:p-8">
+          <div className="text-[10px] tracking-[0.3em] uppercase font-mono text-white/35 mb-4">Sleeve Label</div>
+
+          <div className="w-full rounded-xl overflow-hidden mb-3" style={{ border: '1px solid rgba(255,255,255,0.07)', aspectRatio: '1000 / 640' }}>
+            <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+          </div>
+
+          <div className="text-[10px] font-mono text-white/22 mb-5">
+            1000 x 640 px (approx 85 x 54 mm at 300 dpi) · sleeve label format
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={download}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[12px] font-mono transition-all"
+              style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.30)`, color: `rgb(${accentRGB})` }}>
+              <DownloadSimple size={14} />Download PNG
+            </button>
+
+            {gelatoStatus === null && (
+              <button onClick={orderGelato}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[12px] font-mono transition-all"
+                style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)', background: 'transparent' }}>
+                <Printer size={14} />Order via Gelato
+              </button>
+            )}
+            {gelatoStatus === 'ordering' && (
+              <div className="flex items-center gap-2 text-[11px] font-mono text-white/35">
+                <div className="w-3 h-3 rounded-full border animate-spin" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: 'rgba(255,255,255,0.6)' }} />
+                Placing order...
+              </div>
+            )}
+            {gelatoStatus === 'success' && (
+              <div className="flex items-center gap-2 text-[11px] font-mono" style={{ color: 'rgb(120,220,140)' }}>
+                <Check size={13} weight="bold" />Order placed
+              </div>
+            )}
+            {gelatoStatus === 'unavailable' && (
+              <div className="text-[11px] font-mono text-white/28">Gelato ordering coming soon.</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -21,7 +21,7 @@ catalogNumber: The alphanumeric release code on the label, e.g. "WAP63", "PM-012
 
 title: The EP or LP name — NOT individual track names. Vinyl labels typically list several track titles (side A tracks, side B tracks). Those are tracks on the record, not the release title. The release title is the main EP/LP heading distinct from the track listing.
 
-artist: The performing artist. On minimal underground labels the imprint name (e.g. "PURPOSE MAKER", "WARP", "R&S") is the record label, not the artist. If no artist name is printed separately from the label name, return "".
+artist: The performing artist. On minimal underground labels the imprint name (e.g. "PURPOSE MAKER", "WARP", "R&S") is the record label, not the artist. Mix or remix credits (e.g. "C. Craig's Mind Mix", "DJ Stingray Remix", "remixed by X", "X mix", "X's edit") are NOT the artist — they identify who remixed or mixed the track, not who originally performed it. Only populate artist if a performing artist is clearly and separately labeled. If the only name visible is a mix/remix credit, return "".
 
 label: The record label or imprint name, e.g. "Purpose Maker", "Warp", "Tresor". Different from the artist.
 
@@ -101,7 +101,7 @@ Return ONLY valid JSON (no markdown fences) in this exact shape:
 }
 
 title: The EP or LP name. Track names listed on labels are individual tracks, not the release title.
-artist: The performing artist. Label imprint names (e.g. "PURPOSE MAKER", "WARP") are labels, not artists. Return "" if no artist is printed separately.
+artist: The performing artist. Label imprint names (e.g. "PURPOSE MAKER", "WARP") are labels, not artists. Mix or remix credits (e.g. "C. Craig's Mind Mix", "remixed by X", "X's edit") are NOT the artist. Return "" if no artist is clearly labeled separately from any mix credit.
 label: The record label or imprint.
 catalogNumber: The alphanumeric release code, e.g. "PM-012", "WAP63". Read digits exactly as given.
 rawText: Copy the OCR text verbatim.

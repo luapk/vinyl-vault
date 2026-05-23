@@ -57,6 +57,11 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
   if (artist && title) {
     urls.add(buildSearchUrl({ artist, release_title: title }));
   }
+  if (title) {
+    // Title-only: catches cases where artist is empty (mix credit misread as artist)
+    // or when artist field is wrong but title is correct.
+    urls.add(buildSearchUrl({ release_title: title }));
+  }
   if (label && title) {
     urls.add(buildSearchUrl({ label, release_title: title }));
   }
@@ -86,6 +91,13 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
   const fuzzyQ = rawText || [artist, title, label].filter(Boolean).join(' ');
   if (fuzzyQ) {
     urls.add(buildSearchUrl({ q: fuzzyQ }));
+  }
+
+  // Title-keyword fallback: when rawText contains remix suffixes like "c.craig's mind mix",
+  // the fuzzy search may bias toward wrong releases. A clean title-only keyword search
+  // cuts through that noise.
+  if (title && (!artist || artist === label)) {
+    urls.add(buildSearchUrl({ q: title }));
   }
 
   const batches = await Promise.all(
