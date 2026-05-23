@@ -199,7 +199,10 @@ export async function fetchDiscogsPrice(releaseId) {
 
   if (listingsRes.ok) {
     const data = await listingsRes.json();
-    const listings = data.listings || [];
+    console.log('[price] response top-level keys:', Object.keys(data));
+    // Discogs marketplace search uses 'listings'; database search uses 'results'
+    const listings = data.listings || data.results || [];
+    console.log('[price] listings count:', listings.length);
 
     const prices = listings
       .map(l => l.price?.value)
@@ -208,7 +211,7 @@ export async function fetchDiscogsPrice(releaseId) {
 
     if (listings.length > 0) {
       console.log('[price] sample listing keys:', Object.keys(listings[0]));
-      console.log('[price] sample listing:', JSON.stringify(listings[0]).slice(0, 400));
+      console.log('[price] sample listing:', JSON.stringify(listings[0]).slice(0, 500));
     }
 
     // Group by condition: { "Near Mint (NM or M-)": { total, count } }
