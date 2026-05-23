@@ -206,10 +206,15 @@ export async function fetchDiscogsPrice(releaseId) {
       .filter(p => typeof p === 'number' && p > 0)
       .sort((a, b) => a - b);
 
+    if (listings.length > 0) {
+      console.log('[price] sample listing keys:', Object.keys(listings[0]));
+      console.log('[price] sample listing:', JSON.stringify(listings[0]).slice(0, 400));
+    }
+
     // Group by condition: { "Near Mint (NM or M-)": { total, count } }
     const condMap = {};
     for (const l of listings) {
-      const cond = l.condition;
+      const cond = l.condition || l.grade || l.media_condition;
       const val = l.price?.value;
       if (!cond || typeof val !== 'number' || val <= 0) continue;
       if (!condMap[cond]) condMap[cond] = { total: 0, count: 0 };
