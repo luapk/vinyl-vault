@@ -30,23 +30,54 @@ async function getToken() {
   return cachedToken;
 }
 
+const normStr = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+function titleSim(a, b) {
+  const na = normStr(a), nb = normStr(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  const wa = na.split(' ').filter(w => w.length > 2);
+  const wb = nb.split(' ').filter(w => w.length > 2);
+  if (!wa.length || !wb.length) return (na.includes(nb) || nb.includes(na)) ? 0.5 : 0;
+  const overlap = wa.filter(w => wb.includes(w)).length;
+  const base = overlap / Math.max(wa.length, wb.length);
+  // Substring match, but penalised by length ratio
+  if ((na.includes(nb) || nb.includes(na)) && base < 0.5) {
+    const ratio = Math.min(na.length, nb.length) / Math.max(na.length, nb.length);
+    return Math.max(base, ratio >= 0.7 ? 0.5 : 0.25);
+  }
+  return base;
+}
+
 async function searchTrack(token, artist, trackTitle) {
-  // Only include artist filter when we have one — empty artist: produces malformed queries
   const q = artist ? `track:${trackTitle} artist:${artist}` : `track:${trackTitle}`;
-  const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=3`;
+  const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=5`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     console.log(`[spotify] search ${res.status} for "${q}"`);
     return null;
   }
   const data = await res.json();
-  const track = data.tracks?.items?.[0];
-  if (!track) {
+  const items = data.tracks?.items || [];
+  if (!items.length) {
     console.log(`[spotify] no results for "${q}"`);
     return null;
   }
+
+  // Score each candidate: require title similarity >= 0.5 to avoid wrong-song matches
+  const scored = items
+    .map(t => ({ t, sim: titleSim(trackTitle, t.name) }))
+    .filter(({ sim }) => sim >= 0.5)
+    .sort((a, b) => b.sim - a.sim);
+
+  if (!scored.length) {
+    console.log(`[spotify] no confident title match for "${trackTitle}" in results`);
+    return null;
+  }
+
+  const track = scored[0].t;
   const preview = track.preview_url || null;
-  console.log(`[spotify] hit: id=${track.id} preview=${preview ? 'YES' : 'NULL'}`);
+  console.log(`[spotify] hit: id=${track.id} sim=${scored[0].sim.toFixed(2)} preview=${preview ? 'YES' : 'NULL'}`);
   return { id: track.id, previewUrl: preview };
 }
 
