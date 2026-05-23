@@ -206,6 +206,21 @@ export async function fetchDiscogsPrice(releaseId) {
       .filter(p => typeof p === 'number' && p > 0)
       .sort((a, b) => a - b);
 
+    // Group by condition: { "Near Mint (NM or M-)": { total, count } }
+    const condMap = {};
+    for (const l of listings) {
+      const cond = l.condition;
+      const val = l.price?.value;
+      if (!cond || typeof val !== 'number' || val <= 0) continue;
+      if (!condMap[cond]) condMap[cond] = { total: 0, count: 0 };
+      condMap[cond].total += val;
+      condMap[cond].count++;
+    }
+    const byCondition = {};
+    for (const [cond, { total, count }] of Object.entries(condMap)) {
+      byCondition[cond] = { avg: Math.round((total / count) * 100) / 100, count };
+    }
+
     if (prices.length >= 3) {
       const q1 = prices[Math.floor(prices.length * 0.25)];
       const q3 = prices[Math.floor(prices.length * 0.75)];
@@ -222,7 +237,14 @@ export async function fetchDiscogsPrice(releaseId) {
         high: Math.round(trimmed[trimmed.length - 1] * 100) / 100,
         sampleSize: trimmed.length,
         totalListings: listings.length,
+        byCondition,
       };
+    }
+
+    // Fewer than 3 listings: still return condition data if we have it
+    if (listings.length > 0) {
+      const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
+      return { currency, median: null, mean: null, low: null, high: null, sampleSize: null, totalListings: listings.length, byCondition };
     }
   }
 
@@ -239,5 +261,6 @@ export async function fetchDiscogsPrice(releaseId) {
     high: null,
     sampleSize: null,
     totalListings: stats.num_for_sale || 0,
+    byCondition: {},
   };
 }
