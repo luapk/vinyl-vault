@@ -1633,40 +1633,46 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                 <div className="flex items-center gap-2.5 p-3">
                   <RotatingCube color={activeColor || 'rgba(255,255,255,0.35)'} size={10} />
                   {editingName === crate ? (
-                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
                   ) : (
                     <span className="flex-1 text-sm font-mono" style={{ color: activeColor || 'rgba(255,255,255,0.70)' }}>{crate}</span>
                   )}
-                  <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                  {editingName === crate ? (
+                    <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>
+                  ) : (
+                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                  )}
                   <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
                 </div>
-                {/* Colour picker */}
-                <div className="flex items-center gap-2 px-3 pb-3 pt-0">
-                  <span className="text-[9px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
-                  {CRATE_PALETTE.map(({ id, hex }) => {
-                    const isActive = activeColor === hex;
-                    return (
-                      <button key={id} onClick={() => onSetColor(crate, isActive ? null : hex)}
-                        title={id}
-                        style={{
-                          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
-                          background: hex,
-                          border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.12)',
-                          boxShadow: isActive ? `0 0 8px ${hex}` : 'none',
-                          transition: 'all 0.15s',
-                          transform: isActive ? 'scale(1.2)' : 'scale(1)',
-                        }}
-                      />
-                    );
-                  })}
-                  {activeColor && (
-                    <button onClick={() => onSetColor(crate, null)}
-                      className="text-[9px] font-mono tracking-wide ml-1 transition-all"
-                      style={{ color: 'rgba(255,255,255,0.22)', borderBottom: '1px solid rgba(255,255,255,0.10)', lineHeight: '1.1' }}>
-                      clear
-                    </button>
-                  )}
-                </div>
+                {/* Colour picker — only shown when editing this crate */}
+                {editingName === crate && (
+                  <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                    <span className="text-[9px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
+                    {CRATE_PALETTE.map(({ id, hex }) => {
+                      const isActive = activeColor === hex;
+                      return (
+                        <button key={id} onClick={() => onSetColor(crate, isActive ? null : hex)}
+                          title={id}
+                          style={{
+                            width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                            background: hex,
+                            border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.12)',
+                            boxShadow: isActive ? `0 0 8px ${hex}` : 'none',
+                            transition: 'all 0.15s',
+                            transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                          }}
+                        />
+                      );
+                    })}
+                    {activeColor && (
+                      <button onClick={() => onSetColor(crate, null)}
+                        className="text-[9px] font-mono tracking-wide ml-1 transition-all"
+                        style={{ color: 'rgba(255,255,255,0.22)', borderBottom: '1px solid rgba(255,255,255,0.10)', lineHeight: '1.1' }}>
+                        clear
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
