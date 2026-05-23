@@ -437,7 +437,6 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
-    { id: "batch", label: "Batch", icon: GridNine },
     { id: "about", label: "About", icon: Info },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
@@ -512,7 +511,7 @@ export default function VinylVault() {
       )}
 
       {/* Main */}
-      <main className="relative z-10 px-5 md:px-10 pb-20 max-w-7xl mx-auto">
+      <main className="relative px-5 md:px-10 pb-20 max-w-7xl mx-auto">
         {appView === "admin" && (
           <AdminPanel onBack={() => setAppView("collection")} />
         )}
@@ -1152,8 +1151,15 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     Object.fromEntries((record.tracklist || []).map((t, i) => [i, t.hot || false]))
   );
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [localAccent, setLocalAccent] = useState(accentRGB);
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
+
+  useEffect(() => {
+    const src = images[0] || record.coverUrl;
+    if (!src) return;
+    extractDominantColor(src).then(({ r, g, b }) => setLocalAccent(`${r},${g},${b}`)).catch(() => {});
+  }, [record.coverUrl]);
 
   useEffect(() => {
     if (!record?.tracklist?.length) return;
@@ -1230,11 +1236,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
         <div className="grid sm:grid-cols-[140px_1fr] gap-5 mb-6">
           <div>
-            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${accentRGB},0.35)` }}>
+            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${localAccent},0.35)` }}>
               {images[imgIdx] ? (
                 <img src={images[imgIdx]} alt={record.title} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.07)` }}>
+                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${localAccent},0.07)` }}>
                   <VinylRecord size={28} weight="thin" className="opacity-20" />
                 </div>
               )}
@@ -1242,7 +1248,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             {images.length > 1 && (
               <div className="flex gap-1.5 overflow-x-auto">
                 {images.map((src, i) => (
-                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${accentRGB},0.5)` : "1px solid transparent" }}>
+                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${localAccent},0.5)` : "1px solid transparent" }}>
                     <img src={src} alt="" className="w-full h-full object-cover" />
                   </button>
                 ))}
@@ -1266,12 +1272,12 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                     return (
                       <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
                         style={{
-                          background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
-                          border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
-                          color: col || `rgba(${accentRGB},0.9)`,
+                          background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
+                          border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
+                          color: col || `rgba(${localAccent},0.9)`,
                           boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
                         }}>
-                        <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
+                        <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
                         {c}
                       </span>
                     );
@@ -1284,7 +1290,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {record.tags.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.40)" }}>{t}</span>
+                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},0.07)`, border: `1px solid rgba(${localAccent},0.16)`, color: `rgba(${localAccent},0.65)` }}>{t}</span>
                   ))}
                 </div>
               </div>
