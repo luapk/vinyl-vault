@@ -636,7 +636,7 @@ export default function VinylVault() {
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
-      {showWalkthrough && appView === 'scan' && (
+      {false && showWalkthrough && appView === 'scan' && (
         <WalkthroughOverlay onDismiss={() => {
           localStorage.setItem('walkthroughSeen', '1');
           setShowWalkthrough(false);
