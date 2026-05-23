@@ -1843,11 +1843,35 @@ function CameraModal({ onCapture, onClose }) {
         )}
 
         {error && (
-          <div className="flex flex-col items-center gap-4 px-8 text-center">
-            <div className="text-white/60 text-sm font-mono">{error}</div>
-            <label className="px-5 py-2.5 rounded-full text-sm font-mono text-white/70 cursor-pointer"
+          <div className="flex flex-col items-center gap-5 px-8 text-center max-w-sm">
+            {/* Icon */}
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <Camera size={24} className="text-red-400/70" />
+            </div>
+
+            <div>
+              <p className="text-white/80 text-base font-display mb-1">Camera access blocked</p>
+              <p className="text-white/40 text-sm font-mono leading-relaxed">
+                {error === 'Camera permission denied'
+                  ? 'Your browser blocked camera access. Enable it in site settings, then try again.'
+                  : error}
+              </p>
+            </div>
+
+            {/* How to fix — browser-specific hint */}
+            <div className="w-full rounded-xl px-4 py-3 text-left text-[12px] font-mono text-white/35 leading-relaxed"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <p className="text-white/50 mb-1.5">To allow camera access:</p>
+              <p>1. Tap the lock / info icon in your browser address bar</p>
+              <p>2. Find <span className="text-white/60">Camera</span> and set it to <span className="text-white/60">Allow</span></p>
+              <p>3. Reload the page and try again</p>
+            </div>
+
+            {/* Fallback: choose from library */}
+            <label className="px-5 py-2.5 rounded-full text-sm font-mono text-white/70 cursor-pointer transition-all hover:text-white/90"
               style={{ border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)' }}>
-              Choose photo instead
+              Choose photo from library instead
               <input type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) onCapture(f); }} />
             </label>
