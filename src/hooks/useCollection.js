@@ -39,6 +39,7 @@ function recordFromRelease(release, crates) {
       duration: t.duration || null,
       bpm: t.bpm || null,
       key: t.key || null,
+      previewUrl: t.previewUrl || null,
     })),
     crates,
   };

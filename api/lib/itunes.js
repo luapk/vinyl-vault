@@ -8,7 +8,6 @@ function bestMatch(results, trackTitle) {
   if (!results.length) return null;
   const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const target = norm(trackTitle);
-  // Prefer exact or close title match
   const sorted = results
     .filter(r => r.previewUrl)
     .sort((a, b) => {
@@ -16,7 +15,17 @@ function bestMatch(results, trackTitle) {
       const bScore = norm(b.trackName || '').includes(target) ? 0 : 1;
       return aScore - bScore;
     });
-  return sorted[0]?.previewUrl || null;
+  if (!sorted[0]) return null;
+  return {
+    previewUrl: sorted[0].previewUrl,
+    durationMs: sorted[0].trackTimeMillis || null,
+  };
+}
+
+function msToMmSs(ms) {
+  if (!ms) return null;
+  const totalSec = Math.round(ms / 1000);
+  return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
 }
 
 async function searchTrackPreview(artist, trackTitle) {
@@ -33,8 +42,8 @@ async function searchTrackPreview(artist, trackTitle) {
       );
       if (!res.ok) continue;
       const data = await res.json();
-      const url = bestMatch(data.results || [], trackTitle);
-      if (url) return url;
+      const match = bestMatch(data.results || [], trackTitle);
+      if (match) return match;
     } catch {
       continue;
     }
@@ -49,8 +58,14 @@ export async function fillItunesPreviews(tracks, artist) {
   return Promise.all(
     tracks.map(async track => {
       if (track.previewUrl) return track;
-      const previewUrl = await searchTrackPreview(artist, track.title).catch(() => null);
-      return previewUrl ? { ...track, previewUrl } : track;
+      const match = await searchTrackPreview(artist, track.title).catch(() => null);
+      if (!match) return track;
+      return {
+        ...track,
+        previewUrl: match.previewUrl,
+        // Fill duration from iTunes only when Discogs didn't supply one
+        duration: track.duration || msToMmSs(match.durationMs),
+      };
     })
   );
 }

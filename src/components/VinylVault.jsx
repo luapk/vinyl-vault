@@ -1599,21 +1599,41 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
 function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading }) {
   const keyColor = track.key ? camelotColor(track.key) : null;
   const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
+
+  const PlayBtn = ({ size = 9 }) => track.previewUrl ? (
+    <button onClick={() => onPlay(track.previewUrl)}
+      className="rounded-full flex items-center justify-center transition-all shrink-0"
+      style={{
+        width: size === 9 ? 24 : 28, height: size === 9 ? 24 : 28,
+        background: isPlaying ? `rgba(${accentRGB},0.18)` : "transparent",
+        border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(255,255,255,0.09)",
+        color: isPlaying ? `rgb(${accentRGB})` : "rgba(255,255,255,0.30)",
+      }}>
+      {isPlaying ? <Pause size={size} weight="fill" /> : <Play size={size} weight="fill" />}
+    </button>
+  ) : null;
+
   return (
     <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
       <div className="text-[10px] tracking-[0.12em] text-white/35 font-mono">{track.position}</div>
       <div className="min-w-0">
         <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
+        {/* Mobile: duration + BPM + key inline */}
         <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
           {track.duration && <><span>{track.duration}</span><span>·</span></>}
           {bpmLoading
             ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
-            : <span>{track.bpm != null ? `${track.bpm} BPM` : "— BPM"}</span>
+            : <span>{track.bpm != null ? `${track.bpm} BPM` : ""}</span>
           }
-          <span>·</span>
-          <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || "—"}</span>
+          {track.bpm != null && <span>·</span>}
+          <span style={{ color: keyColor || "rgba(255,255,255,0.2)" }}>{track.key || ""}</span>
         </div>
       </div>
+      {/* Mobile play button — sits in the "auto" third column */}
+      <div className="md:hidden flex items-center justify-center">
+        <PlayBtn size={10} />
+      </div>
+      {/* Desktop columns */}
       <div className="hidden md:flex items-center gap-1 text-[11px] text-white/35 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
       <div className="hidden md:flex items-center gap-1 text-[11px] tabular-nums min-w-[72px] justify-end font-mono">
         <span className="text-white/22 text-[9px]">BPM</span>
@@ -1628,11 +1648,7 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading 
         ) : <span className="text-white/20 text-[10px] font-mono">—</span>}
       </div>
       <div className="hidden md:flex items-center justify-center">
-        {track.previewUrl ? (
-          <button onClick={() => onPlay(track.previewUrl)} className="w-6 h-6 rounded-full flex items-center justify-center transition-all" style={{ background: isPlaying ? `rgba(${accentRGB},0.18)` : "transparent", border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(255,255,255,0.09)", color: isPlaying ? `rgb(${accentRGB})` : "rgba(255,255,255,0.25)" }}>
-            {isPlaying ? <Pause size={9} weight="fill" /> : <Play size={9} weight="fill" />}
-          </button>
-        ) : <div className="w-6 h-6" />}
+        <PlayBtn size={9} />
       </div>
     </div>
   );
