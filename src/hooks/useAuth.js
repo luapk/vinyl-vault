@@ -28,7 +28,7 @@ export function useAuth() {
   useEffect(() => {
     if (!isSupabaseEnabled) { setLoading(false); return; }
 
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000));
     Promise.race([supabase.auth.getSession(), timeout])
       .then(async ({ data: { session } }) => {
         setUser(session?.user ?? null);

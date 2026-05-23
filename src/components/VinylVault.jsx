@@ -340,7 +340,7 @@ export default function VinylVault() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#050508" }}>
         <div className="w-8 h-8 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.6)" }} />
-        <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Loading...</span>
+        <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>Connecting...</span>
       </div>
     );
   }

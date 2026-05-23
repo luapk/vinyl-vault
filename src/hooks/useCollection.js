@@ -213,7 +213,7 @@ export function useCollection(userId = null) {
     renameCrate,
     deleteCrate,
     migrateFromLocalStorage,
-    hasLocalRecords: !useDb && load().length > 0,
+    hasLocalRecords: load().length > 0,
   };
 }
 
