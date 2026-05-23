@@ -3,7 +3,7 @@ import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
-  Scan, Info, Crown, SignOut, UserCircle,
+  Scan, Info, Crown, SignOut, UserCircle, GearSix,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -307,6 +307,7 @@ export default function VinylVault() {
   }
   const greeting = user ? greetingRef.current : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
+  const [showAccount, setShowAccount] = useState(false);
 
   const userId = user?.id ?? null;
   const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, migrateFromLocalStorage, hasLocalRecords } = useCollection(userId);
@@ -573,17 +574,13 @@ export default function VinylVault() {
           )}
         </nav>
 
-        {/* User info + sign out — only when Supabase is active */}
+        {/* Account button */}
         {isSupabaseEnabled && user && (
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-white/30">
-              {isAdmin && <Crown size={11} className="text-amber-400" weight="duotone" />}
-              <span className="truncate max-w-[120px]">{profile?.email || user.email}</span>
-            </div>
-            <button onClick={signOut} title="Sign out" className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 transition-colors" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-              <SignOut size={13} />
-            </button>
-          </div>
+          <button onClick={() => setShowAccount(true)} title="Account settings"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 transition-colors shrink-0"
+            style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+            <GearSix size={13} />
+          </button>
         )}
       </header>
 
@@ -647,6 +644,15 @@ export default function VinylVault() {
       )}
 
       {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
+
+      {showAccount && (
+        <AccountModal
+          user={user}
+          profile={profile}
+          onClose={() => setShowAccount(false)}
+          onSignOut={() => { setShowAccount(false); signOut(); }}
+        />
+      )}
     </div>
   );
 }
@@ -1709,6 +1715,111 @@ function PriceGraph({ price, accentRGB }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ----- AccountModal -----------------------------------------------------------
+
+function AccountModal({ user, profile, onClose, onSignOut }) {
+  const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [saving, setSaving] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  async function saveDisplayName() {
+    if (!displayName.trim()) return;
+    setSaving(true);
+    setMsg('');
+    try {
+      const { supabase } = await import('../lib/supabase.js');
+      const { error } = await supabase.from('profiles').update({ display_name: displayName.trim() }).eq('id', user.id);
+      if (error) throw error;
+      setMsg('Name updated.');
+    } catch {
+      setMsg('Could not save. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendPasswordReset() {
+    try {
+      const { supabase } = await import('../lib/supabase.js');
+      await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin });
+      setResetSent(true);
+    } catch {
+      setMsg('Could not send reset email.');
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
+      <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6"
+        style={{ background: 'linear-gradient(160deg,rgba(255,255,255,0.09) 0%,rgba(255,255,255,0.04) 100%)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', boxShadow: '0 32px 64px rgba(0,0,0,0.5)' }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between mb-5">
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Account</h2>
+          <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors"><X size={16} /></button>
+        </div>
+
+        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>{user.email}</p>
+
+        {/* Display name */}
+        <div className="mb-4">
+          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Display name</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
+              placeholder="Your name"
+              style={{ flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
+              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+            />
+            <button onClick={saveDisplayName} disabled={saving}
+              style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#000', background: saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? '...' : 'Save'}
+            </button>
+          </div>
+          {msg && <p style={{ fontSize: 11, color: msg.includes('not') ? '#fca5a5' : '#86efac', marginTop: 6, fontFamily: 'monospace' }}>{msg}</p>}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
+
+        {/* Password reset */}
+        <div className="mb-5">
+          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Password</label>
+          {resetSent ? (
+            <p style={{ fontSize: 12, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
+          ) : (
+            <button onClick={sendPasswordReset}
+              className="text-sm text-white/50 hover:text-white/80 transition-colors"
+              style={{ fontFamily: 'monospace', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              Send password reset email
+            </button>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
+
+        {/* Sign out */}
+        <button onClick={onSignOut}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#fca5a5'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}>
+          <SignOut size={14} />
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }
