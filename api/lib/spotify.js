@@ -65,12 +65,25 @@ async function searchTrack(token, artist, trackTitle, releaseYear) {
   }
 
   // Score each candidate: require title similarity >= 0.5 to avoid wrong-song matches
+  const normArtist = normStr(artist || '');
+  const artistWords = normArtist.split(' ').filter(w => w.length > 2);
+
   const scored = items
     .map(t => {
       const sim = titleSim(trackTitle, t.name);
       if (sim < 0.5) return null;
 
       let s = sim;
+
+      // Artist: penalise results with no word overlap against the searched artist.
+      // Structured `artist:` query already narrows results, but can still miss.
+      if (artistWords.length > 0) {
+        const spotifyArtist = (t.artists || []).map(a => normStr(a.name)).join(' ');
+        const spotifyWords = spotifyArtist.split(' ').filter(w => w.length > 2);
+        const hasOverlap = artistWords.some(w => spotifyWords.includes(w)) ||
+          spotifyWords.some(w => artistWords.includes(w));
+        if (!hasOverlap && spotifyWords.length > 0) s -= 0.6;  // drops below 0.5 threshold even for exact title
+      }
 
       // Year proximity: penalise re-recordings from a different era
       if (releaseYear && t.album?.release_date) {

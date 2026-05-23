@@ -48,14 +48,16 @@ function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear,
 
   let score = ts;
 
-  // Artist similarity (bonus, not required)
+  // Artist: mismatch is a penalty, not just a missed bonus.
+  // Zero word-overlap against a known artist means it's the wrong recording.
   const na = norm(artist || ''), nb = norm(result.artistName || '');
   if (na && nb) {
     if (na === nb || na.includes(nb) || nb.includes(na)) score += 2;
     else {
       const wa = na.split(' ').filter(w => w.length > 2);
       const wb = nb.split(' ').filter(w => w.length > 2);
-      if (wa.some(w => wb.includes(w))) score += 1;
+      if (wa.length && wb.length && wa.some(w => wb.includes(w))) score += 1;
+      else score -= 2;  // no word overlap at all: clearly a different artist
     }
   }
 
@@ -88,7 +90,7 @@ function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear,
   return score;
 }
 
-const MIN_SCORE = 2;
+const MIN_SCORE = 3;
 
 function bestMatch(results, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) {
   const candidates = results
