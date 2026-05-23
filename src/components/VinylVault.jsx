@@ -810,6 +810,45 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
 // ----- CollectionView --------------------------------------------------------
 
+// ----- Crate colour system ---------------------------------------------------
+
+const CRATE_PALETTE = [
+  { id: 'cyan',    hex: '#22d3ee' },
+  { id: 'amber',   hex: '#f59e0b' },
+  { id: 'rose',    hex: '#f43f5e' },
+  { id: 'violet',  hex: '#8b5cf6' },
+  { id: 'emerald', hex: '#10b981' },
+];
+
+function loadCrateColors() {
+  try { return JSON.parse(localStorage.getItem('vinylvault_crate_colors') || '{}'); }
+  catch { return {}; }
+}
+
+function RotatingCube({ color, size = 9 }) {
+  const c = color || 'rgba(255,255,255,0.4)';
+  const half = size / 2;
+  const face = {
+    position: 'absolute', width: size, height: size,
+    background: `${c}14`, border: `1px solid ${c}`,
+    top: 0, left: 0, boxSizing: 'border-box',
+  };
+  return (
+    <div style={{ width: size, height: size, perspective: size * 5, flexShrink: 0 }}>
+      <div className="crate-cube" style={{ width: size, height: size, position: 'relative', transformStyle: 'preserve-3d' }}>
+        <div style={{ ...face, transform: `translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(180deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateY(-90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateX(-90deg) translateZ(${half}px)` }} />
+        <div style={{ ...face, transform: `rotateX(90deg) translateZ(${half}px)` }} />
+      </div>
+    </div>
+  );
+}
+
+// ----- CollectionView --------------------------------------------------------
+
 function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
@@ -818,6 +857,16 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
+  const [crateColors, setCrateColorsState] = useState(loadCrateColors);
+
+  const setCrateColor = (name, hex) => {
+    setCrateColorsState(prev => {
+      const next = { ...prev };
+      if (hex) next[name] = hex; else delete next[name];
+      localStorage.setItem('vinylvault_crate_colors', JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
@@ -916,12 +965,23 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
           {/* Crate filters — user crates only */}
           {allCrates.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
-              {allCrates.map((c) => (
-                <button key={c} onClick={() => setFilterCrate(filterCrate === c ? null : c)} className="px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
-                  style={{ background: filterCrate === c ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.025)", border: filterCrate === c ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.07)", color: filterCrate === c ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.38)" }}>
-                  {c}
-                </button>
-              ))}
+              {allCrates.map((c) => {
+                const col = crateColors[c] || null;
+                const active = filterCrate === c;
+                return (
+                  <button key={c} onClick={() => setFilterCrate(active ? null : c)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={{
+                      background: active ? (col ? `${col}22` : 'rgba(255,255,255,0.10)') : (col ? `${col}0d` : 'rgba(255,255,255,0.025)'),
+                      border: active ? `1px solid ${col || 'rgba(255,255,255,0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(255,255,255,0.07)'}`,
+                      color: active ? (col || 'rgba(255,255,255,0.88)') : (col ? col + 'bb' : 'rgba(255,255,255,0.38)'),
+                      boxShadow: active && col ? `0 0 14px -3px ${col}66` : 'none',
+                    }}>
+                    <RotatingCube color={col || 'rgba(255,255,255,0.4)'} size={8} />
+                    {c}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -930,7 +990,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -942,15 +1002,15 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} />}
-      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} />}
+      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
     </div>
   );
 }
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB }) {
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {} }) {
   const touchStartX = useRef(null);
   const [dragDelta, setDragDelta] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -1011,9 +1071,21 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <div className="text-base md:text-lg text-white/50 font-display mb-3">{current.title}</div>
         {current.crates && current.crates.length > 0 && (
           <div className="flex flex-wrap justify-center gap-1.5 mb-3">
-            {current.crates.map((c) => (
-              <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
-            ))}
+            {current.crates.map((c) => {
+              const col = crateColors[c] || null;
+              return (
+                <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                  style={{
+                    background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
+                    border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
+                    color: col || `rgba(${accentRGB},0.9)`,
+                    boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                  }}>
+                  <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
+                  {c}
+                </span>
+              );
+            })}
           </div>
         )}
         <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
@@ -1065,7 +1137,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB }) {
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {} }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
@@ -1186,9 +1258,21 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
               <div>
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {record.crates.map((c) => (
-                    <span key={c} className="text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${accentRGB},0.1)`, border: `1px solid rgba(${accentRGB},0.22)`, color: `rgba(${accentRGB},0.9)` }}>{c}</span>
-                  ))}
+                  {record.crates.map((c) => {
+                    const col = crateColors[c] || null;
+                    return (
+                      <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                        style={{
+                          background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
+                          border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
+                          color: col || `rgba(${accentRGB},0.9)`,
+                          boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                        }}>
+                        <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
+                        {c}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1290,7 +1374,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB }) {
 
 // ----- CrateManagerModal -----------------------------------------------------
 
-function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
+function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = {}, onSetColor }) {
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
 
@@ -1308,17 +1392,50 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete }) {
         </div>
         {crates.length === 0 && <p className="text-white/30 text-sm font-mono text-center py-4">No crates yet.</p>}
         <div className="space-y-2">
-          {crates.map((crate) => (
-            <div key={crate} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}>
-              {editingName === crate ? (
-                <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
-              ) : (
-                <span className="flex-1 text-sm font-mono text-white/70">{crate}</span>
-              )}
-              <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
-              <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
-            </div>
-          ))}
+          {crates.map((crate) => {
+            const activeColor = crateColors[crate] || null;
+            return (
+              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${activeColor ? activeColor + '44' : 'rgba(255,255,255,0.06)'}`, boxShadow: activeColor ? `0 0 16px -6px ${activeColor}55` : 'none' }}>
+                <div className="flex items-center gap-2.5 p-3">
+                  <RotatingCube color={activeColor || 'rgba(255,255,255,0.35)'} size={10} />
+                  {editingName === crate ? (
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} onBlur={commitRename} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)" }} />
+                  ) : (
+                    <span className="flex-1 text-sm font-mono" style={{ color: activeColor || 'rgba(255,255,255,0.70)' }}>{crate}</span>
+                  )}
+                  <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                  <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
+                </div>
+                {/* Colour picker */}
+                <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                  <span className="text-[9px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
+                  {CRATE_PALETTE.map(({ id, hex }) => {
+                    const isActive = activeColor === hex;
+                    return (
+                      <button key={id} onClick={() => onSetColor(crate, isActive ? null : hex)}
+                        title={id}
+                        style={{
+                          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                          background: hex,
+                          border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.12)',
+                          boxShadow: isActive ? `0 0 8px ${hex}` : 'none',
+                          transition: 'all 0.15s',
+                          transform: isActive ? 'scale(1.2)' : 'scale(1)',
+                        }}
+                      />
+                    );
+                  })}
+                  {activeColor && (
+                    <button onClick={() => onSetColor(crate, null)}
+                      className="text-[9px] font-mono tracking-wide ml-1 transition-all"
+                      style={{ color: 'rgba(255,255,255,0.22)', borderBottom: '1px solid rgba(255,255,255,0.10)', lineHeight: '1.1' }}>
+                      clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

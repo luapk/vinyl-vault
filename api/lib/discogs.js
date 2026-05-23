@@ -125,7 +125,9 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     }
   }
 
-  return merged.slice(0, 5).map(r => {
+  // Slice to 15: broad catno searches can return up to 5 wrong-label collisions,
+  // which would crowd out correct releases from targeted searches if we sliced to 5.
+  return merged.slice(0, 15).map(r => {
     const { artist: a, recordTitle } = parseDiscogsTitle(r.title || '');
     return {
       id: String(r.id),
