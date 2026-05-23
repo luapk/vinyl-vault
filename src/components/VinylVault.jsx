@@ -318,7 +318,7 @@ export default function VinylVault() {
 
   // Gate: show login screen when Supabase is configured but no user is logged in.
   if (isSupabaseEnabled && !authLoading && !user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onSignInWithGoogle={signInWithGoogle} onSignInWithFacebook={signInWithFacebook} loading={authLoading} />;
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
   }
   if (isSupabaseEnabled && authLoading) {
     return (
