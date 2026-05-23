@@ -202,8 +202,42 @@ async function detectBPM(previewUrl) {
 
 // ----- Main Component --------------------------------------------------------
 
+// ----- Greeting helper -------------------------------------------------------
+
+function getGreeting(name) {
+  const hour = new Date().getHours();
+  let pool;
+  if (hour >= 5 && hour < 12) {
+    pool = [
+      `Morning, ${name}. What are we digging today?`,
+      `Early start, ${name}. Coffee and crates?`,
+      `Rise and spin, ${name}.`,
+    ];
+  } else if (hour >= 12 && hour < 18) {
+    pool = [
+      `Afternoon, ${name}. Stack's not going to sort itself.`,
+      `Back at it, ${name}?`,
+      `Good afternoon, ${name}. Ready to dig?`,
+    ];
+  } else if (hour >= 18 && hour < 22) {
+    pool = [
+      `Evening, ${name}. Time to spin something.`,
+      `Hey ${name}, what's going in tonight?`,
+      `Good evening, ${name}. The vault awaits.`,
+    ];
+  } else {
+    pool = [
+      `Late night crate-digging, ${name}?`,
+      `Still at it, ${name}. Respect.`,
+      `Night owl mode, ${name}.`,
+      `The best finds happen late, ${name}.`,
+    ];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export default function VinylVault() {
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, isSupabaseEnabled } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled } = useAuth();
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -222,6 +256,15 @@ export default function VinylVault() {
   // Always-fresh ref so async callbacks never read stale queue state
   const batchQueueRef = useRef([]);
 
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'there';
+  // Stable greeting chosen once when user first becomes known (stored in a ref)
+  const greetingRef = useRef(null);
+  if (user && greetingRef.current === null) {
+    greetingRef.current = getGreeting(displayName);
+  }
+  const greeting = user ? greetingRef.current : null;
+  const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
+
   const userId = user?.id ?? null;
   const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, migrateFromLocalStorage, hasLocalRecords } = useCollection(userId);
 
@@ -232,7 +275,7 @@ export default function VinylVault() {
 
   // Gate: show login screen when Supabase is configured but no user is logged in.
   if (isSupabaseEnabled && !authLoading && !user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onSignInWithGoogle={signInWithGoogle} onSignInWithFacebook={signInWithFacebook} loading={authLoading} />;
   }
   if (isSupabaseEnabled && authLoading) {
     return (
@@ -515,7 +558,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} />}
+            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
             {phase === "disambiguation" && (
               <>
@@ -542,13 +585,20 @@ export default function VinylVault() {
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
+      {showWalkthrough && appView === 'scan' && (
+        <WalkthroughOverlay onDismiss={() => {
+          localStorage.setItem('walkthroughSeen', '1');
+          setShowWalkthrough(false);
+        }} accentRGB={accentRGB} />
+      )}
+
     </div>
   );
 }
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBatch, accentRGB }) {
+function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
   const [showCamera, setShowCamera] = useState(false);
 
   const handleCapture = (file) => {
@@ -557,10 +607,16 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
   };
 
   return (
-    <div className="pt-10 md:pt-20">
-      <div className="max-w-2xl mb-14 md:mb-20">
+    <div className="pt-10 md:pt-20 flex flex-col items-center">
+      {/* Heading section - left-aligned */}
+      <div className="w-full max-w-2xl mb-14 md:mb-20">
+        {greeting && (
+          <div className="text-white/50 text-sm font-mono mb-3" style={{ animation: 'fadeUp 0.4s ease-out' }}>
+            {greeting}
+          </div>
+        )}
         <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
-        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight">
+        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left">
           Stack your wax<br />
           <span className="text-white/35">the easy way.</span>
         </h1>
@@ -569,11 +625,12 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+      {/* Cards grid - centred */}
+      <div className="grid sm:grid-cols-2 gap-4 max-w-lg mx-auto w-full">
         {/* Camera / scan card */}
-        <div className="relative rounded-2xl p-7 transition-all hover:brightness-110 active:scale-[0.98]" style={glass({ boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 32px 64px -20px rgba(0,0,0,0.6), 0 0 50px -15px rgba(${accentRGB},0.18)` })}>
-          <div className="flex flex-col gap-5">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.25), rgba(${accentRGB},0.05))`, border: `1px solid rgba(${accentRGB},0.3)` }}>
+        <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
+          <div className="flex flex-col items-center gap-5 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(145deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.08))`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 12px rgba(0,0,0,0.3)' }}>
               <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
             </div>
             <div>
@@ -582,14 +639,13 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
             </div>
           </div>
           {/* Primary: open camera viewfinder */}
-          <button onClick={() => setShowCamera(true)} className="absolute inset-0 w-full h-full rounded-2xl" aria-label="Open camera" />
-          {/* Secondary: choose from library (small link below the card) */}
+          <button onClick={() => setShowCamera(true)} className="absolute inset-0 w-full h-full" style={{ borderRadius: '20px' }} aria-label="Open camera" />
         </div>
 
-        {/* Upload from library -- shown below camera card on small screens, as a separate option */}
-        <label className="relative block rounded-2xl p-7 cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={glassSubtle({ borderRadius: "1rem" })}>
-          <div className="relative z-10 flex flex-col gap-5">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
+        {/* Batch queue card */}
+        <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
+          <div className="relative z-10 flex flex-col items-center gap-5 text-center">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
               <GridNine size={22} weight="light" className="text-white/45" />
             </div>
             <div>
@@ -601,8 +657,8 @@ function IdleView({ onUpload, onBatch, accentRGB }) {
         </label>
       </div>
 
-      {/* "or choose from library" fallback for the scan card */}
-      <div className="mt-3 max-w-2xl">
+      {/* "or choose from library" centred below the grid */}
+      <div className="mt-4 flex justify-center">
         <label className="inline-flex items-center gap-1.5 text-[11px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
           <Upload size={11} />
           or choose a photo from library
@@ -2308,6 +2364,103 @@ function LabelModal({ record, accentRGB, onClose }) {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ----- WalkthroughOverlay ----------------------------------------------------
+
+function WalkthroughOverlay({ onDismiss, accentRGB }) {
+  const steps = [
+    {
+      icon: Camera,
+      title: 'Scan',
+      body: 'Photograph a sleeve or upload from your library. We read the label and find the exact pressing on Discogs.',
+    },
+    {
+      icon: Check,
+      title: 'Confirm',
+      body: 'Review the match, tweak the details, mark your hot tracks with the fire emoji.',
+    },
+    {
+      icon: Stack,
+      title: 'Organise',
+      body: 'File records into crates, explore your collection by tag, or dig through the carousel.',
+    },
+    {
+      icon: Printer,
+      title: 'Print',
+      body: 'Select records and print sleeve labels in one batch. Download or send to print.',
+    },
+  ];
+
+  const [step, setStep] = useState(0);
+  const isLast = step === steps.length - 1;
+  const StepIcon = steps[step].icon;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+    >
+      <div
+        className="w-full max-w-sm rounded-3xl p-8 flex flex-col items-center text-center"
+        style={{
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 32px 64px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          animation: 'fadeUp 0.3s ease-out',
+        }}
+        key={step}
+      >
+        {/* Icon */}
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+          style={{
+            background: `linear-gradient(145deg, rgba(139,92,246,0.35), rgba(139,92,246,0.08))`,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 4px 16px rgba(0,0,0,0.4)',
+          }}
+        >
+          <StepIcon size={28} weight="light" className="text-violet-300" />
+        </div>
+
+        {/* Title */}
+        <h2 className="text-xl font-display mb-3">{steps[step].title}</h2>
+
+        {/* Body */}
+        <p className="text-white/55 text-sm leading-relaxed mb-8">{steps[step].body}</p>
+
+        {/* Progress dots */}
+        <div className="flex items-center gap-2 mb-8">
+          {steps.map((_, i) => (
+            <div
+              key={i}
+              className="rounded-full transition-all"
+              style={{
+                width: i === step ? 20 : 6,
+                height: 6,
+                background: i === step ? 'rgba(139,92,246,0.9)' : 'rgba(255,255,255,0.2)',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Actions */}
+        <button
+          onClick={() => { if (isLast) { onDismiss(); } else { setStep(s => s + 1); } }}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white mb-3 transition-all"
+          style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.8), rgba(6,182,212,0.6))', border: '1px solid rgba(139,92,246,0.4)' }}
+        >
+          {isLast ? "Let's go" : 'Next'}
+        </button>
+        <button
+          onClick={onDismiss}
+          className="text-xs font-mono text-white/30 hover:text-white/55 transition-colors"
+        >
+          Skip
+        </button>
       </div>
     </div>
   );

@@ -19,7 +19,7 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, role')
+      .select('id, email, role, display_name')
       .eq('id', userId)
       .single();
     return data || null;
@@ -58,9 +58,30 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
-  const signUp = useCallback(async (email, password) => {
+  const signUp = useCallback(async (email, password, displayName) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    if (data?.user && displayName) {
+      await supabase.from('profiles').upsert({ id: data.user.id, email, display_name: displayName });
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }, []);
+
+  const signInWithFacebook = useCallback(async () => {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: window.location.origin },
+    });
     if (error) throw error;
   }, []);
 
@@ -71,5 +92,5 @@ export function useAuth() {
 
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, isSupabaseEnabled };
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled };
 }
