@@ -197,6 +197,7 @@ export async function fetchDiscogsPrice(releaseId) {
     { headers }
   );
 
+  console.log('[price] marketplace search status:', listingsRes.status);
   if (listingsRes.ok) {
     const data = await listingsRes.json();
     console.log('[price] response top-level keys:', Object.keys(data));
