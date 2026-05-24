@@ -1850,13 +1850,21 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
           fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
           timeout(8000),
         ]);
-        const body = await resp.text().catch(() => '(no body)');
-        lines.push(`Server: HTTP ${resp.status}`);
-        if (resp.status >= 400) {
-          lines.push(`Response: ${body.slice(0, 200)}`);
-          ok = false;
-          setDbCheck({ status: 'error', lines });
-          return;
+        const body = await resp.text().catch(() => '');
+        // Supabase restricts the bare /rest/v1/ root to secret keys; for a
+        // publishable key we expect 401 with "Secret API key required" and
+        // that is fine: it confirms the gateway recognised the key.
+        const rootRestrictedForPublishable = resp.status === 401 && body.includes('Secret API key required');
+        if (rootRestrictedForPublishable) {
+          lines.push(`Server: HTTP 401 at root (expected for publishable key)`);
+        } else {
+          lines.push(`Server: HTTP ${resp.status}`);
+          if (resp.status >= 400) {
+            lines.push(`Response: ${body.slice(0, 200)}`);
+            ok = false;
+            setDbCheck({ status: 'error', lines });
+            return;
+          }
         }
       } catch (e) {
         lines.push(`Server reachable: NO - ${e.message}`);
