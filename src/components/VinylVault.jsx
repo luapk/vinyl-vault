@@ -1324,7 +1324,8 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
       </div>
 
       {/* Info */}
-      <div className="mt-7 text-center" style={{ animation: "fadeUp 0.18s ease-out" }} key={current.id}>
+      <div className="mt-7 text-center">
+        <div key={current.id} style={{ animation: "fadeOnly 0.12s ease-out" }}>
         <div className="text-[10px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
           {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
         </div>
@@ -1412,6 +1413,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         })()}
 
         <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
+        </div>
       </div>
 
       {selectMode && current && (

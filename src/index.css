@@ -55,6 +55,10 @@ body {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes fadeOnly {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 @keyframes spinCube {
   from { transform: rotateX(22deg) rotateY(0deg); }
   to   { transform: rotateX(22deg) rotateY(360deg); }
