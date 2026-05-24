@@ -201,6 +201,8 @@ export async function fetchDiscogsPrice(releaseId) {
     const data = await listingsRes.json();
     // Discogs marketplace search uses 'listings'; database search uses 'results'
     const listings = data.listings || data.results || [];
+    const _firstKeys = listings[0] ? Object.keys(listings[0]).join(',') : 'no listings';
+    const _httpStatus = listingsRes.status;
 
     const prices = listings
       .map(l => l.price?.value)
@@ -231,22 +233,25 @@ export async function fetchDiscogsPrice(releaseId) {
       const mean = Math.round((trimmed.reduce((s, p) => s + p, 0) / trimmed.length) * 100) / 100;
       const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
       return {
-        currency,
-        median: Math.round(median * 100) / 100,
-        mean,
+        currency, median: Math.round(median * 100) / 100, mean,
         low: Math.round(trimmed[0] * 100) / 100,
         high: Math.round(trimmed[trimmed.length - 1] * 100) / 100,
-        sampleSize: trimmed.length,
-        totalListings: listings.length,
-        byCondition,
+        sampleSize: trimmed.length, totalListings: listings.length, byCondition,
+        _debug: { source: 'marketplace/search', count: listings.length, firstKeys: _firstKeys },
       };
     }
 
-    // Fewer than 3 listings: still return condition data if we have it
     if (listings.length > 0) {
       const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
-      return { currency, median: null, mean: null, low: null, high: null, sampleSize: null, totalListings: listings.length, byCondition };
+      return { currency, median: null, mean: null, low: null, high: null, sampleSize: null, totalListings: listings.length, byCondition,
+        _debug: { source: 'marketplace/search', count: listings.length, firstKeys: _firstKeys },
+      };
     }
+
+    // marketplace/search returned 200 but no usable listings
+    console.log('marketplace/search empty. HTTP', _httpStatus, 'keys in data:', Object.keys(data).join(','));
+  } else {
+    console.log('marketplace/search failed:', listingsRes.status);
   }
 
   // Fallback: marketplace stats gives at least the floor price

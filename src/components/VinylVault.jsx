@@ -1721,7 +1721,10 @@ function PriceGraph({ price, accentRGB }) {
       {/* Bars */}
       <div className="px-4 py-3 space-y-2">
         {rows.length === 0 ? (
-          <div className="text-[11px] font-mono py-2" style={{ color: 'rgba(255,255,255,0.22)' }}>No condition data available.</div>
+          <div style={{ color: 'rgba(255,255,255,0.22)' }}>
+            <div className="text-[11px] font-mono py-2">No condition data available.</div>
+            {price._debug && <div className="text-[9px] font-mono pb-2 opacity-60">debug: {JSON.stringify(price._debug)}</div>}
+          </div>
         ) : rows.map((row, i) => {
           const pct = row.avg / maxAvg;
           // Brightness fades gently from M down to P
