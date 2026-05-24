@@ -358,7 +358,7 @@ export default function VinylVault() {
     }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#050508" }}>
-        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 64, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
+        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 192, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
         <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.1)", borderTopColor: "rgba(255,255,255,0.5)" }} />
         <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)' }}>Connecting...</span>
       </div>
@@ -569,7 +569,7 @@ export default function VinylVault() {
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
         <div className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 43, mixBlendMode: "screen", opacity: 0.92 }} />
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 129, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
@@ -718,7 +718,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
         <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
         <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
           {greeting
-            ? <>{greeting.split('.')[0]}.<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>
+            ? <>{greeting.split('.')[0]}{/[?!]$/.test(greeting.split('.')[0]) ? '' : '.'}<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>
             : <>Stack your wax<br /><span className="text-white/35">the easy way.</span></>
           }
         </h1>
