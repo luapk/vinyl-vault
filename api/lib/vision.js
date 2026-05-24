@@ -1,3 +1,12 @@
+export const GENRE_CRATES = [
+  'Techno', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
+  'Breakbeat', 'Electro', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
+  'EBM', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Funk', 'Soul', 'R&B', 'Jazz',
+  'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
+];
+
+const GENRE_LIST = GENRE_CRATES.join(', ');
+
 const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONLY valid JSON (no markdown fences, no preamble) in this exact shape:
 
 {
@@ -30,7 +39,7 @@ If the outer sleeve has no text, look for the circular paper disc label in the i
 Context: electronic music archive. Most records: house, techno, ambient, IDM, electro, drum & bass, dub, breaks, downtempo.
 
 genres: 2-4 genre/style tags.
-suggestedBoxes: 2-3 short evocative crate names specific to THIS record. Examples: "Deep House Workouts", "4am Closers", "Detroit Lineage", "Dub Techno Continuum", "Peak-Time Weapons".
+suggestedBoxes: Pick 1-2 genres from this list that best match the record: ${GENRE_LIST}. Return exact strings from the list only.
 notes: one sentence max, notable attributes or caveats.
 
 Return ONLY the JSON object, nothing else.`;
@@ -107,7 +116,7 @@ catalogNumber: The alphanumeric release code, e.g. "PM-012", "WAP63". Read digit
 rawText: Copy the OCR text verbatim.
 
 Use your knowledge to identify the release if you recognise it. Context: electronic music archive — house, techno, ambient, IDM, electro, drum & bass, dub, downtempo.
-genres: 2-4 tags. suggestedBoxes: 2-3 evocative crate names. notes: one sentence max.
+genres: 2-4 tags. suggestedBoxes: Pick 1-2 genres from this list: ${GENRE_LIST}. Exact strings only. notes: one sentence max.
 
 Return ONLY the JSON object.`;
 
@@ -156,9 +165,10 @@ export async function generateCrateSuggestions(release, apiKey) {
 
   const prompt = `${context}
 
-Give 2-3 short evocative DJ crate names for this specific record. Be precise to this artist/era/sound, not generic. Good examples: "Detroit Lineage", "4am Closers", "Dub Techno Continuum", "Warp Catalogue Essentials", "Peak-Time Weapons".
+Pick 1-2 genre crates from this list that best describe this record:
+${GENRE_LIST}
 
-Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
+Return ONLY a JSON array using exact strings from the list. Example: ["Techno", "Ambient"]`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -170,7 +180,7 @@ Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
+        max_tokens: 60,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -183,7 +193,8 @@ Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
       .replace(/^```\s*/i, '')
       .replace(/```\s*$/i, '')
       .trim();
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return parsed.filter(s => GENRE_CRATES.includes(s));
   } catch {
     return [];
   }

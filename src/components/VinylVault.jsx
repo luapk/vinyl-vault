@@ -10,6 +10,15 @@ import { useAuth } from "../hooks/useAuth.js";
 import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 
+// ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
+
+const GENRE_CRATES = [
+  'Techno', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
+  'Breakbeat', 'Electro', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
+  'EBM', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Funk', 'Soul', 'R&B', 'Jazz',
+  'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
+];
+
 // ----- Helpers ---------------------------------------------------------------
 
 const resizeImage = (file, maxDim = 1500, quality = 0.85) =>
@@ -398,7 +407,7 @@ export default function VinylVault() {
         setPhase("disambiguation");
       } else if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates([]);
+        setPendingCrates(data.release.suggestedBoxes || []);
         setPhase("result");
         const coverSrc = data.release.coverUrl || null;
         if (coverSrc) { const c = await extractDominantColor(coverSrc); setAccent(c); }
@@ -427,7 +436,7 @@ export default function VinylVault() {
       const data = await response.json();
       if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates([]);
+        setPendingCrates(data.release.suggestedBoxes || []);
         setPhase("result");
         if (data.release.coverUrl) { const c = await extractDominantColor(data.release.coverUrl); setAccent(c); }
       } else {
@@ -858,8 +867,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // Crate assignment: only user-created crates from the existing collection
-  const existingNotPicked = allCrates.filter((c) => !pendingCrates.includes(c));
+  // Genre chips: fixed list minus already-pending
+  const genreChips = GENRE_CRATES.filter(g => !pendingCrates.includes(g));
+  // Custom crates from existing collection (non-genre) minus already-pending
+  const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c));
 
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
@@ -940,11 +951,12 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
         </GlassSection>
       )}
 
-      {/* Crate assignment — pure organisation, user-created only */}
+      {/* Crate assignment */}
       <GlassSection title="File into crates" subtitle="Where does this record live?" accentRGB={accentRGB}>
-        <div className="space-y-4">
+        <div className="space-y-3">
+          {/* Selected crates */}
           {pendingCrates.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {pendingCrates.map((name) => (
                 <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.85)" }}>
                   <Check size={11} weight="bold" />{name}<X size={10} className="opacity-50 ml-0.5" />
@@ -953,18 +965,28 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             </div>
           )}
 
-          {existingNotPicked.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {existingNotPicked.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all hover:border-white/20 hover:text-white/60" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)" }}>
-                  <Plus size={11} />{name}
+          {/* Genre list */}
+          <div className="flex flex-wrap gap-1.5">
+            {genreChips.map((name) => (
+              <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.32)" }}>
+                <Plus size={9} />{name}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom crates from existing collection */}
+          {existingCustom.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {existingCustom.map((name) => (
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.32)" }}>
+                  <Plus size={9} />{name}
                 </button>
               ))}
             </div>
           )}
 
           <div className="flex items-center gap-2">
-            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder={existingNotPicked.length > 0 ? "Or create a new crate..." : "Create a crate..."} className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }} />
+            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }} />
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
@@ -1193,7 +1215,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1230,12 +1252,14 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect }) {
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [] }) {
   const startXRef = useRef(null);
   const startTimeRef = useRef(null);
   const didDragRef = useRef(false);
   const rafRef = useRef(null);
   const [visualDelta, setVisualDelta] = useState(0);
+  const [showCratePicker, setShowCratePicker] = useState(false);
+  const [cratePickerInput, setCratePickerInput] = useState('');
 
   const onTouchStart = (e) => {
     startXRef.current = e.touches[0].clientX;
@@ -1272,6 +1296,10 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
   const current = records[index];
   if (!current) return null;
   const isDragging = visualDelta !== 0;
+
+  // Close picker when navigating to a different record
+  const prevIndexRef = useRef(index);
+  if (prevIndexRef.current !== index) { prevIndexRef.current = index; if (showCratePicker) setShowCratePicker(false); }
 
   return (
     <div className="select-none">
@@ -1313,25 +1341,87 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         </div>
         <div className="text-xl md:text-2xl leading-tight font-display"><span className="italic">{current.artist}</span></div>
         <div className="text-base md:text-lg text-white/50 font-display mb-3">{current.title}</div>
-        {current.crates && current.crates.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1.5 mb-3">
-            {current.crates.map((c) => {
-              const col = crateColors[c] || null;
-              return (
-                <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
-                  style={{
-                    background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
-                    border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
-                    color: 'rgba(255,255,255,0.65)',
-                    boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
-                  }}>
-                  <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
-                  {c}
-                </span>
-              );
-            })}
-          </div>
-        )}
+
+        {/* Crate badges + edit toggle */}
+        <div className="flex flex-wrap justify-center gap-1.5 mb-2">
+          {(current.crates || []).map((c) => {
+            const col = crateColors[c] || null;
+            return (
+              <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                style={{
+                  background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
+                  border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
+                  color: 'rgba(255,255,255,0.65)',
+                  boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                }}>
+                <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
+                {c}
+              </span>
+            );
+          })}
+          {!selectMode && onUpdate && (
+            <button onClick={() => { setShowCratePicker(p => !p); setCratePickerInput(''); }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all"
+              style={{ border: `1px solid ${showCratePicker ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.1)'}`, color: showCratePicker ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.3)', background: showCratePicker ? 'rgba(255,255,255,0.07)' : 'transparent' }}>
+              {showCratePicker ? <X size={9} /> : <Plus size={9} />}
+              {showCratePicker ? 'Done' : 'Crates'}
+            </button>
+          )}
+        </div>
+
+        {/* Inline crate picker */}
+        {showCratePicker && onUpdate && (() => {
+          const recordCrates = current.crates || [];
+          const customOther = allCrates.filter(c => !recordCrates.includes(c) && !GENRE_CRATES.includes(c));
+          const toggleCrate = (name) => {
+            const next = recordCrates.includes(name) ? recordCrates.filter(c => c !== name) : [...recordCrates, name];
+            onUpdate(current.id, { crates: next });
+          };
+          const addCustom = () => {
+            const name = cratePickerInput.trim();
+            if (!name || recordCrates.includes(name)) { setCratePickerInput(''); return; }
+            onUpdate(current.id, { crates: [...recordCrates, name] });
+            setCratePickerInput('');
+          };
+          return (
+            <div className="mx-auto max-w-sm mt-1 mb-2 px-4 py-3 rounded-2xl space-y-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {/* Selected */}
+              {recordCrates.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {recordCrates.map(c => (
+                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all" style={{ background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.22)', color: 'rgba(255,255,255,0.85)' }}>
+                      <Check size={9} weight="bold" />{c}<X size={8} className="opacity-50 ml-0.5" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Genre list */}
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {GENRE_CRATES.filter(g => !recordCrates.includes(g)).map(g => (
+                  <button key={g} onClick={() => toggleCrate(g)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.32)' }}>
+                    <Plus size={9} />{g}
+                  </button>
+                ))}
+              </div>
+              {/* Custom crates */}
+              {customOther.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {customOther.map(c => (
+                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.32)' }}>
+                      <Plus size={9} />{c}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Custom input */}
+              <div className="flex gap-2">
+                <input value={cratePickerInput} onChange={e => setCratePickerInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }} />
+                <button onClick={addCustom} className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70" style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.40)', background: 'transparent' }}>Add</button>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
       </div>
 
@@ -1426,7 +1516,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const [localAccent, setLocalAccent] = useState(accentRGB);
   const [crateInput, setCrateInput] = useState('');
   const recordCrates = record.crates || [];
-  const otherCrates = allCrates.filter(c => !recordCrates.includes(c));
+  const genreChips = GENRE_CRATES.filter(g => !recordCrates.includes(g));
+  const otherCrates = allCrates.filter(c => !recordCrates.includes(c) && !GENRE_CRATES.includes(c));
 
   const toggleRecordCrate = (name) => {
     const next = recordCrates.includes(name)
@@ -1589,18 +1680,26 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   <span className="text-[10px] font-mono text-white/25">Not in any crate yet.</span>
                 )}
               </div>
+              {/* Genre list */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {genreChips.map((g) => (
+                  <button key={g} onClick={() => toggleRecordCrate(g)}
+                    className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
+                    style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.32)' }}>
+                    <Plus size={9} />{g}
+                  </button>
+                ))}
+              </div>
+              {/* Custom crates */}
               {otherCrates.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {otherCrates.map((c) => {
-                    const col = crateColors[c] || null;
-                    return (
-                      <button key={c} onClick={() => toggleRecordCrate(c)}
-                        className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
-                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)' }}>
-                        <Plus size={10} />{c}
-                      </button>
-                    );
-                  })}
+                  {otherCrates.map((c) => (
+                    <button key={c} onClick={() => toggleRecordCrate(c)}
+                      className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                      style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)' }}>
+                      <Plus size={10} />{c}
+                    </button>
+                  ))}
                 </div>
               )}
               <div className="flex items-center gap-2 mt-1">
