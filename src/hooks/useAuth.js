@@ -103,17 +103,21 @@ export function useAuth() {
   }, []);
 
   // Stores the resized avatar data URL in the profiles table.
-  // Optimistic update so the header swaps immediately; DB write happens in background.
+  // Optimistic update so the header swaps immediately; DB write is capped at 8 s.
   const updateAvatar = useCallback(async (avatarDataUrl) => {
     if (!supabase) throw new Error('Supabase not configured');
     if (!user?.id) throw new Error('Not logged in');
 
     setProfile(p => p ? { ...p, avatar_url: avatarDataUrl } : p);
 
-    const { error } = await supabase
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Avatar sync timed out')), 8000)
+    );
+    const write = supabase
       .from('profiles')
       .update({ avatar_url: avatarDataUrl })
       .eq('id', user.id);
+    const { error } = await Promise.race([write, timeout]);
     if (error) throw error;
   }, [user]);
 

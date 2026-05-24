@@ -1807,7 +1807,7 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
   const [errorMsg, setErrorMsg] = useState('');
 
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
-  const [avatarSaving, setAvatarSaving] = useState(false);
+  // avatarSaving removed -- save is now fire-and-forget so UI never blocks on network
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
   const avatarInputRef = useRef(null);
 
@@ -1819,28 +1819,17 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
     try {
       const resized = await resizeAvatar(file);
       setAvatarPreview(resized);
-      setAvatarSavedOk(false);
-      setAvatarSaving(true);
-      await onUpdateAvatar(resized);
       setAvatarSavedOk(true);
       setTimeout(() => setAvatarSavedOk(false), 3000);
+      onUpdateAvatar(resized).catch(err => setErrorMsg(err?.message || 'Photo saved but could not sync.'));
     } catch (err) {
-      setErrorMsg(err?.message || 'Could not save photo.');
-    } finally {
-      setAvatarSaving(false);
+      setErrorMsg(err?.message || 'Could not process photo.');
     }
   }
 
-  async function removeAvatar() {
-    setAvatarSaving(true);
-    try {
-      await onUpdateAvatar(null);
-      setAvatarPreview(null);
-    } catch (err) {
-      setErrorMsg(err?.message || 'Could not remove photo.');
-    } finally {
-      setAvatarSaving(false);
-    }
+  function removeAvatar() {
+    setAvatarPreview(null);
+    onUpdateAvatar(null).catch(err => setErrorMsg(err?.message || 'Could not remove photo.'));
   }
 
   async function saveDisplayName() {
@@ -1896,16 +1885,11 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
               boxShadow: avatarSavedOk ? '0 0 24px -4px rgba(120,220,140,0.55)' : 'none',
               transition: 'all 0.3s',
             }}
-            disabled={avatarSaving}>
+            >
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
               : <span style={{ fontSize: 28, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{initials}</span>
             }
-            {avatarSaving && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-full" style={{ background: 'rgba(0,0,0,0.55)' }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace' }}>SAVING...</span>
-              </div>
-            )}
             {avatarSavedOk && (
               <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(60,190,90,0.98)', border: '2px solid rgba(20,20,28,1)' }}>
@@ -1914,14 +1898,14 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
             )}
           </button>
           <div className="flex items-center gap-3">
-            <button onClick={() => avatarInputRef.current?.click()} disabled={avatarSaving}
+            <button onClick={() => avatarInputRef.current?.click()}
               style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {avatarPreview ? 'Change photo' : 'Upload photo'}
             </button>
             {avatarPreview && (
               <>
                 <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11 }}>|</span>
-                <button onClick={removeAvatar} disabled={avatarSaving}
+                <button onClick={removeAvatar}
                   style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Remove
                 </button>
