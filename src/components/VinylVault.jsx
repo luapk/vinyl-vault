@@ -1822,6 +1822,7 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
 
   useEffect(() => {
     async function check() {
+      try {
       const { supabase: sb, isSupabaseEnabled: enabled } = await import('../lib/supabase.js');
       if (!enabled || !sb) {
         setDbCheck({ status: 'error', lines: ['Supabase env vars not set - database disabled'] });
@@ -1875,17 +1876,18 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
 
       // Step 2a: raw fetch to records table (bypasses supabase-js entirely)
       try {
-        const session = (await sb.auth.getSession()).data.session;
+        const sessionResult = await Promise.race([sb.auth.getSession(), timeout(5000)]);
+        const session = sessionResult?.data?.session;
         const headers = { apikey: key };
         if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
         const resp = await Promise.race([
           fetch(`${url}/rest/v1/records?select=id&limit=1`, { headers }),
-          timeout(15000),
+          timeout(10000),
         ]);
         const body = await resp.text().catch(() => '');
         lines.push(`records (raw): HTTP ${resp.status}${session ? ' [authed]' : ' [anon]'}`);
         if (resp.status >= 400) lines.push(`  body: ${body.slice(0, 200)}`);
-      } catch (e) { lines.push(`records (raw): TIMEOUT - ${e.message}`); ok = false; }
+      } catch (e) { lines.push(`records (raw): ${e.message}`); ok = false; }
 
       // Step 2b: records table via supabase-js
       try {
@@ -1909,6 +1911,9 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       } catch (e) { lines.push(`profiles: TIMEOUT - ${e.message}`); ok = false; }
 
       setDbCheck({ status: ok ? 'ok' : 'error', lines });
+      } catch (e) {
+        setDbCheck({ status: 'error', lines: [`Diagnostic crashed: ${e.message}`] });
+      }
     }
     check();
   }, [user?.id]);
