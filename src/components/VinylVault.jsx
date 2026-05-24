@@ -435,7 +435,7 @@ export default function VinylVault() {
     const extraImages = imageUrl ? [...(release.images || []), imageUrl] : (release.images || []);
     const toSave = { ...release, coverUrl, images: extraImages };
     playSaveChime();
-    addRecord(toSave, pendingCrates).catch(err => console.error('DB save failed:', err));
+    addRecord(toSave, pendingCrates).catch(err => setErrorMsg(`Saved locally but failed to sync: ${err.message}`));
     setSavedId(`${release.artist}|${release.title}`);
     setSaveAnim({ release: toSave });
     setTimeout(() => setSaveAnim(null), 2200);
@@ -485,7 +485,7 @@ export default function VinylVault() {
           syncQueue(q);
           // Crates are user-organisational, not derived from metadata. Genres
           // already flow into the record's tags inside recordFromRelease.
-          addRecord(batchRelease, []);
+          addRecord(batchRelease, []).catch(console.error);
         } else if (data.status === "disambiguation") {
           q[i] = { ...q[i], status: "disambiguation", candidates: data.candidates, vision: data.vision };
           syncQueue(q);
@@ -524,7 +524,7 @@ export default function VinylVault() {
         latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
         const disambigScanUrl = latest[itemIdx].imageUrl;
         const disambigRelease = !data.release.coverUrl && disambigScanUrl ? { ...data.release, coverUrl: disambigScanUrl } : data.release;
-        addRecord(disambigRelease, []);
+        addRecord(disambigRelease, []).catch(console.error);
       } else {
         latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
