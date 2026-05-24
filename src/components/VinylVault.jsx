@@ -406,11 +406,18 @@ export default function VinylVault() {
     }
   };
 
-  const saveRecord = (selectedCover) => {
+  const saveRecord = async (selectedCover) => {
     if (!release) return;
     const coverUrl = selectedCover || release.coverUrl || imageUrl || null;
     const toSave = { ...release, coverUrl };
-    addRecord(toSave, pendingCrates);
+    try {
+      await addRecord(toSave, pendingCrates);
+    } catch (err) {
+      console.error('DB save failed:', err);
+      setErrorMsg(`Could not save to database: ${err?.message || 'unknown error'}`);
+      setPhase('error');
+      return;
+    }
     setSavedId(`${release.artist}|${release.title}`);
     playSaveChime();
     setSaveAnim({ release: toSave });
@@ -816,15 +823,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center">
         <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.04)" }}>
-          <CaretLeft size={12} />New scan
+          {saved ? <><X size={12} />Close</> : <><CaretLeft size={12} />New scan</>}
         </button>
-        {saved && (
-          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ background: "rgba(120,220,140,0.14)", border: "1px solid rgba(120,220,140,0.40)", color: "rgb(140,230,160)" }}>
-            <Check size={11} weight="bold" />Scan another
-          </button>
-        )}
       </div>
       {/* Meta bar */}
       <div className="flex items-center gap-3 flex-wrap">

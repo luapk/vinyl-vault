@@ -147,10 +147,11 @@ export function useCollection(userId = null) {
     const record = recordFromRelease(release, crates);
     dispatch({ type: 'ADD', record });
     if (useDb) {
-      dbInsert(userId, record).then(dbId => {
+      return dbInsert(userId, record).then(dbId => {
         dbIds.current[record.id] = dbId;
-      }).catch(console.error);
+      });
     }
+    return Promise.resolve();
   }, [useDb, userId]);
 
   const removeRecord = useCallback((id) => {
