@@ -1829,28 +1829,45 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       }
       const lines = [];
       let ok = true;
-      const timeout = ms => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
+      const timeout = ms => new Promise((_, r) => setTimeout(() => r(new Error(`timeout after ${ms/1000}s`)), ms));
 
-      // Test records table
+      // Step 1: raw HTTP ping to PostgREST root - tests URL + CORS + network
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      lines.push(`URL: ${url || '(not set)'}`);
+      try {
+        const resp = await Promise.race([
+          fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
+          timeout(8000),
+        ]);
+        lines.push(`Server reachable: YES (HTTP ${resp.status})`);
+      } catch (e) {
+        lines.push(`Server reachable: NO - ${e.message} (check URL + Vercel env vars)`);
+        ok = false;
+        setDbCheck({ status: 'error', lines });
+        return;
+      }
+
+      // Step 2: records table
       try {
         const { count, error } = await Promise.race([
           sb.from('records').select('id', { count: 'exact', head: true }),
-          timeout(5000),
+          timeout(8000),
         ]);
         if (error) { lines.push(`records table: ERROR - ${error.message}`); ok = false; }
         else lines.push(`records table: OK (${count ?? '?'} rows)`);
-      } catch (e) { lines.push(`records table: TIMEOUT / unreachable`); ok = false; }
+      } catch (e) { lines.push(`records table: TIMEOUT - ${e.message}`); ok = false; }
 
-      // Test profiles table + avatar_url column
+      // Step 3: profiles table + avatar_url column
       try {
         const { data, error } = await Promise.race([
           sb.from('profiles').select('id, avatar_url').eq('id', user?.id).single(),
-          timeout(5000),
+          timeout(8000),
         ]);
         if (error) { lines.push(`profiles table: ERROR - ${error.message}`); ok = false; }
         else if (data && !('avatar_url' in data)) { lines.push(`profiles table: OK but avatar_url column missing - run migration SQL`); ok = false; }
         else lines.push(`profiles table: OK (avatar_url column present)`);
-      } catch (e) { lines.push(`profiles table: TIMEOUT / unreachable`); ok = false; }
+      } catch (e) { lines.push(`profiles table: TIMEOUT - ${e.message}`); ok = false; }
 
       setDbCheck({ status: ok ? 'ok' : 'error', lines });
     }
