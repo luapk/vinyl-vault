@@ -619,7 +619,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} />
         )}
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
@@ -1021,7 +1021,7 @@ function RotatingCube({ color, size = 9 }) {
 
 // ----- CollectionView --------------------------------------------------------
 
-function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
+function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
