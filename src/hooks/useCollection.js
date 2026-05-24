@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback, useRef } from 'react';
+import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
 
 const STORAGE_KEY = 'vinylvault_collection';
@@ -126,6 +126,8 @@ export function useCollection(userId = null) {
 
   // Track db row IDs keyed by local record id so we can update/delete.
   const dbIds = useRef({});
+  // null = dbLoad not yet complete; Set = IDs confirmed in Supabase.
+  const [syncedIds, setSyncedIds] = useState(null);
   // True once dbLoad has confirmed the DB has records for this user.
   // Prevents an empty DB response from wiping a non-empty local collection.
   const dbHasData = useRef(false);
@@ -141,6 +143,7 @@ export function useCollection(userId = null) {
     dbLoad(userId).then(async records => {
       records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
       const dbRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+      const confirmed = new Set(dbRecords.map(r => r.id));
 
       // Push localStorage records that are not yet in Supabase into the DB.
       const local = load();
@@ -152,6 +155,7 @@ export function useCollection(userId = null) {
               const dbId = await dbInsert(userId, record);
               dbIds.current[record.id] = dbId;
               dbRecords.unshift(record);
+              confirmed.add(record.id);
             } catch (e) {
               console.error('Migration failed for record', record.artist, record.title, e);
             }
@@ -161,6 +165,7 @@ export function useCollection(userId = null) {
 
       if (dbRecords.length === 0 && !dbHasData.current) return;
       dbHasData.current = dbRecords.length > 0;
+      setSyncedIds(confirmed);
       dispatch({ type: 'SET', records: dbRecords });
     }).catch(console.error);
   }, [useDb, userId]);
@@ -177,6 +182,7 @@ export function useCollection(userId = null) {
     if (useDb) {
       return dbInsert(userId, record).then(dbId => {
         dbIds.current[record.id] = dbId;
+        setSyncedIds(s => s ? new Set([...s, record.id]) : new Set([record.id]));
       });
     }
     return Promise.resolve();
@@ -231,6 +237,7 @@ export function useCollection(userId = null) {
 
   return {
     collection,
+    syncedIds,
     addRecord,
     removeRecord,
     updateRecord,

@@ -319,7 +319,7 @@ export default function VinylVault() {
   const [showAccount, setShowAccount] = useState(false);
 
   const userId = user?.id ?? null;
-  const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection(userId);
+  const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection(userId);
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
     setRelease(prev => {
@@ -1207,6 +1207,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
                   selectMode={labelSelectMode}
                   selected={selectedForLabels.has(record.id)}
                   onToggleSelect={() => toggleLabelSelect(record.id)}
+                  localOnly={syncedIds !== null && !syncedIds.has(record.id)}
                 />
               ))}
             </div>
@@ -1371,7 +1372,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 
 // ----- RecordCard (grid) -----------------------------------------------------
 
-function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect }) {
+function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect, localOnly = false }) {
   return (
     <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect}>
       <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)" }}>
@@ -1393,6 +1394,13 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
           <div className="absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
             style={{ background: selected ? `rgb(${accentRGB})` : 'rgba(0,0,0,0.5)', borderColor: selected ? `rgb(${accentRGB})` : 'rgba(255,255,255,0.4)' }}>
             {selected && <Check size={9} weight="bold" style={{ color: '#000' }} />}
+          </div>
+        )}
+        {localOnly && !selectMode && (
+          <div title="Saved locally, not yet synced to database"
+            className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center group-hover:opacity-0 transition-opacity"
+            style={{ background: 'rgba(251,146,60,0.92)', fontSize: 9, fontWeight: 800, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>
+            !
           </div>
         )}
       </div>
