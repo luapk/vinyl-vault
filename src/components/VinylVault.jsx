@@ -1834,15 +1834,18 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       // Step 1: raw HTTP ping to PostgREST root - tests URL + CORS + network
       const url = import.meta.env.VITE_SUPABASE_URL;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const keyPreview = key ? `${key.slice(0, 20)}...${key.slice(-6)} (${key.length} chars)` : '(not set)';
       lines.push(`URL: ${url || '(not set)'}`);
+      lines.push(`Key: ${keyPreview}`);
       try {
         const resp = await Promise.race([
           fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
           timeout(8000),
         ]);
-        lines.push(`Server reachable: YES (HTTP ${resp.status})`);
+        lines.push(`Server: HTTP ${resp.status}${resp.status === 401 ? ' - anon key rejected, wrong key for this project' : ''}`);
+        if (resp.status === 401) { ok = false; setDbCheck({ status: 'error', lines }); return; }
       } catch (e) {
-        lines.push(`Server reachable: NO - ${e.message} (check URL + Vercel env vars)`);
+        lines.push(`Server reachable: NO - ${e.message}`);
         ok = false;
         setDbCheck({ status: 'error', lines });
         return;
