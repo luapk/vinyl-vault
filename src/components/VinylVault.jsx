@@ -316,6 +316,18 @@ export default function VinylVault() {
   const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
   const [showAccount, setShowAccount] = useState(false);
+  const [labelSelectMode, setLabelSelectMode] = useState(false);
+  const [selectedForLabels, setSelectedForLabels] = useState(new Set());
+  const [showBatchLabelModal, setShowBatchLabelModal] = useState(false);
+  const enterLabelMode = useCallback(() => { setLabelSelectMode(true); setSelectedForLabels(new Set()); }, []);
+  const exitLabelMode = useCallback(() => { setLabelSelectMode(false); setSelectedForLabels(new Set()); }, []);
+  const toggleLabelSelect = useCallback((id) => {
+    setSelectedForLabels(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
 
   const userId = user?.id ?? null;
   const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection(userId);
@@ -618,7 +630,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} />
         )}
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
@@ -643,6 +655,8 @@ export default function VinylVault() {
           onSignOut={() => { setShowAccount(false); signOut(); }}
           onUpdateDisplayName={updateDisplayName}
           onUpdateAvatar={updateAvatar}
+          onPrintLabels={() => { setShowAccount(false); setAppView('collection'); enterLabelMode(); }}
+          onDownloadCSV={() => downloadCSV(collection)}
         />
       )}
     </div>
@@ -1020,7 +1034,7 @@ function RotatingCube({ color, size = 9 }) {
 
 // ----- CollectionView --------------------------------------------------------
 
-function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV }) {
+function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
@@ -1028,20 +1042,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
-  const [labelSelectMode, setLabelSelectMode] = useState(false);
-  const [selectedForLabels, setSelectedForLabels] = useState(new Set());
-  const [showBatchLabelModal, setShowBatchLabelModal] = useState(false);
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
-
-  const toggleLabelSelect = (id) => {
-    setSelectedForLabels(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const enterLabelMode = () => { setLabelSelectMode(true); setSelectedForLabels(new Set()); };
-  const exitLabelMode = () => { setLabelSelectMode(false); setSelectedForLabels(new Set()); };
 
   const setCrateColor = (name, hex) => {
     setCrateColorsState(prev => {
@@ -1119,7 +1120,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
                   <DownloadSimple size={12} />CSV
                 </button>
-                <button onClick={enterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
                   <Printer size={12} />Labels
                 </button>
               </>
@@ -1127,13 +1128,13 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
               <>
                 <span className="text-[11px] font-mono text-white/40">{selectedForLabels.size} selected</span>
                 <button
-                  onClick={() => setShowBatchLabelModal(true)}
+                  onClick={() => onShowBatchLabelModal(true)}
                   disabled={selectedForLabels.size === 0}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all"
                   style={{ border: `1px solid rgba(${accentRGB},${selectedForLabels.size > 0 ? '0.4' : '0.12'})`, color: selectedForLabels.size > 0 ? `rgb(${accentRGB})` : 'rgba(255,255,255,0.2)', background: selectedForLabels.size > 0 ? `rgba(${accentRGB},0.12)` : 'transparent', cursor: selectedForLabels.size === 0 ? 'not-allowed' : 'pointer' }}>
                   <Printer size={12} />Preview Labels
                 </button>
-                <button onClick={exitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
+                <button onClick={onExitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.38)", background: "transparent" }}>
                   Cancel
                 </button>
               </>
@@ -1192,7 +1193,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={toggleLabelSelect} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1205,7 +1206,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                   accentRGB={accentRGB}
                   selectMode={labelSelectMode}
                   selected={selectedForLabels.has(record.id)}
-                  onToggleSelect={() => toggleLabelSelect(record.id)}
+                  onToggleSelect={() => onToggleLabelSelect(record.id)}
                   localOnly={syncedIds !== null && !syncedIds.has(record.id)}
                 />
               ))}
@@ -1220,7 +1221,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
           accentRGB={accentRGB}
-          onClose={() => setShowBatchLabelModal(false)}
+          onClose={() => onShowBatchLabelModal(false)}
         />
       )}
     </div>
@@ -1808,121 +1809,39 @@ function PriceGraph({ price, accentRGB }) {
 
 // ----- AccountModal -----------------------------------------------------------
 
-function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, onUpdateAvatar }) {
+function AccountSection({ label, open, onToggle, children }) {
+  return (
+    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-3.5 text-left transition-colors"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
+        <span style={{ fontSize: 12, fontFamily: 'monospace', color: open ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.4)' }}>{label}</span>
+        <CaretRight size={12} style={{ color: 'rgba(255,255,255,0.25)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && <div className="pb-4">{children}</div>}
+    </div>
+  );
+}
+
+function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, onUpdateAvatar, onPrintLabels, onDownloadCSV }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [openSection, setOpenSection] = useState(null);
 
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
-  // avatarSaving removed -- save is now fire-and-forget so UI never blocks on network
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
   const avatarInputRef = useRef(null);
-  const [dbCheck, setDbCheck] = useState({ status: 'checking', lines: [] });
-
-  useEffect(() => {
-    async function check() {
-      try {
-      const { supabase: sb, isSupabaseEnabled: enabled } = await import('../lib/supabase.js');
-      if (!enabled || !sb) {
-        setDbCheck({ status: 'error', lines: ['Supabase env vars not set - database disabled'] });
-        return;
-      }
-      const lines = [];
-      let ok = true;
-      const timeout = ms => new Promise((_, r) => setTimeout(() => r(new Error(`timeout after ${ms/1000}s`)), ms));
-
-      // Step 1: raw HTTP ping to PostgREST root - tests URL + CORS + network
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const keyPreview = key ? `${key.slice(0, 20)}...${key.slice(-6)} (${key.length} chars)` : '(not set)';
-      const isPublishable = key?.startsWith('sb_publishable_') || key?.startsWith('sb_secret_');
-      lines.push(`URL: ${url || '(not set)'}`);
-      lines.push(`Key: ${keyPreview}`);
-      lines.push(`Key format: ${isPublishable ? 'publishable (new)' : 'JWT (legacy)'}`);
-      if (!isPublishable) {
-        try {
-          const payload = JSON.parse(atob(key.split('.')[1]));
-          lines.push(`JWT project ref: ${payload.ref || '(missing)'} | role: ${payload.role || '?'} | alg: ${JSON.parse(atob(key.split('.')[0])).alg}`);
-        } catch { lines.push('JWT: could not decode payload'); }
-      }
-      try {
-        const resp = await Promise.race([
-          fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
-          timeout(8000),
-        ]);
-        const body = await resp.text().catch(() => '');
-        const restrictedRoot = resp.status === 401 &&
-          (body.includes('Secret API key required') || body.includes('service_role'));
-        if (restrictedRoot) {
-          lines.push(`Server: reachable (root restricted to service_role - normal)`);
-        } else if (resp.status >= 400) {
-          lines.push(`Server: HTTP ${resp.status} - ${body.slice(0, 120)}`);
-          ok = false;
-        } else {
-          lines.push(`Server: HTTP ${resp.status}`);
-        }
-      } catch (e) {
-        lines.push(`Server reachable: NO - ${e.message}`);
-        ok = false;
-        setDbCheck({ status: 'error', lines });
-        return;
-      }
-
-      // Step 2a: raw fetch to records table (bypasses supabase-js entirely)
-      // Read session token from localStorage instead of sb.auth.getSession()
-      // which can hang when auth client has key/refresh issues.
-      try {
-        let accessToken = null;
-        try {
-          const projectRef = url.match(/https?:\/\/([^.]+)/)?.[1];
-          const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
-          if (raw) accessToken = JSON.parse(raw)?.access_token || null;
-        } catch {}
-        const headers = { apikey: key };
-        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-        const resp = await Promise.race([
-          fetch(`${url}/rest/v1/records?select=id&limit=1`, { headers }),
-          timeout(10000),
-        ]);
-        const body = await resp.text().catch(() => '');
-        lines.push(`records (raw): HTTP ${resp.status}${accessToken ? ' [authed]' : ' [anon]'}`);
-        if (resp.status >= 400) lines.push(`  body: ${body.slice(0, 200)}`);
-        else lines.push(`  body: ${body.slice(0, 80)}`);
-      } catch (e) { lines.push(`records (raw): ${e.message}`); ok = false; }
-
-      // Step 2b: records table via supabase-js
-      try {
-        const { count, error } = await Promise.race([
-          sb.from('records').select('id', { count: 'exact', head: true }),
-          timeout(8000),
-        ]);
-        if (error) { lines.push(`records (sb): ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
-        else lines.push(`records (sb): OK (${count ?? '?'} rows)`);
-      } catch (e) { lines.push(`records (sb): TIMEOUT - ${e.message}`); ok = false; }
-
-      // Step 3: profiles table + avatar_url column
-      try {
-        const { data, error } = await Promise.race([
-          sb.from('profiles').select('id, avatar_url').eq('id', user?.id).single(),
-          timeout(8000),
-        ]);
-        if (error) { lines.push(`profiles: ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
-        else if (data && !('avatar_url' in data)) { lines.push(`profiles: OK but avatar_url column missing - run migration SQL`); ok = false; }
-        else lines.push(`profiles: OK (avatar_url column present)`);
-      } catch (e) { lines.push(`profiles: TIMEOUT - ${e.message}`); ok = false; }
-
-      setDbCheck({ status: ok ? 'ok' : 'error', lines });
-      } catch (e) {
-        setDbCheck({ status: 'error', lines: [`Diagnostic crashed: ${e.message}`] });
-      }
-    }
-    check();
-  }, [user?.id]);
 
   const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
+
+  function toggleSection(name) {
+    setOpenSection(prev => prev === name ? null : name);
+  }
 
   async function handleAvatarFile(e) {
     const file = e.target.files?.[0];
@@ -1954,7 +1873,6 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 3000);
     } catch (e) {
-      console.error('[AccountModal] updateDisplayName error:', e);
       setErrorMsg(e?.message || 'Could not save. Try again.');
     } finally {
       setSaving(false);
@@ -1985,129 +1903,122 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
         </div>
 
         {/* Avatar */}
-        <div className="flex flex-col items-center mb-6">
+        <div className="flex flex-col items-center mb-5">
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
           <button
             onClick={() => avatarInputRef.current?.click()}
-            className="relative w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-3 transition-opacity hover:opacity-80"
+            className="relative w-16 h-16 rounded-full overflow-hidden flex items-center justify-center mb-2.5 transition-opacity hover:opacity-80"
             style={{
               border: avatarSavedOk ? '2px solid rgba(120,220,140,0.8)' : '2px solid rgba(255,255,255,0.15)',
               background: 'rgba(255,255,255,0.06)',
-              boxShadow: avatarSavedOk ? '0 0 24px -4px rgba(120,220,140,0.55)' : 'none',
+              boxShadow: avatarSavedOk ? '0 0 20px -4px rgba(120,220,140,0.55)' : 'none',
               transition: 'all 0.3s',
-            }}
-            >
+            }}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 28, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{initials}</span>
+              : <span style={{ fontSize: 22, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{initials}</span>
             }
             {avatarSavedOk && (
-              <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center"
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(60,190,90,0.98)', border: '2px solid rgba(20,20,28,1)' }}>
-                <Check size={14} weight="bold" style={{ color: '#fff' }} />
+                <Check size={11} weight="bold" style={{ color: '#fff' }} />
               </div>
             )}
           </button>
           <div className="flex items-center gap-3">
             <button onClick={() => avatarInputRef.current?.click()}
-              style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {avatarPreview ? 'Change photo' : 'Upload photo'}
             </button>
             {avatarPreview && (
               <>
                 <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11 }}>|</span>
                 <button onClick={removeAvatar}
-                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Remove
                 </button>
               </>
             )}
           </div>
-          {avatarSavedOk && (
-            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(120,220,140)', marginTop: 6, fontFamily: 'monospace' }}>
-              <Check size={12} weight="bold" />Photo saved.
-            </p>
-          )}
         </div>
 
-        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>{user.email}</p>
+        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
 
-        {/* Display name */}
-        <div className="mb-4">
-          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Display name</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={displayName}
-              onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
-              onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
-              placeholder="Your name"
-              style={{ flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
-              onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-            />
-            <button onClick={saveDisplayName} disabled={saving || savedOk}
-              style={{
-                padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
-                color: '#000',
-                background: saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)',
-                border: 'none',
-                cursor: (saving || savedOk) ? 'default' : 'pointer',
-                minWidth: 52,
-              }}>
-              {saving ? '...' : 'Save'}
+        {errorMsg && <p style={{ fontSize: 11, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
+
+        {/* Accordion sections */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+
+          <AccountSection label="Profile name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={displayName}
+                onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
+                onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
+                placeholder="Your name"
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+              />
+              <button onClick={saveDisplayName} disabled={saving || savedOk}
+                style={{
+                  padding: '8px 13px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+                  color: '#000',
+                  background: saving ? 'rgba(255,255,255,0.3)' : savedOk ? 'rgba(120,220,140,0.9)' : 'rgba(255,255,255,0.9)',
+                  border: 'none',
+                  cursor: (saving || savedOk) ? 'default' : 'pointer',
+                  minWidth: 48,
+                  transition: 'background 0.2s',
+                }}>
+                {saving ? '...' : savedOk ? <Check size={13} weight="bold" /> : 'Save'}
+              </button>
+            </div>
+          </AccountSection>
+
+          <AccountSection label="Password" open={openSection === 'password'} onToggle={() => toggleSection('password')}>
+            {resetSent ? (
+              <p style={{ fontSize: 12, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
+            ) : (
+              <button onClick={sendPasswordReset}
+                style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.45)'}>
+                Send password reset email
+              </button>
+            )}
+          </AccountSection>
+
+          <AccountSection label="Print labels" open={openSection === 'labels'} onToggle={() => toggleSection('labels')}>
+            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
+            <button onClick={onPrintLabels}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.11)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}>
+              <Printer size={13} />Go to collection
             </button>
-          </div>
-          {savedOk && (
-            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(120,220,140)', marginTop: 8, fontFamily: 'monospace' }}>
-              <Check size={12} weight="bold" />Name saved.
-            </p>
-          )}
-          {errorMsg && <p style={{ fontSize: 11, color: '#fca5a5', marginTop: 6, fontFamily: 'monospace' }}>{errorMsg}</p>}
-        </div>
+          </AccountSection>
 
-        {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
-
-        {/* Password reset */}
-        <div className="mb-5">
-          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Password</label>
-          {resetSent ? (
-            <p style={{ fontSize: 12, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
-          ) : (
-            <button onClick={sendPasswordReset}
-              className="text-sm text-white/50 hover:text-white/80 transition-colors"
-              style={{ fontFamily: 'monospace', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-              Send password reset email
+          <AccountSection label="Download CSV" open={openSection === 'csv'} onToggle={() => toggleSection('csv')}>
+            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
+            <button onClick={onDownloadCSV}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.11)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}>
+              <DownloadSimple size={13} />Download
             </button>
-          )}
+          </AccountSection>
+
         </div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
-
-        {/* Database status */}
-        <div className="mb-5">
-          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Database</label>
-          <div style={{ fontSize: 10, fontFamily: 'monospace', padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${dbCheck.status === 'ok' ? 'rgba(120,220,140,0.25)' : dbCheck.status === 'error' ? 'rgba(250,100,100,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-            {dbCheck.status === 'checking'
-              ? <span style={{ color: 'rgba(255,255,255,0.3)' }}>checking...</span>
-              : dbCheck.lines.map((l, i) => (
-                <div key={i} style={{ color: l.includes('ERROR') || l.includes('TIMEOUT') || l.includes('missing') || l.includes('not set') ? 'rgba(250,130,130,0.9)' : 'rgba(120,220,140,0.9)', lineHeight: 1.6 }}>{l}</div>
-              ))
-            }
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
 
         {/* Sign out */}
         <button onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-5"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#fca5a5'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}>
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}>
           <SignOut size={14} />
           Sign out
         </button>
