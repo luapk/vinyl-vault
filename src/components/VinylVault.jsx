@@ -104,7 +104,7 @@ const glassSubtle = (extra = {}) => ({
 
 // Synthesise a soft confirmation chime using Web Audio API.
 // Three cycling styles so the user can compare feels on first few saves.
-function playSaveChime(style) {
+function playSaveChime() {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -125,20 +125,8 @@ function playSaveChime(style) {
     };
 
     const now = ctx.currentTime;
-    if (style === 0) {
-      // Soft ascending two-note (E5 then B5): clean, quick, like macOS
-      tone(659, now, 0.30, 0.20);
-      tone(988, now + 0.11, 0.45, 0.17);
-    } else if (style === 1) {
-      // Bell: single A5 with an octave harmonic, long sustain
-      tone(880, now, 0.80, 0.16);
-      tone(1760, now, 0.40, 0.05);
-    } else {
-      // Three-note scale C5-E5-G5: positive, iOS-like
-      tone(523, now,        0.22, 0.18);
-      tone(659, now + 0.09, 0.22, 0.18);
-      tone(784, now + 0.18, 0.42, 0.16);
-    }
+    tone(880, now, 0.80, 0.16);
+    tone(1760, now, 0.40, 0.05);
     setTimeout(() => ctx.close().catch(() => {}), 1400);
   } catch {}
 }
@@ -291,8 +279,7 @@ export default function VinylVault() {
   const [visionData, setVisionData] = useState(null);
   const [pendingCrates, setPendingCrates] = useState([]);
   const [savedId, setSavedId] = useState(null);
-  const [saveAnim, setSaveAnim] = useState(null); // { style: 0|1|2, release }
-  const saveStyleRef = useRef(0);
+  const [saveAnim, setSaveAnim] = useState(null);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
   // Always-fresh ref so async callbacks never read stale queue state
@@ -424,9 +411,7 @@ export default function VinylVault() {
     const toSave = !release.coverUrl && imageUrl ? { ...release, coverUrl: imageUrl } : release;
     addRecord(toSave, pendingCrates);
     setSavedId(`${release.artist}|${release.title}`);
-    const style = saveStyleRef.current;
-    saveStyleRef.current = (saveStyleRef.current + 1) % 3;
-    playSaveChime(style);
+    playSaveChime();
     setSaveAnim({ release: toSave });
     setTimeout(() => setSaveAnim(null), 2200);
   };
