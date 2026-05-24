@@ -2306,7 +2306,7 @@ function AboutView({ accentRGB }) {
             Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve, and within seconds you have the pressing confirmed, the tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
           </p>
           <p>
-            It works with your physical collection the way your collection works with you. No manual entry, no spreadsheets, no forgetting what you paid or where you found it. Just point a camera and the rest happens automatically. When there is more than one pressing in the database, you pick the right one. Everything else is handled.
+            No typing, no cross-referencing, no spreadsheet. When the match is unambiguous, it files automatically. When several pressings exist, you pick the right one. That is the only decision required.
           </p>
           <p>
             The crate system is intentional. Instead of flat tags, Vinyl Vault organises records the way a real DJ would: by feel, era, energy, purpose. Crate names come from the music, not a dropdown. And if the suggestions are not right for how you think, you can name them yourself.
