@@ -867,8 +867,6 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // Genre chips: fixed list minus already-pending
-  const genreChips = GENRE_CRATES.filter(g => !pendingCrates.includes(g));
   // Custom crates from existing collection (non-genre) minus already-pending
   const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c));
 
@@ -964,15 +962,6 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
               ))}
             </div>
           )}
-
-          {/* Genre list */}
-          <div className="flex flex-wrap gap-1.5">
-            {genreChips.map((name) => (
-              <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.32)" }}>
-                <Plus size={9} />{name}
-              </button>
-            ))}
-          </div>
 
           {/* Custom crates from existing collection */}
           {existingCustom.length > 0 && (
