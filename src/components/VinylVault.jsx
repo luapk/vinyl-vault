@@ -1838,6 +1838,10 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       lines.push(`URL: ${url || '(not set)'}`);
       lines.push(`Key: ${keyPreview}`);
       try {
+        const payload = JSON.parse(atob(key.split('.')[1]));
+        lines.push(`Key project ref: ${payload.ref || '(not in JWT)'} | role: ${payload.role || '?'}`);
+      } catch { lines.push('Key: could not decode JWT payload'); }
+      try {
         const resp = await Promise.race([
           fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
           timeout(8000),
