@@ -68,12 +68,12 @@ function reducer(state, action) {
     case 'RENAME_CRATE':
       return state.map(r => ({
         ...r,
-        crates: r.crates.map(c => c === action.from ? action.to : c),
+        crates: (r.crates || []).map(c => c === action.from ? action.to : c),
       }));
     case 'DELETE_CRATE':
       return state.map(r => ({
         ...r,
-        crates: r.crates.filter(c => c !== action.name),
+        crates: (r.crates || []).filter(c => c !== action.name),
       }));
     default:
       return state;
@@ -129,6 +129,10 @@ export function useCollection(userId = null) {
   // True once dbLoad has confirmed the DB has records for this user.
   // Prevents an empty DB response from wiping a non-empty local collection.
   const dbHasData = useRef(false);
+  // Mirror of collection so async writers can read the latest state without
+  // dispatch-then-read races (needed for partial updates like crate changes).
+  const collectionRef = useRef(collection);
+  collectionRef.current = collection;
 
   // Load from Supabase when userId arrives or changes.
   useEffect(() => {
@@ -173,15 +177,13 @@ export function useCollection(userId = null) {
   const updateRecord = useCallback((id, patch) => {
     dispatch({ type: 'UPDATE', id, patch });
     if (useDb && dbIds.current[id]) {
-      // Fetch the merged record from current state asynchronously then persist.
-      // We pass the full merged object as `data` to replace the jsonb column.
-      // Note: the reducer runs synchronously so we need to build the merged data here.
       const dbId = dbIds.current[id];
-      // We can't easily access the new state after dispatch here, so we use a
-      // separate async push that reads state after a tick.
-      setTimeout(() => {
-        dbUpdate(dbId, patch).catch(console.error);
-      }, 0);
+      // dbUpdate replaces the whole jsonb `data` column, so we must send the
+      // FULL merged record. Compute it from the latest known state to avoid
+      // wiping fields not included in the patch.
+      const current = collectionRef.current.find(r => r.id === id) || {};
+      const merged = { ...current, ...patch };
+      dbUpdate(dbId, merged).catch(console.error);
     }
   }, [useDb]);
 

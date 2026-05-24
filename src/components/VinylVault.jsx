@@ -534,7 +534,7 @@ export default function VinylVault() {
     }
   };
 
-  const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
+  const allCrates = [...new Set(collection.flatMap((r) => r.crates || []))].sort();
   const accentRGB = `${accent.r}, ${accent.g}, ${accent.b}`;
 
   const navItems = [
@@ -1052,7 +1052,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
   };
 
   // Only user-created crates — tags and genres stay out of this list
-  const allCrates = [...new Set(collection.flatMap((r) => r.crates))].sort();
+  const allCrates = [...new Set(collection.flatMap((r) => r.crates || []))].sort();
 
   const filtered = collection.filter((r) => {
     const q = search.toLowerCase();
@@ -1212,7 +1212,7 @@ function CollectionView({ collection, accentRGB, onRemove, onUpdate, onRenameCra
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
       {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
       {showBatchLabelModal && (
         <BatchLabelModal
@@ -1402,7 +1402,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {} }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
@@ -1414,6 +1414,23 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     Object.fromEntries((record.tracklist || []).map((t, i) => [i, t.hot || false]))
   );
   const [localAccent, setLocalAccent] = useState(accentRGB);
+  const [crateInput, setCrateInput] = useState('');
+  const recordCrates = record.crates || [];
+  const otherCrates = allCrates.filter(c => !recordCrates.includes(c));
+
+  const toggleRecordCrate = (name) => {
+    const next = recordCrates.includes(name)
+      ? recordCrates.filter(c => c !== name)
+      : [...recordCrates, name];
+    onUpdate?.(record.id, { crates: next });
+  };
+  const addNewCrate = () => {
+    const name = crateInput.trim();
+    if (!name || recordCrates.includes(name)) { setCrateInput(''); return; }
+    onUpdate?.(record.id, { crates: [...recordCrates, name] });
+    setCrateInput('');
+  };
+
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
 
@@ -1538,28 +1555,57 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               {record.label && <Pill label="Label" value={record.label} />}
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
             </div>
-            {record.crates && record.crates.length > 0 && (
-              <div>
-                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {record.crates.map((c) => {
+            <div>
+              <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {recordCrates.map((c) => {
+                  const col = crateColors[c] || null;
+                  return (
+                    <button key={c} onClick={() => toggleRecordCrate(c)}
+                      className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
+                      style={{
+                        background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
+                        border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
+                        color: 'rgba(255,255,255,0.65)',
+                        boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
+                      }}>
+                      <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
+                      {c}
+                      <X size={9} className="opacity-50 ml-0.5" />
+                    </button>
+                  );
+                })}
+                {recordCrates.length === 0 && (
+                  <span className="text-[10px] font-mono text-white/25">Not in any crate yet.</span>
+                )}
+              </div>
+              {otherCrates.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {otherCrates.map((c) => {
                     const col = crateColors[c] || null;
                     return (
-                      <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
-                        style={{
-                          background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
-                          border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
-                          color: 'rgba(255,255,255,0.65)',
-                          boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
-                        }}>
-                        <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
-                        {c}
-                      </span>
+                      <button key={c} onClick={() => toggleRecordCrate(c)}
+                        className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)' }}>
+                        <Plus size={10} />{c}
+                      </button>
                     );
                   })}
                 </div>
+              )}
+              <div className="flex items-center gap-2 mt-1">
+                <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addNewCrate()}
+                  placeholder={otherCrates.length > 0 ? 'Or create a new crate...' : 'Create a crate...'}
+                  className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/65 placeholder-white/20 outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }} />
+                <button onClick={addNewCrate}
+                  className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70"
+                  style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.40)', background: 'transparent' }}>
+                  Add
+                </button>
               </div>
-            )}
+            </div>
             {record.tags && record.tags.length > 0 && (
               <div className="mt-2">
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
