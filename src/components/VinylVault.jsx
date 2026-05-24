@@ -261,7 +261,6 @@ function getGreeting(name) {
   let pool;
   if (hour >= 5 && hour < 12) {
     pool = [
-      `Morning, ${name}. What are we digging today?`,
       `Early start, ${name}. Coffee and crates?`,
       `Rise and spin, ${name}.`,
     ];
