@@ -583,8 +583,8 @@ export default function VinylVault() {
           <button onClick={() => setShowAccount(true)} title="Account settings"
             className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center shrink-0 transition-opacity hover:opacity-70"
             style={{ border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)" }}>
-            {user?.user_metadata?.avatar_url
-              ? <img src={user.user_metadata.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
               : <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1 }}>
                   {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
                 </span>
@@ -1806,7 +1806,7 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [avatarPreview, setAvatarPreview] = useState(user?.user_metadata?.avatar_url || null);
+  const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
   const avatarInputRef = useRef(null);
