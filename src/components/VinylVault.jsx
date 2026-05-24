@@ -1417,6 +1417,12 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const bpmTriedRef = useRef(new Set());
   const images = record.images?.length ? record.images : (record.coverUrl ? [record.coverUrl] : []);
 
+  // Start with the saved hero image selected, not always index 0
+  useEffect(() => {
+    const idx = images.findIndex(s => s === record.coverUrl);
+    if (idx > 0) setImgIdx(idx);
+  }, [record.id]);
+
   useEffect(() => {
     const src = images[0] || record.coverUrl;
     if (!src) return;
@@ -1506,11 +1512,19 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                 </div>
               )}
             </div>
-            {images.length > 1 && (
+            {images.length > 0 && (
               <div className="flex gap-1.5 overflow-x-auto">
                 {images.map((src, i) => (
-                  <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-8 h-8 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.38, border: imgIdx === i ? `1px solid rgba(${localAccent},0.5)` : "1px solid transparent" }}>
+                  <button key={i} onClick={() => {
+                    setImgIdx(i);
+                    if (src !== record.coverUrl && onUpdate) onUpdate(record.id, { coverUrl: src });
+                  }} className="relative shrink-0 w-10 h-10 rounded-md overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.45, border: imgIdx === i ? "1px solid rgba(120,220,140,0.70)" : "1px solid rgba(255,255,255,0.08)", boxShadow: imgIdx === i ? "0 0 10px -2px rgba(120,220,140,0.45)" : "none" }}>
                     <img src={src} alt="" className="w-full h-full object-cover" />
+                    {imgIdx === i && (
+                      <div className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ background: "rgba(60,190,90,0.95)", border: "1px solid rgba(255,255,255,0.30)" }}>
+                        <Check size={7} weight="bold" style={{ color: "#fff" }} />
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -1828,19 +1842,28 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
           <button
             onClick={() => avatarInputRef.current?.click()}
             className="relative w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-3 transition-opacity hover:opacity-80"
-            style={{ border: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}
+            style={{
+              border: avatarSavedOk ? '2px solid rgba(120,220,140,0.8)' : '2px solid rgba(255,255,255,0.15)',
+              background: 'rgba(255,255,255,0.06)',
+              boxShadow: avatarSavedOk ? '0 0 24px -4px rgba(120,220,140,0.55)' : 'none',
+              transition: 'all 0.3s',
+            }}
             disabled={avatarSaving}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
               : <span style={{ fontSize: 28, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{initials}</span>
             }
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-full"
-              style={{ background: 'rgba(0,0,0,0.55)' }}>
-              {avatarSaving
-                ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>...</span>
-                : <span style={{ fontSize: 10, color: '#fff', fontFamily: 'monospace', letterSpacing: '0.1em' }}>CHANGE</span>
-              }
-            </div>
+            {avatarSaving && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace' }}>SAVING...</span>
+              </div>
+            )}
+            {avatarSavedOk && (
+              <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(60,190,90,0.98)', border: '2px solid rgba(20,20,28,1)' }}>
+                <Check size={14} weight="bold" style={{ color: '#fff' }} />
+              </div>
+            )}
           </button>
           <div className="flex items-center gap-3">
             <button onClick={() => avatarInputRef.current?.click()} disabled={avatarSaving}

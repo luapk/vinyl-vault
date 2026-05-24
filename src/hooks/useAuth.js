@@ -104,10 +104,40 @@ export function useAuth() {
 
   const updateAvatar = useCallback(async (avatarUrl) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { error } = await supabase.rpc('set_own_avatar_url', { p_avatar_url: avatarUrl });
-    if (error) throw error;
-    setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
-  }, []);
+    if (!user?.id) throw new Error('Not logged in');
+
+    // Try RPC first (security definer, bypasses RLS UPDATE policy)
+    const { error: rpcError } = await supabase.rpc('set_own_avatar_url', { p_avatar_url: avatarUrl });
+
+    // Verify the row actually changed
+    const { data: row1 } = await supabase
+      .from('profiles').select('avatar_url').eq('id', user.id).single();
+
+    if (row1?.avatar_url === avatarUrl) {
+      setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
+      return;
+    }
+
+    // RPC did not persist. Try direct UPDATE (requires profiles_self_update policy).
+    const { error: updateError } = await supabase
+      .from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
+
+    const { data: row2 } = await supabase
+      .from('profiles').select('avatar_url').eq('id', user.id).single();
+
+    if (row2?.avatar_url === avatarUrl) {
+      setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
+      return;
+    }
+
+    // Both failed. Surface the real reason so we can see what's wrong.
+    const reasons = [
+      rpcError && `RPC: ${rpcError.message}`,
+      updateError && `UPDATE: ${updateError.message}`,
+      !rpcError && !updateError && 'Both calls returned no error but 0 rows updated (RLS or missing function/permission).',
+    ].filter(Boolean).join(' | ');
+    throw new Error(`Avatar did not save. ${reasons}`);
+  }, [user]);
 
   const isAdmin = profile?.role === 'admin';
 
