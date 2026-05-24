@@ -102,20 +102,47 @@ export function useAuth() {
     if (data?.user) setUser(data.user);
   }, []);
 
-  const updateAvatar = useCallback((avatarUrl) => {
+  // Uploads avatar to Supabase Storage and stores ONLY the public URL in
+  // user_metadata. Inline data URLs in user_metadata bloat the JWT and silently
+  // fail to persist above a soft size limit, which is why this needs Storage.
+  // Requires the avatars bucket and policies in supabase/storage.sql.
+  const updateAvatar = useCallback(async (avatarDataUrl) => {
     if (!supabase) throw new Error('Supabase not configured');
     if (!user?.id) throw new Error('Not logged in');
+    const userId = user.id;
+    const path = `${userId}/avatar.jpg`;
 
-    // Avatar lives in auth user_metadata (no DB column required). Optimistic
-    // setUser ensures the header re-renders immediately, even before the
-    // network round-trip completes.
-    setUser(u => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: avatarUrl } } : u);
+    // Removal: clear metadata and delete the storage object.
+    if (avatarDataUrl === null) {
+      setUser(u => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: null } } : u);
+      const { error: authErr } = await supabase.auth.updateUser({ data: { avatar_url: null } });
+      if (authErr) throw authErr;
+      supabase.storage.from('avatars').remove([path]).catch(() => {});
+      return;
+    }
 
-    supabase.auth.updateUser({ data: { avatar_url: avatarUrl } })
-      .then(({ data, error }) => {
-        if (!error && data?.user) setUser(data.user);
-      })
-      .catch(err => console.error('Avatar persist failed:', err));
+    // Upload data URL as a blob to Storage.
+    const blob = await (await fetch(avatarDataUrl)).blob();
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+    if (uploadError) {
+      throw new Error(
+        `Avatar upload failed: ${uploadError.message}. ` +
+        `If you have not set up the avatars bucket yet, run the SQL in supabase/storage.sql.`
+      );
+    }
+
+    // Cache-bust so the browser refetches the new image (same path is reused).
+    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+    const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    // Optimistic state update so the header swaps immediately.
+    setUser(u => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: publicUrl } } : u);
+
+    // Persist the URL to auth metadata so it survives across sessions.
+    const { error: authError } = await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
+    if (authError) throw authError;
   }, [user]);
 
   const isAdmin = profile?.role === 'admin';
