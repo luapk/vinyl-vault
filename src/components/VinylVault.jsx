@@ -1873,15 +1873,29 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
         return;
       }
 
-      // Step 2: records table
+      // Step 2a: raw fetch to records table (bypasses supabase-js entirely)
+      try {
+        const session = (await sb.auth.getSession()).data.session;
+        const headers = { apikey: key };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const resp = await Promise.race([
+          fetch(`${url}/rest/v1/records?select=id&limit=1`, { headers }),
+          timeout(15000),
+        ]);
+        const body = await resp.text().catch(() => '');
+        lines.push(`records (raw): HTTP ${resp.status}${session ? ' [authed]' : ' [anon]'}`);
+        if (resp.status >= 400) lines.push(`  body: ${body.slice(0, 200)}`);
+      } catch (e) { lines.push(`records (raw): TIMEOUT - ${e.message}`); ok = false; }
+
+      // Step 2b: records table via supabase-js
       try {
         const { count, error } = await Promise.race([
           sb.from('records').select('id', { count: 'exact', head: true }),
           timeout(8000),
         ]);
-        if (error) { lines.push(`records: ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
-        else lines.push(`records: OK (${count ?? '?'} rows)`);
-      } catch (e) { lines.push(`records: TIMEOUT - ${e.message}`); ok = false; }
+        if (error) { lines.push(`records (sb): ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
+        else lines.push(`records (sb): OK (${count ?? '?'} rows)`);
+      } catch (e) { lines.push(`records (sb): TIMEOUT - ${e.message}`); ok = false; }
 
       // Step 3: profiles table + avatar_url column
       try {
