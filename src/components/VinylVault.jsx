@@ -569,7 +569,7 @@ export default function VinylVault() {
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(5,5,8,0.75)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(255,255,255,0.055)" }}>
         <div className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 129, mixBlendMode: "screen", opacity: 0.92 }} />
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, mixBlendMode: "screen", opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
