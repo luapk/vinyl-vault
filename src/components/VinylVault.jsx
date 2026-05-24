@@ -825,7 +825,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       {/* Top bar */}
       <div className="flex items-center">
         <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.04)" }}>
-          {saved ? <><X size={12} />Close</> : <><CaretLeft size={12} />New scan</>}
+          <CaretLeft size={12} />New scan
         </button>
       </div>
       {/* Meta bar */}
@@ -927,12 +927,11 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          <button onClick={() => onSave(images[imgIdx] || imageUrl)} disabled={saved} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
-            style={saved
-              ? { background: "rgba(120,220,140,0.10)", border: "1px solid rgba(120,220,140,0.30)", color: "rgb(120,220,140)" }
-              : { background: `linear-gradient(135deg, rgba(${accentRGB},0.22), rgba(${accentRGB},0.08))`, border: `1px solid rgba(${accentRGB},0.35)`, color: "#fff", boxShadow: `0 0 20px -6px rgba(${accentRGB},0.4)` }
-            }>
-            {saved ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved to collection</span> : "Save to collection"}
+          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl)} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
+            style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.22), rgba(${accentRGB},0.08))`, border: `1px solid rgba(${accentRGB},0.35)`, color: "#fff", boxShadow: `0 0 20px -6px rgba(${accentRGB},0.4)` }}>
+            {saved
+              ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved. Scan another</span>
+              : "Save to collection"}
           </button>
         </div>
       </GlassSection>
