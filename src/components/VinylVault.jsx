@@ -2317,53 +2317,17 @@ function AboutView({ accentRGB }) {
           <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
           <div className="space-y-3">
             {[
-              { n: "01", title: "Photograph", desc: "Point your camera at the sleeve or label. A single photo is all it takes." },
-              { n: "02", title: "Identify", desc: "The exact pressing is matched against the global record database: label, catalogue number, year, country." },
-              { n: "03", title: "Enrich", desc: "Tracklist, BPM, and Camelot key notation are pulled automatically where available." },
-              { n: "04", title: "File", desc: "Assign the record to one or more crates, or save it unassigned and sort later. Your collection lives locally in your browser." },
-            ].map(({ n, title, desc }) => (
-              <div key={n} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
-                <div className="text-[11px] font-mono shrink-0 mt-0.5" style={{ color: `rgba(${accentRGB},0.7)` }}>{n}</div>
+              { Icon: Camera,          title: "Photograph", desc: "Point your camera at the sleeve or label. A single photo is all it takes." },
+              { Icon: Scan,            title: "Identify",   desc: "The exact pressing is matched against the global record database: label, catalogue number, year, country." },
+              { Icon: Sparkle,         title: "Enrich",     desc: "Tracklist, BPM, and Camelot key notation are pulled automatically where available." },
+              { Icon: VinylRecord,     title: "File",       desc: "Assign the record to one or more crates, or save it unassigned and sort later." },
+            ].map(({ Icon, title, desc }) => (
+              <div key={title} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
+                <div className="shrink-0 mt-0.5">
+                  <Icon size={16} style={{ color: `rgba(${accentRGB},0.7)` }} />
+                </div>
                 <div>
                   <div className="text-sm font-display mb-0.5 text-white/85">{title}</div>
-                  <div className="text-[13px] text-white/40 leading-relaxed">{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Release notes</div>
-          <div className="space-y-3">
-            {[
-              {
-                v: "v1.2",
-                label: "Current",
-                title: "Collection and Crates",
-                desc: "Persistent local collection, vinyl carousel browser, crate management, batch scanning, CSV export and print.",
-                accentRGB,
-              },
-              {
-                v: "v1.1",
-                label: null,
-                title: "Audio Features",
-                desc: "BPM detection and Camelot key notation on every track. Audio previews where available.",
-              },
-              {
-                v: "v1.0",
-                label: null,
-                title: "Scan and Identify",
-                desc: "The core pipeline: photograph a record, get a confirmed pressing with full tracklist and artwork.",
-              },
-            ].map(({ v, label, title, desc, accentRGB: rgb }) => (
-              <div key={v} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
-                <div className="shrink-0 text-right" style={{ minWidth: 36 }}>
-                  <div className="text-[10px] font-mono text-white/30">{v}</div>
-                  {label && <div className="text-[9px] font-mono mt-0.5" style={{ color: rgb ? `rgba(${rgb},0.7)` : "rgba(255,255,255,0.3)" }}>{label}</div>}
-                </div>
-                <div>
-                  <div className="text-sm font-display mb-0.5 text-white/80">{title}</div>
                   <div className="text-[13px] text-white/40 leading-relaxed">{desc}</div>
                 </div>
               </div>
