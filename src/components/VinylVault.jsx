@@ -1810,6 +1810,44 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
   // avatarSaving removed -- save is now fire-and-forget so UI never blocks on network
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
   const avatarInputRef = useRef(null);
+  const [dbCheck, setDbCheck] = useState({ status: 'checking', lines: [] });
+
+  useEffect(() => {
+    async function check() {
+      const { supabase: sb, isSupabaseEnabled: enabled } = await import('../lib/supabase.js');
+      if (!enabled || !sb) {
+        setDbCheck({ status: 'error', lines: ['Supabase env vars not set - database disabled'] });
+        return;
+      }
+      const lines = [];
+      let ok = true;
+      const timeout = ms => new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms));
+
+      // Test records table
+      try {
+        const { count, error } = await Promise.race([
+          sb.from('records').select('id', { count: 'exact', head: true }),
+          timeout(5000),
+        ]);
+        if (error) { lines.push(`records table: ERROR - ${error.message}`); ok = false; }
+        else lines.push(`records table: OK (${count ?? '?'} rows)`);
+      } catch (e) { lines.push(`records table: TIMEOUT / unreachable`); ok = false; }
+
+      // Test profiles table + avatar_url column
+      try {
+        const { data, error } = await Promise.race([
+          sb.from('profiles').select('id, avatar_url').eq('id', user?.id).single(),
+          timeout(5000),
+        ]);
+        if (error) { lines.push(`profiles table: ERROR - ${error.message}`); ok = false; }
+        else if (data && !('avatar_url' in data)) { lines.push(`profiles table: OK but avatar_url column missing - run migration SQL`); ok = false; }
+        else lines.push(`profiles table: OK (avatar_url column present)`);
+      } catch (e) { lines.push(`profiles table: TIMEOUT / unreachable`); ok = false; }
+
+      setDbCheck({ status: ok ? 'ok' : 'error', lines });
+    }
+    check();
+  }, [user?.id]);
 
   const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
 
@@ -1970,6 +2008,22 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
               Send password reset email
             </button>
           )}
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '20px 0' }} />
+
+        {/* Database status */}
+        <div className="mb-5">
+          <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>Database</label>
+          <div style={{ fontSize: 10, fontFamily: 'monospace', padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.3)', border: `1px solid ${dbCheck.status === 'ok' ? 'rgba(120,220,140,0.25)' : dbCheck.status === 'error' ? 'rgba(250,100,100,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+            {dbCheck.status === 'checking'
+              ? <span style={{ color: 'rgba(255,255,255,0.3)' }}>checking...</span>
+              : dbCheck.lines.map((l, i) => (
+                <div key={i} style={{ color: l.includes('ERROR') || l.includes('TIMEOUT') || l.includes('missing') || l.includes('not set') ? 'rgba(250,130,130,0.9)' : 'rgba(120,220,140,0.9)', lineHeight: 1.6 }}>{l}</div>
+              ))
+            }
+          </div>
         </div>
 
         {/* Divider */}
