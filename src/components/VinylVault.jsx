@@ -300,12 +300,12 @@ export default function VinylVault() {
   const batchQueueRef = useRef([]);
 
   const displayName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || 'there';
-  // Stable greeting chosen once when user first becomes known (stored in a ref)
-  const greetingRef = useRef(null);
-  if (user && greetingRef.current === null) {
-    greetingRef.current = getGreeting(displayName);
+  // Regenerate greeting when the display name changes (e.g. after saving account settings)
+  const greetingRef = useRef({ name: null, text: null });
+  if (user && greetingRef.current.name !== displayName) {
+    greetingRef.current = { name: displayName, text: getGreeting(displayName) };
   }
-  const greeting = user ? greetingRef.current : null;
+  const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
   const [showAccount, setShowAccount] = useState(false);
 
@@ -464,31 +464,34 @@ export default function VinylVault() {
     setAppView("batch");
     setBatchProcessing(true);
 
-    // Work on a local copy; sync to ref+state after every mutation so that
-    // concurrent resolveBatchDisambiguation calls always see fresh data.
-    const current = items.map((item) => ({ ...item }));
-    for (let i = 0; i < current.length; i++) {
-      current[i] = { ...current[i], status: "processing" };
-      syncQueue([...current]);
+    // Always read from the ref before writing so concurrent resolveBatchDisambiguation
+    // calls on other indices are never overwritten.
+    for (let i = 0; i < items.length; i++) {
+      const qPre = [...batchQueueRef.current];
+      qPre[i] = { ...qPre[i], status: "processing" };
+      syncQueue(qPre);
+
       try {
-        const { dataUrl, data } = await processImage(current[i].file, true);
-        current[i].imageUrl = dataUrl;
+        const { dataUrl, data } = await processImage(items[i].file, true);
+        const q = [...batchQueueRef.current];
+        q[i] = { ...q[i], imageUrl: dataUrl };
         if (data.status === "complete") {
-          current[i].status = "complete";
-          current[i].release = data.release;
+          q[i] = { ...q[i], status: "complete", release: data.release };
           const batchRelease = !data.release.coverUrl && dataUrl ? { ...data.release, coverUrl: dataUrl } : data.release;
+          syncQueue(q);
           addRecord(batchRelease, data.release.topGenres || []);
         } else if (data.status === "disambiguation") {
-          current[i].status = "disambiguation";
-          current[i].candidates = data.candidates;
-          current[i].vision = data.vision;
+          q[i] = { ...q[i], status: "disambiguation", candidates: data.candidates, vision: data.vision };
+          syncQueue(q);
         } else {
-          current[i].status = "error";
+          q[i] = { ...q[i], status: "error" };
+          syncQueue(q);
         }
       } catch {
-        current[i].status = "error";
+        const q = [...batchQueueRef.current];
+        q[i] = { ...q[i], status: "error" };
+        syncQueue(q);
       }
-      syncQueue([...current]);
     }
     setBatchProcessing(false);
   };
@@ -587,11 +590,7 @@ export default function VinylVault() {
       {/* Migration banner */}
       {migrationBanner && (
         <MigrationBanner
-          onMigrate={async () => {
-            const count = await migrateFromLocalStorage();
-            if (count > 0) setMigrationBanner(false);
-            return count;
-          }}
+          onMigrate={migrateFromLocalStorage}
           onDismiss={() => setMigrationBanner(false)}
         />
       )}
@@ -655,38 +654,56 @@ export default function VinylVault() {
 
 function MigrationBanner({ onMigrate, onDismiss }) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState(null);
+  const [progress, setProgress] = useState(null); // { moved, total }
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   async function handle() {
     setBusy(true);
+    setProgress(null);
+    setError('');
     try {
-      const count = await onMigrate();
-      if (count > 0) return;
-      setResult('Could not move records. Check your connection and try again.');
+      const count = await onMigrate((moved, total) => setProgress({ moved, total }));
+      if (count > 0) {
+        setSuccess(true);
+        setTimeout(onDismiss, 1800);
+        return;
+      }
+      setError('Could not move records. Check your connection and try again.');
     } catch {
-      setResult('Something went wrong. Try again.');
+      setError('Something went wrong. Try again.');
     } finally {
       setBusy(false);
     }
   }
 
+  const label = success
+    ? 'Success! Records moved to your account.'
+    : error
+    ? error
+    : busy && progress
+    ? `${progress.moved} of ${progress.total} moved...`
+    : busy
+    ? 'Moving...'
+    : 'You have records saved locally. Move them to your profile account?';
+
   return (
     <div className="relative z-20 px-5 md:px-10 pt-3">
       <div className="max-w-7xl mx-auto p-3 rounded-xl flex flex-wrap items-center gap-3 text-sm"
-        style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.3)" }}>
-        <span className="text-white/70 flex-1 min-w-0">
-          {result || 'You have records saved locally. Move them to your profile account?'}
-        </span>
-        {!result && (
-          <button onClick={handle} disabled={busy}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all disabled:opacity-50"
+        style={{ background: success ? "rgba(34,197,94,0.08)" : "rgba(139,92,246,0.1)", border: success ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(139,92,246,0.3)" }}>
+        <span className="text-white/70 flex-1 min-w-0">{label}</span>
+        {!busy && !success && (
+          <button onClick={handle}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all"
             style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
-            {busy ? 'Moving...' : 'Move records'}
+            Move records
           </button>
         )}
-        <button onClick={onDismiss} className="text-white/30 hover:text-white/60 transition-colors">
-          <X size={14} />
-        </button>
+        {!busy && !success && (
+          <button onClick={onDismiss} className="text-white/30 hover:text-white/60 transition-colors">
+            <X size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -750,7 +767,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
           }
         </h1>
         <p className="text-white/45 text-base md:text-lg max-w-lg leading-relaxed">
-          Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM and Camelot key attached, and the record filed exactly where you want it.
+          Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM data attached, and the record filed exactly where you want it.
         </p>
       </div>
 
@@ -1752,7 +1769,9 @@ function PriceGraph({ price, accentRGB }) {
 // ----- AccountModal -----------------------------------------------------------
 
 function AccountModal({ user, profile, onClose, onSignOut }) {
-  const [displayName, setDisplayName] = useState(profile?.display_name || '');
+  const [displayName, setDisplayName] = useState(
+    user?.user_metadata?.display_name || profile?.display_name || ''
+  );
   const [saving, setSaving] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [msg, setMsg] = useState('');

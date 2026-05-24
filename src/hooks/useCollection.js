@@ -186,7 +186,7 @@ export function useCollection(userId = null) {
   }, []);
 
   // Migration: copy localStorage records into Supabase on first login.
-  const migrateFromLocalStorage = useCallback(async () => {
+  const migrateFromLocalStorage = useCallback(async (onProgress) => {
     if (!useDb) return 0;
     const local = load();
     if (!local.length) return 0;
@@ -196,6 +196,7 @@ export function useCollection(userId = null) {
         const dbId = await dbInsert(userId, record);
         dbIds.current[record.id] = dbId;
         count++;
+        onProgress?.(count, local.length);
       } catch { /* skip duplicates */ }
     }
     if (count > 0) {
