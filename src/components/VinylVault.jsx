@@ -818,13 +818,13 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
-      {/* Top bar: back button left, scan-another right when saved */}
+      {/* Top bar */}
       <div className="flex items-center justify-between">
-        <button onClick={onReset} className="inline-flex items-center gap-1.5 text-[11px] font-mono text-white/35 hover:text-white/65 transition-colors">
+        <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.04)" }}>
           <CaretLeft size={12} />New scan
         </button>
         {saved && (
-          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(120,220,140,0.10)", border: "1px solid rgba(120,220,140,0.28)", color: "rgb(120,220,140)" }}>
+          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ background: "rgba(120,220,140,0.14)", border: "1px solid rgba(120,220,140,0.40)", color: "rgb(140,230,160)" }}>
             <Check size={11} weight="bold" />Scan another
           </button>
         )}
@@ -1773,15 +1773,20 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }
             <button onClick={saveDisplayName} disabled={saving || savedOk}
               style={{
                 padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
-                color: savedOk ? '#fff' : '#000',
-                background: savedOk ? 'rgba(120,220,140,0.25)' : saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)',
-                border: savedOk ? '1px solid rgba(120,220,140,0.5)' : 'none',
+                color: '#000',
+                background: saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)',
+                border: 'none',
                 cursor: (saving || savedOk) ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: 5,
+                minWidth: 52,
               }}>
-              {savedOk ? <><Check size={13} weight="bold" style={{ color: 'rgb(120,220,140)' }} />Saved</> : saving ? '...' : 'Save'}
+              {saving ? '...' : 'Save'}
             </button>
           </div>
+          {savedOk && (
+            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(120,220,140)', marginTop: 8, fontFamily: 'monospace' }}>
+              <Check size={12} weight="bold" />Name saved.
+            </p>
+          )}
           {errorMsg && <p style={{ fontSize: 11, color: '#fca5a5', marginTop: 6, fontFamily: 'monospace' }}>{errorMsg}</p>}
         </div>
 
