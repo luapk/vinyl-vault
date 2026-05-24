@@ -135,17 +135,33 @@ export function useCollection(userId = null) {
   collectionRef.current = collection;
 
   // Load from Supabase when userId arrives or changes.
+  // Also migrates any localStorage-only records into Supabase so all devices stay in sync.
   useEffect(() => {
     if (!useDb) { dbHasData.current = false; return; }
-    dbLoad(userId).then(records => {
-      if (records.length === 0 && !dbHasData.current) {
-        // DB is empty and we have never confirmed it has data for this user.
-        // Keep local collection intact rather than wiping it.
-        return;
-      }
-      dbHasData.current = records.length > 0;
+    dbLoad(userId).then(async records => {
       records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
-      dispatch({ type: 'SET', records: records.map(r => { const c = { ...r }; delete c._dbId; return c; }) });
+      const dbRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+
+      // Push localStorage records that are not yet in Supabase into the DB.
+      const local = load();
+      if (local.length > 0) {
+        const dbKeys = new Set(dbRecords.map(r => `${r.artist}|||${r.title}`));
+        for (const record of local) {
+          if (!dbKeys.has(`${record.artist}|||${record.title}`)) {
+            try {
+              const dbId = await dbInsert(userId, record);
+              dbIds.current[record.id] = dbId;
+              dbRecords.unshift(record);
+            } catch (e) {
+              console.error('Migration failed for record', record.artist, record.title, e);
+            }
+          }
+        }
+      }
+
+      if (dbRecords.length === 0 && !dbHasData.current) return;
+      dbHasData.current = dbRecords.length > 0;
+      dispatch({ type: 'SET', records: dbRecords });
     }).catch(console.error);
   }, [useDb, userId]);
 
@@ -189,14 +205,29 @@ export function useCollection(userId = null) {
 
   const renameCrate = useCallback((from, to) => {
     dispatch({ type: 'RENAME_CRATE', from, to });
-    // Batch update: all affected records need re-saving. Done optimistically.
-  }, []);
+    if (!useDb) return;
+    collectionRef.current
+      .filter(r => (r.crates || []).includes(from))
+      .forEach(r => {
+        const dbId = dbIds.current[r.id];
+        if (!dbId) return;
+        const merged = { ...r, crates: r.crates.map(c => c === from ? to : c) };
+        dbUpdate(dbId, merged).catch(console.error);
+      });
+  }, [useDb]);
 
   const deleteCrate = useCallback((name) => {
     dispatch({ type: 'DELETE_CRATE', name });
-  }, []);
-
-  // Migration: copy localStorage records into Supabase on first login.
+    if (!useDb) return;
+    collectionRef.current
+      .filter(r => (r.crates || []).includes(name))
+      .forEach(r => {
+        const dbId = dbIds.current[r.id];
+        if (!dbId) return;
+        const merged = { ...r, crates: r.crates.filter(c => c !== name) };
+        dbUpdate(dbId, merged).catch(console.error);
+      });
+  }, [useDb]);
 
   return {
     collection,
