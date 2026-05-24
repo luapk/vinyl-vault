@@ -778,7 +778,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     });
   }, [releaseKey]);
 
-  const images = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
+  const discogsImages = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
+  // Always append the user's scanned photo so there is always at least two options
+  // when a Discogs cover exists: the official artwork and their own shot.
+  const images = (imageUrl && discogsImages.length > 0) ? [...discogsImages, imageUrl] : discogsImages.length > 0 ? discogsImages : imageUrl ? [imageUrl] : [];
   const displayImage = images[imgIdx] || imageUrl;
 
   // Swipe support for the main image
@@ -928,7 +931,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           </div>
 
           <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl)} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
-            style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.22), rgba(${accentRGB},0.08))`, border: `1px solid rgba(${accentRGB},0.35)`, color: "#fff", boxShadow: `0 0 20px -6px rgba(${accentRGB},0.4)` }}>
+            style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
             {saved
               ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved. Scan another</span>
               : "Save to collection"}
