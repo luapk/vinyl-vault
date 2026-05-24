@@ -410,6 +410,7 @@ export default function VinylVault() {
     if (!release) return;
     const coverUrl = selectedCover || release.coverUrl || imageUrl || null;
     const toSave = { ...release, coverUrl };
+    playSaveChime(); // must run synchronously inside the tap handler for iOS AudioContext
     try {
       await addRecord(toSave, pendingCrates);
     } catch (err) {
@@ -419,7 +420,6 @@ export default function VinylVault() {
       return;
     }
     setSavedId(`${release.artist}|${release.title}`);
-    playSaveChime();
     setSaveAnim({ release: toSave });
     setTimeout(() => setSaveAnim(null), 2200);
   };
@@ -931,7 +931,9 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           </div>
 
           <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl)} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
-            style={{ background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
+            style={saved
+              ? { background: "rgba(100,210,120,0.18)", border: "1px solid rgba(100,210,120,0.50)", color: "rgb(140,230,160)", boxShadow: "0 0 24px -8px rgba(100,210,120,0.4)" }
+              : { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
             {saved
               ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved. Scan another</span>
               : "Save to collection"}
