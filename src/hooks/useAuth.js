@@ -98,8 +98,8 @@ export function useAuth() {
     const { error } = await supabase.auth.updateUser({ data: { display_name: name } });
     if (error) throw error;
     // Force-refresh user state so display name and greeting update immediately.
-    const { data: { user: refreshed } } = await supabase.auth.getUser();
-    if (refreshed) setUser(refreshed);
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) setUser(data.user);
   }, []);
 
   const isAdmin = profile?.role === 'admin';

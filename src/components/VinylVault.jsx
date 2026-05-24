@@ -295,7 +295,6 @@ export default function VinylVault() {
   const saveStyleRef = useRef(0);
   const [batchQueue, setBatchQueue] = useState([]);
   const [batchProcessing, setBatchProcessing] = useState(false);
-  const [migrationBanner, setMigrationBanner] = useState(false);
   // Always-fresh ref so async callbacks never read stale queue state
   const batchQueueRef = useRef([]);
 
@@ -310,12 +309,7 @@ export default function VinylVault() {
   const [showAccount, setShowAccount] = useState(false);
 
   const userId = user?.id ?? null;
-  const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, migrateFromLocalStorage, hasLocalRecords } = useCollection(userId);
-
-  // Offer localStorage migration once on first login when local records exist.
-  useEffect(() => {
-    if (user && hasLocalRecords && isSupabaseEnabled) setMigrationBanner(true);
-  }, [user?.id]);
+  const { collection, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection(userId);
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
     setRelease(prev => {
@@ -570,11 +564,6 @@ export default function VinylVault() {
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
-          {appView === "scan" && phase === "result" && (
-            <button onClick={reset} className="ml-1 text-[11px] tracking-[0.15em] uppercase font-mono px-3 py-1.5 rounded-full transition-all" style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.35)", background: "transparent" }}>
-              New scan
-            </button>
-          )}
         </nav>
 
         {/* Account button */}
@@ -586,14 +575,6 @@ export default function VinylVault() {
           </button>
         )}
       </header>
-
-      {/* Migration banner */}
-      {migrationBanner && (
-        <MigrationBanner
-          onMigrate={migrateFromLocalStorage}
-          onDismiss={() => setMigrationBanner(false)}
-        />
-      )}
 
       {/* Main */}
       <main className="relative px-5 md:px-10 pb-20 max-w-7xl mx-auto">
@@ -615,7 +596,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
@@ -652,63 +633,6 @@ export default function VinylVault() {
 }
 
 // ----- SaveConfirmation (pill toast, audio does the heavy lifting) -----------
-
-function MigrationBanner({ onMigrate, onDismiss }) {
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(null); // { moved, total }
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handle() {
-    setBusy(true);
-    setProgress(null);
-    setError('');
-    try {
-      const count = await onMigrate((moved, total) => setProgress({ moved, total }));
-      if (count > 0) {
-        setSuccess(true);
-        setTimeout(onDismiss, 1800);
-        return;
-      }
-      setError('Nothing to move.');
-    } catch (e) {
-      setError(e?.message || 'Something went wrong. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const label = success
-    ? 'Success! Records moved to your account.'
-    : error
-    ? error
-    : busy && progress
-    ? `${progress.moved} of ${progress.total} moved...`
-    : busy
-    ? 'Moving...'
-    : 'You have records saved locally. Move them to your profile account?';
-
-  return (
-    <div className="relative z-20 px-5 md:px-10 pt-3">
-      <div className="max-w-7xl mx-auto p-3 rounded-xl flex flex-wrap items-center gap-3 text-sm"
-        style={{ background: success ? "rgba(34,197,94,0.08)" : "rgba(139,92,246,0.1)", border: success ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(139,92,246,0.3)" }}>
-        <span className="text-white/70 flex-1 min-w-0">{label}</span>
-        {!busy && !success && (
-          <button onClick={handle}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-mono text-white transition-all"
-            style={{ background: "rgba(139,92,246,0.5)", border: "1px solid rgba(139,92,246,0.4)" }}>
-            Move records
-          </button>
-        )}
-        {!busy && !success && (
-          <button onClick={onDismiss} className="text-white/30 hover:text-white/60 transition-colors">
-            <X size={14} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function SaveConfirmation({ release, accentRGB }) {
   const [leaving, setLeaving] = useState(false);
@@ -839,7 +763,7 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -894,6 +818,17 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
+      {/* Top bar: back button left, scan-another right when saved */}
+      <div className="flex items-center justify-between">
+        <button onClick={onReset} className="inline-flex items-center gap-1.5 text-[11px] font-mono text-white/35 hover:text-white/65 transition-colors">
+          <CaretLeft size={12} />New scan
+        </button>
+        {saved && (
+          <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(120,220,140,0.10)", border: "1px solid rgba(120,220,140,0.28)", color: "rgb(120,220,140)" }}>
+            <Check size={11} weight="bold" />Scan another
+          </button>
+        )}
+      </div>
       {/* Meta bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <ConfidenceBadge confidence={release.confidence} identified={release.identified} accentRGB={accentRGB} />
@@ -1770,23 +1705,27 @@ function PriceGraph({ price, accentRGB }) {
 // ----- AccountModal -----------------------------------------------------------
 
 function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }) {
-  const [displayName, setDisplayName] = useState(
-    user?.user_metadata?.display_name || profile?.display_name || ''
-  );
+  // Pre-fill with whatever the greeting is actually showing, including email fallback.
+  const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
+  const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   async function saveDisplayName() {
     const name = displayName.trim();
     if (!name) return;
     setSaving(true);
-    setMsg('');
+    setSavedOk(false);
+    setErrorMsg('');
     try {
       await onUpdateDisplayName(name);
-      setMsg('Name updated.');
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 3000);
     } catch (e) {
-      setMsg(e?.message || 'Could not save. Try again.');
+      console.error('[AccountModal] updateDisplayName error:', e);
+      setErrorMsg(e?.message || 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
@@ -1798,7 +1737,7 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }
       await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin });
       setResetSent(true);
     } catch (e) {
-      setMsg(e?.message || 'Could not send reset email.');
+      setErrorMsg(e?.message || 'Could not send reset email.');
     }
   }
 
@@ -1824,19 +1763,26 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }
             <input
               type="text"
               value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
+              onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
               onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
               placeholder="Your name"
               style={{ flex: 1, padding: '9px 12px', borderRadius: 10, fontSize: 13, color: '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none' }}
               onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.3)'}
               onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
             />
-            <button onClick={saveDisplayName} disabled={saving}
-              style={{ padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, color: '#000', background: saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? '...' : 'Save'}
+            <button onClick={saveDisplayName} disabled={saving || savedOk}
+              style={{
+                padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                color: savedOk ? '#fff' : '#000',
+                background: savedOk ? 'rgba(120,220,140,0.25)' : saving ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)',
+                border: savedOk ? '1px solid rgba(120,220,140,0.5)' : 'none',
+                cursor: (saving || savedOk) ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              {savedOk ? <><Check size={13} weight="bold" style={{ color: 'rgb(120,220,140)' }} />Saved</> : saving ? '...' : 'Save'}
             </button>
           </div>
-          {msg && <p style={{ fontSize: 11, color: msg.includes('not') ? '#fca5a5' : '#86efac', marginTop: 6, fontFamily: 'monospace' }}>{msg}</p>}
+          {errorMsg && <p style={{ fontSize: 11, color: '#fca5a5', marginTop: 6, fontFamily: 'monospace' }}>{errorMsg}</p>}
         </div>
 
         {/* Divider */}
