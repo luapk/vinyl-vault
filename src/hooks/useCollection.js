@@ -126,22 +126,30 @@ export function useCollection(userId = null) {
 
   // Track db row IDs keyed by local record id so we can update/delete.
   const dbIds = useRef({});
+  // True once dbLoad has confirmed the DB has records for this user.
+  // Prevents an empty DB response from wiping a non-empty local collection.
+  const dbHasData = useRef(false);
 
   // Load from Supabase when userId arrives or changes.
   useEffect(() => {
-    if (!useDb) return;
+    if (!useDb) { dbHasData.current = false; return; }
     dbLoad(userId).then(records => {
+      if (records.length === 0 && !dbHasData.current) {
+        // DB is empty and we have never confirmed it has data for this user.
+        // Keep local collection intact rather than wiping it.
+        return;
+      }
+      dbHasData.current = records.length > 0;
       records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
       dispatch({ type: 'SET', records: records.map(r => { const c = { ...r }; delete c._dbId; return c; }) });
     }).catch(console.error);
   }, [useDb, userId]);
 
-  // Persist to localStorage when NOT using Supabase.
+  // Always persist to localStorage so logout never destroys local data.
   useEffect(() => {
-    if (useDb) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collection)); }
     catch { /* storage full */ }
-  }, [collection, useDb]);
+  }, [collection]);
 
   const addRecord = useCallback((release, crates = []) => {
     const record = recordFromRelease(release, crates);
