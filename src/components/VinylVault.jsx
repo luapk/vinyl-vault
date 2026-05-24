@@ -1835,19 +1835,29 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       const url = import.meta.env.VITE_SUPABASE_URL;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const keyPreview = key ? `${key.slice(0, 20)}...${key.slice(-6)} (${key.length} chars)` : '(not set)';
+      const isPublishable = key?.startsWith('sb_publishable_') || key?.startsWith('sb_secret_');
       lines.push(`URL: ${url || '(not set)'}`);
       lines.push(`Key: ${keyPreview}`);
-      try {
-        const payload = JSON.parse(atob(key.split('.')[1]));
-        lines.push(`Key project ref: ${payload.ref || '(not in JWT)'} | role: ${payload.role || '?'}`);
-      } catch { lines.push('Key: could not decode JWT payload'); }
+      lines.push(`Key format: ${isPublishable ? 'publishable (new)' : 'JWT (legacy)'}`);
+      if (!isPublishable) {
+        try {
+          const payload = JSON.parse(atob(key.split('.')[1]));
+          lines.push(`JWT project ref: ${payload.ref || '(missing)'} | role: ${payload.role || '?'} | alg: ${JSON.parse(atob(key.split('.')[0])).alg}`);
+        } catch { lines.push('JWT: could not decode payload'); }
+      }
       try {
         const resp = await Promise.race([
           fetch(`${url}/rest/v1/`, { headers: { apikey: key } }),
           timeout(8000),
         ]);
-        lines.push(`Server: HTTP ${resp.status}${resp.status === 401 ? ' - anon key rejected, wrong key for this project' : ''}`);
-        if (resp.status === 401) { ok = false; setDbCheck({ status: 'error', lines }); return; }
+        const body = await resp.text().catch(() => '(no body)');
+        lines.push(`Server: HTTP ${resp.status}`);
+        if (resp.status >= 400) {
+          lines.push(`Response: ${body.slice(0, 200)}`);
+          ok = false;
+          setDbCheck({ status: 'error', lines });
+          return;
+        }
       } catch (e) {
         lines.push(`Server reachable: NO - ${e.message}`);
         ok = false;
@@ -1861,9 +1871,9 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
           sb.from('records').select('id', { count: 'exact', head: true }),
           timeout(8000),
         ]);
-        if (error) { lines.push(`records table: ERROR - ${error.message}`); ok = false; }
-        else lines.push(`records table: OK (${count ?? '?'} rows)`);
-      } catch (e) { lines.push(`records table: TIMEOUT - ${e.message}`); ok = false; }
+        if (error) { lines.push(`records: ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
+        else lines.push(`records: OK (${count ?? '?'} rows)`);
+      } catch (e) { lines.push(`records: TIMEOUT - ${e.message}`); ok = false; }
 
       // Step 3: profiles table + avatar_url column
       try {
@@ -1871,10 +1881,10 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
           sb.from('profiles').select('id, avatar_url').eq('id', user?.id).single(),
           timeout(8000),
         ]);
-        if (error) { lines.push(`profiles table: ERROR - ${error.message}`); ok = false; }
-        else if (data && !('avatar_url' in data)) { lines.push(`profiles table: OK but avatar_url column missing - run migration SQL`); ok = false; }
-        else lines.push(`profiles table: OK (avatar_url column present)`);
-      } catch (e) { lines.push(`profiles table: TIMEOUT - ${e.message}`); ok = false; }
+        if (error) { lines.push(`profiles: ERROR ${error.code || ''} - ${error.message}${error.hint ? ` (${error.hint})` : ''}`); ok = false; }
+        else if (data && !('avatar_url' in data)) { lines.push(`profiles: OK but avatar_url column missing - run migration SQL`); ok = false; }
+        else lines.push(`profiles: OK (avatar_url column present)`);
+      } catch (e) { lines.push(`profiles: TIMEOUT - ${e.message}`); ok = false; }
 
       setDbCheck({ status: ok ? 'ok' : 'error', lines });
     }
