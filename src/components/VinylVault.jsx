@@ -1875,18 +1875,25 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, 
       }
 
       // Step 2a: raw fetch to records table (bypasses supabase-js entirely)
+      // Read session token from localStorage instead of sb.auth.getSession()
+      // which can hang when auth client has key/refresh issues.
       try {
-        const sessionResult = await Promise.race([sb.auth.getSession(), timeout(5000)]);
-        const session = sessionResult?.data?.session;
+        let accessToken = null;
+        try {
+          const projectRef = url.match(/https?:\/\/([^.]+)/)?.[1];
+          const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+          if (raw) accessToken = JSON.parse(raw)?.access_token || null;
+        } catch {}
         const headers = { apikey: key };
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
         const resp = await Promise.race([
           fetch(`${url}/rest/v1/records?select=id&limit=1`, { headers }),
           timeout(10000),
         ]);
         const body = await resp.text().catch(() => '');
-        lines.push(`records (raw): HTTP ${resp.status}${session ? ' [authed]' : ' [anon]'}`);
+        lines.push(`records (raw): HTTP ${resp.status}${accessToken ? ' [authed]' : ' [anon]'}`);
         if (resp.status >= 400) lines.push(`  body: ${body.slice(0, 200)}`);
+        else lines.push(`  body: ${body.slice(0, 80)}`);
       } catch (e) { lines.push(`records (raw): ${e.message}`); ok = false; }
 
       // Step 2b: records table via supabase-js
