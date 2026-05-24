@@ -106,19 +106,14 @@ export function useAuth() {
     if (!supabase) throw new Error('Supabase not configured');
     if (!user?.id) throw new Error('Not logged in');
 
-    // Optimistic update -- UI reflects the change immediately.
-    setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
+    // Avatar lives in auth user_metadata (no DB column required). Optimistic
+    // setUser ensures the header re-renders immediately, even before the
+    // network round-trip completes.
+    setUser(u => u ? { ...u, user_metadata: { ...u.user_metadata, avatar_url: avatarUrl } } : u);
 
-    // Persist in the background with a hard timeout so nothing can hang the UI.
-    const userId = user.id;
-    const deadline = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 8000)
-    );
-    Promise.race([supabase.rpc('set_own_avatar_url', { p_avatar_url: avatarUrl }), deadline])
-      .then(({ error }) => {
-        if (!error) return;
-        // RPC returned an error -- fall back to direct UPDATE.
-        return supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', userId);
+    supabase.auth.updateUser({ data: { avatar_url: avatarUrl } })
+      .then(({ data, error }) => {
+        if (!error && data?.user) setUser(data.user);
       })
       .catch(err => console.error('Avatar persist failed:', err));
   }, [user]);
