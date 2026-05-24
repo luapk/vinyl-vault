@@ -278,7 +278,7 @@ function getGreeting(name) {
 }
 
 export default function VinylVault() {
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName } = useAuth();
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -644,6 +644,7 @@ export default function VinylVault() {
           profile={profile}
           onClose={() => setShowAccount(false)}
           onSignOut={() => { setShowAccount(false); signOut(); }}
+          onUpdateDisplayName={updateDisplayName}
         />
       )}
     </div>
@@ -669,9 +670,9 @@ function MigrationBanner({ onMigrate, onDismiss }) {
         setTimeout(onDismiss, 1800);
         return;
       }
-      setError('Could not move records. Check your connection and try again.');
-    } catch {
-      setError('Something went wrong. Try again.');
+      setError('Nothing to move.');
+    } catch (e) {
+      setError(e?.message || 'Something went wrong. Try again.');
     } finally {
       setBusy(false);
     }
@@ -1768,7 +1769,7 @@ function PriceGraph({ price, accentRGB }) {
 
 // ----- AccountModal -----------------------------------------------------------
 
-function AccountModal({ user, profile, onClose, onSignOut }) {
+function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }) {
   const [displayName, setDisplayName] = useState(
     user?.user_metadata?.display_name || profile?.display_name || ''
   );
@@ -1777,16 +1778,15 @@ function AccountModal({ user, profile, onClose, onSignOut }) {
   const [msg, setMsg] = useState('');
 
   async function saveDisplayName() {
-    if (!displayName.trim()) return;
+    const name = displayName.trim();
+    if (!name) return;
     setSaving(true);
     setMsg('');
     try {
-      const { supabase } = await import('../lib/supabase.js');
-      const { error } = await supabase.auth.updateUser({ data: { display_name: displayName.trim() } });
-      if (error) throw error;
+      await onUpdateDisplayName(name);
       setMsg('Name updated.');
-    } catch {
-      setMsg('Could not save. Try again.');
+    } catch (e) {
+      setMsg(e?.message || 'Could not save. Try again.');
     } finally {
       setSaving(false);
     }
@@ -1797,8 +1797,8 @@ function AccountModal({ user, profile, onClose, onSignOut }) {
       const { supabase } = await import('../lib/supabase.js');
       await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin });
       setResetSent(true);
-    } catch {
-      setMsg('Could not send reset email.');
+    } catch (e) {
+      setMsg(e?.message || 'Could not send reset email.');
     }
   }
 

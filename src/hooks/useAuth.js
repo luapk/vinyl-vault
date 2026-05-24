@@ -93,7 +93,16 @@ export function useAuth() {
     await supabase.auth.signOut();
   }, []);
 
+  const updateDisplayName = useCallback(async (name) => {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.updateUser({ data: { display_name: name } });
+    if (error) throw error;
+    // Force-refresh user state so display name and greeting update immediately.
+    const { data: { user: refreshed } } = await supabase.auth.getUser();
+    if (refreshed) setUser(refreshed);
+  }, []);
+
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled };
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName };
 }

@@ -192,17 +192,13 @@ export function useCollection(userId = null) {
     if (!local.length) return 0;
     let count = 0;
     for (const record of local) {
-      try {
-        const dbId = await dbInsert(userId, record);
-        dbIds.current[record.id] = dbId;
-        count++;
-        onProgress?.(count, local.length);
-      } catch { /* skip duplicates */ }
+      const dbId = await dbInsert(userId, record);
+      dbIds.current[record.id] = dbId;
+      count++;
+      onProgress?.(count, local.length);
     }
-    if (count > 0) {
-      dispatch({ type: 'SET', records: local });
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    dispatch({ type: 'SET', records: local });
+    localStorage.removeItem(STORAGE_KEY);
     return count;
   }, [useDb, userId]);
 
