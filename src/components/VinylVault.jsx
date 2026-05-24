@@ -881,7 +881,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           </div>
 
           {/* Image strip */}
-          {images.length > 1 && (
+          {images.length > 0 && (
             <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
               {images.map((src, i) => (
                 <button key={i} onClick={() => setImgIdx(i)} className="relative shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all"

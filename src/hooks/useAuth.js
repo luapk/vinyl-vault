@@ -104,13 +104,10 @@ export function useAuth() {
 
   const updateAvatar = useCallback(async (avatarUrl) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ avatar_url: avatarUrl })
-      .eq('id', user?.id);
+    const { error } = await supabase.rpc('set_own_avatar_url', { p_avatar_url: avatarUrl });
     if (error) throw error;
     setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
-  }, [user]);
+  }, []);
 
   const isAdmin = profile?.role === 'admin';
 

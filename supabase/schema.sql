@@ -117,3 +117,22 @@ create trigger records_updated_at
 --
 --   update public.profiles set role = 'admin'
 --   where email = 'admin@vault.local';
+
+-- ─── Avatar RPC (bypasses UPDATE RLS entirely) ────────────────────────────────
+-- Security definer means this runs as the postgres role, not the caller,
+-- so it can update profiles regardless of the UPDATE policy.
+-- auth.uid() inside the function still returns the calling user's ID.
+create or replace function public.set_own_avatar_url(p_avatar_url text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update profiles set avatar_url = p_avatar_url where id = auth.uid();
+end;
+$$;
+
+-- Migration for existing databases (run this in Supabase SQL editor):
+-- create or replace function public.set_own_avatar_url(p_avatar_url text)
+-- returns void language plpgsql security definer set search_path = public as $$
+-- begin
+--   update profiles set avatar_url = p_avatar_url where id = auth.uid();
+-- end;
+-- $$;
