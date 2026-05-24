@@ -18,15 +18,20 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- is_admin() must be defined BEFORE policies that reference it. Inline EXISTS
+-- queries against public.profiles would otherwise recurse through the SELECT
+-- policy. SECURITY DEFINER lets the helper bypass RLS for the admin lookup.
+create or replace function public.is_admin()
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  );
+$$;
+
 -- Users can read their own profile; admins can read all profiles.
 create policy "profiles_select" on public.profiles
-  for select using (
-    auth.uid() = id
-    or exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  for select using (auth.uid() = id or public.is_admin());
 
 -- Users can update their own profile (display name, avatar, etc.).
 create policy "profiles_self_update" on public.profiles
@@ -34,17 +39,14 @@ create policy "profiles_self_update" on public.profiles
 
 -- Admins can update any profile (e.g. change roles).
 create policy "profiles_admin_update" on public.profiles
-  for update using (
-    exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
-    )
-  );
+  for update using (public.is_admin());
 
--- Migration for existing databases (replace old profiles_update policy):
--- drop policy if exists "profiles_update" on public.profiles;
--- create policy "profiles_self_update" on public.profiles for update using (auth.uid() = id);
--- create policy "profiles_admin_update" on public.profiles for update using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
+-- Migration for existing databases (run in Supabase SQL editor):
+-- create or replace function public.is_admin() returns boolean language sql security definer stable set search_path = public as $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'); $$;
+-- drop policy if exists "profiles_select" on public.profiles;
+-- drop policy if exists "profiles_admin_update" on public.profiles;
+-- create policy "profiles_select" on public.profiles for select using (auth.uid() = id or public.is_admin());
+-- create policy "profiles_admin_update" on public.profiles for update using (public.is_admin());
 
 -- ─── Auto-create profile on sign-up ───────────────────────────────────────────
 create or replace function public.handle_new_user()
