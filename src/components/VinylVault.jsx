@@ -483,7 +483,9 @@ export default function VinylVault() {
           q[i] = { ...q[i], status: "complete", release: data.release };
           const batchRelease = !data.release.coverUrl && dataUrl ? { ...data.release, coverUrl: dataUrl } : data.release;
           syncQueue(q);
-          addRecord(batchRelease, data.release.topGenres || []);
+          // Crates are user-organisational, not derived from metadata. Genres
+          // already flow into the record's tags inside recordFromRelease.
+          addRecord(batchRelease, []);
         } else if (data.status === "disambiguation") {
           q[i] = { ...q[i], status: "disambiguation", candidates: data.candidates, vision: data.vision };
           syncQueue(q);
@@ -522,7 +524,7 @@ export default function VinylVault() {
         latest[itemIdx] = { ...latest[itemIdx], status: "complete", release: data.release };
         const disambigScanUrl = latest[itemIdx].imageUrl;
         const disambigRelease = !data.release.coverUrl && disambigScanUrl ? { ...data.release, coverUrl: disambigScanUrl } : data.release;
-        addRecord(disambigRelease, data.release.topGenres || []);
+        addRecord(disambigRelease, []);
       } else {
         latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
