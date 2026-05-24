@@ -2336,7 +2336,7 @@ function AboutView({ accentRGB }) {
         </div>
 
         <div className="pt-2 border-t border-white/[0.06] text-[11px] text-white/20 font-mono leading-relaxed">
-          Your collection is stored locally in your browser and never leaves your device. No account required.
+          Your collection is stored locally and synced to your account across devices.
         </div>
       </div>
     </div>
