@@ -9,8 +9,12 @@ create table if not exists public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   email       text not null,
   role        text not null default 'user' check (role in ('user', 'admin')),
+  avatar_url  text,
   created_at  timestamptz not null default now()
 );
+
+-- Migration for existing databases:
+-- alter table public.profiles add column if not exists avatar_url text;
 
 alter table public.profiles enable row level security;
 
@@ -24,14 +28,23 @@ create policy "profiles_select" on public.profiles
     )
   );
 
--- Only admins can update any profile (e.g. change roles).
-create policy "profiles_update" on public.profiles
+-- Users can update their own profile (display name, avatar, etc.).
+create policy "profiles_self_update" on public.profiles
+  for update using (auth.uid() = id);
+
+-- Admins can update any profile (e.g. change roles).
+create policy "profiles_admin_update" on public.profiles
   for update using (
     exists (
       select 1 from public.profiles p
       where p.id = auth.uid() and p.role = 'admin'
     )
   );
+
+-- Migration for existing databases (replace old profiles_update policy):
+-- drop policy if exists "profiles_update" on public.profiles;
+-- create policy "profiles_self_update" on public.profiles for update using (auth.uid() = id);
+-- create policy "profiles_admin_update" on public.profiles for update using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 -- ─── Auto-create profile on sign-up ───────────────────────────────────────────
 create or replace function public.handle_new_user()

@@ -64,6 +64,29 @@ const extractDominantColor = (imageSrc) =>
     img.src = imageSrc;
   });
 
+const resizeAvatar = (file, size = 160) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const { width, height } = img;
+        const minDim = Math.min(width, height);
+        const sx = (width - minDim) / 2;
+        const sy = (height - minDim) / 2;
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 const camelotColor = (key) => {
   if (!key) return "rgb(120,120,130)";
   const num = parseInt(key, 10);
@@ -266,7 +289,7 @@ function getGreeting(name) {
 }
 
 export default function VinylVault() {
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateAvatar } = useAuth();
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -556,9 +579,14 @@ export default function VinylVault() {
         {/* Account button */}
         {isSupabaseEnabled && user && (
           <button onClick={() => setShowAccount(true)} title="Account settings"
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white/30 hover:text-white/70 transition-colors shrink-0"
-            style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-            <GearSix size={13} />
+            className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center shrink-0 transition-opacity hover:opacity-70"
+            style={{ border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)" }}>
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+              : <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(255,255,255,0.45)', lineHeight: 1 }}>
+                  {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
+                </span>
+            }
           </button>
         )}
       </header>
@@ -613,6 +641,7 @@ export default function VinylVault() {
           onClose={() => setShowAccount(false)}
           onSignOut={() => { setShowAccount(false); signOut(); }}
           onUpdateDisplayName={updateDisplayName}
+          onUpdateAvatar={updateAvatar}
         />
       )}
     </div>
@@ -1707,14 +1736,50 @@ function PriceGraph({ price, accentRGB }) {
 
 // ----- AccountModal -----------------------------------------------------------
 
-function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }) {
-  // Pre-fill with whatever the greeting is actually showing, including email fallback.
+function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName, onUpdateAvatar }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarSavedOk, setAvatarSavedOk] = useState(false);
+  const avatarInputRef = useRef(null);
+
+  const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
+
+  async function handleAvatarFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const resized = await resizeAvatar(file);
+      setAvatarPreview(resized);
+      setAvatarSavedOk(false);
+      setAvatarSaving(true);
+      await onUpdateAvatar(resized);
+      setAvatarSavedOk(true);
+      setTimeout(() => setAvatarSavedOk(false), 3000);
+    } catch (err) {
+      setErrorMsg(err?.message || 'Could not save photo.');
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  async function removeAvatar() {
+    setAvatarSaving(true);
+    try {
+      await onUpdateAvatar(null);
+      setAvatarPreview(null);
+    } catch (err) {
+      setErrorMsg(err?.message || 'Could not remove photo.');
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
 
   async function saveDisplayName() {
     const name = displayName.trim();
@@ -1755,6 +1820,48 @@ function AccountModal({ user, profile, onClose, onSignOut, onUpdateDisplayName }
         <div className="flex items-center justify-between mb-5">
           <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Account</h2>
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors"><X size={16} /></button>
+        </div>
+
+        {/* Avatar */}
+        <div className="flex flex-col items-center mb-6">
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            className="relative w-20 h-20 rounded-full overflow-hidden flex items-center justify-center mb-3 transition-opacity hover:opacity-80"
+            style={{ border: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}
+            disabled={avatarSaving}>
+            {avatarPreview
+              ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
+              : <span style={{ fontSize: 28, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(255,255,255,0.35)' }}>{initials}</span>
+            }
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-full"
+              style={{ background: 'rgba(0,0,0,0.55)' }}>
+              {avatarSaving
+                ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>...</span>
+                : <span style={{ fontSize: 10, color: '#fff', fontFamily: 'monospace', letterSpacing: '0.1em' }}>CHANGE</span>
+              }
+            </div>
+          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => avatarInputRef.current?.click()} disabled={avatarSaving}
+              style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              {avatarPreview ? 'Change photo' : 'Upload photo'}
+            </button>
+            {avatarPreview && (
+              <>
+                <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 11 }}>|</span>
+                <button onClick={removeAvatar} disabled={avatarSaving}
+                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Remove
+                </button>
+              </>
+            )}
+          </div>
+          {avatarSavedOk && (
+            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgb(120,220,140)', marginTop: 6, fontFamily: 'monospace' }}>
+              <Check size={12} weight="bold" />Photo saved.
+            </p>
+          )}
         </div>
 
         <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)', marginBottom: 20 }}>{user.email}</p>

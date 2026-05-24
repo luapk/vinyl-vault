@@ -19,7 +19,7 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, role')
+      .select('id, email, role, avatar_url')
       .eq('id', userId)
       .single();
     return data || null;
@@ -102,7 +102,17 @@ export function useAuth() {
     if (data?.user) setUser(data.user);
   }, []);
 
+  const updateAvatar = useCallback(async (avatarUrl) => {
+    if (!supabase) throw new Error('Supabase not configured');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', user?.id);
+    if (error) throw error;
+    setProfile(p => p ? { ...p, avatar_url: avatarUrl } : p);
+  }, [user]);
+
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName };
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateAvatar };
 }
