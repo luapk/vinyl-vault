@@ -1504,6 +1504,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   );
   const [localAccent, setLocalAccent] = useState(accentRGB);
   const [crateInput, setCrateInput] = useState('');
+  const [showCrateEditor, setShowCrateEditor] = useState(false);
   const recordCrates = record.crates || [];
   const genreChips = GENRE_CRATES.filter(g => !recordCrates.includes(g));
   const otherCrates = allCrates.filter(c => !recordCrates.includes(c) && !GENRE_CRATES.includes(c));
@@ -1665,44 +1666,52 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                     </button>
                   );
                 })}
-                {recordCrates.length === 0 && (
+                {recordCrates.length === 0 && !showCrateEditor && (
                   <span className="text-[10px] font-mono text-white/25">Not in any crate yet.</span>
                 )}
-              </div>
-              {/* Genre list */}
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {genreChips.map((g) => (
-                  <button key={g} onClick={() => toggleRecordCrate(g)}
-                    className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
-                    style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.32)' }}>
-                    <Plus size={9} />{g}
-                  </button>
-                ))}
-              </div>
-              {/* Custom crates */}
-              {otherCrates.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {otherCrates.map((c) => (
-                    <button key={c} onClick={() => toggleRecordCrate(c)}
-                      className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
-                      style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)' }}>
-                      <Plus size={10} />{c}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addNewCrate()}
-                  placeholder={otherCrates.length > 0 ? 'Or create a new crate...' : 'Create a crate...'}
-                  className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/65 placeholder-white/20 outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }} />
-                <button onClick={addNewCrate}
-                  className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70"
-                  style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.40)', background: 'transparent' }}>
-                  Add
+                <button onClick={() => { setShowCrateEditor(p => !p); setCrateInput(''); }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all"
+                  style={{ border: `1px solid ${showCrateEditor ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, color: showCrateEditor ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.28)', background: 'transparent' }}>
+                  {showCrateEditor ? <X size={9} /> : <Plus size={9} />}
+                  {showCrateEditor ? 'Done' : 'Edit'}
                 </button>
               </div>
+              {showCrateEditor && (
+                <div className="space-y-2 mt-1">
+                  <div className="flex flex-wrap gap-1.5">
+                    {genreChips.map((g) => (
+                      <button key={g} onClick={() => toggleRecordCrate(g)}
+                        className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
+                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.32)' }}>
+                        <Plus size={9} />{g}
+                      </button>
+                    ))}
+                  </div>
+                  {otherCrates.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {otherCrates.map((c) => (
+                        <button key={c} onClick={() => toggleRecordCrate(c)}
+                          className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.35)' }}>
+                          <Plus size={10} />{c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && addNewCrate()}
+                      placeholder="Create a custom crate..."
+                      className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/65 placeholder-white/20 outline-none"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }} />
+                    <button onClick={addNewCrate}
+                      className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70"
+                      style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.40)', background: 'transparent' }}>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             {record.tags && record.tags.length > 0 && (
               <div className="mt-2">
