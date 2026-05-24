@@ -406,9 +406,10 @@ export default function VinylVault() {
     }
   };
 
-  const saveRecord = () => {
+  const saveRecord = (selectedCover) => {
     if (!release) return;
-    const toSave = !release.coverUrl && imageUrl ? { ...release, coverUrl: imageUrl } : release;
+    const coverUrl = selectedCover || release.coverUrl || imageUrl || null;
+    const toSave = { ...release, coverUrl };
     addRecord(toSave, pendingCrates);
     setSavedId(`${release.artist}|${release.title}`);
     playSaveChime();
@@ -773,6 +774,17 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
   const images = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
   const displayImage = images[imgIdx] || imageUrl;
 
+  // Swipe support for the main image
+  const imgSwipeStartX = useRef(null);
+  const onImgTouchStart = (e) => { imgSwipeStartX.current = e.touches[0].clientX; };
+  const onImgTouchEnd = (e) => {
+    if (imgSwipeStartX.current === null || images.length <= 1) return;
+    const delta = e.changedTouches[0].clientX - imgSwipeStartX.current;
+    imgSwipeStartX.current = null;
+    if (delta < -40) setImgIdx(i => Math.min(i + 1, images.length - 1));
+    else if (delta > 40) setImgIdx(i => Math.max(i - 1, 0));
+  };
+
   const playPreview = (url) => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (playingPreview === url) { setPlayingPreview(null); return; }
@@ -829,7 +841,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10">
         {/* Image gallery */}
         <div className="relative">
-          <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 90px -20px rgba(${accentRGB},0.45), 0 0 0 1px rgba(255,255,255,0.07)` }}>
+          <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 90px -20px rgba(${accentRGB},0.45), 0 0 0 1px rgba(255,255,255,0.07)` }} onTouchStart={onImgTouchStart} onTouchEnd={onImgTouchEnd}>
             {displayImage ? (
               <img src={displayImage} alt={release.title} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { if (imageUrl && e.target.src !== imageUrl) e.target.src = imageUrl; }} />
             ) : (
@@ -844,8 +856,14 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           {images.length > 1 && (
             <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
               {images.map((src, i) => (
-                <button key={i} onClick={() => setImgIdx(i)} className="shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all" style={{ opacity: imgIdx === i ? 1 : 0.4, border: imgIdx === i ? `1px solid rgba(${accentRGB},0.6)` : "1px solid rgba(255,255,255,0.08)", boxShadow: imgIdx === i ? `0 0 10px -2px rgba(${accentRGB},0.4)` : "none" }}>
+                <button key={i} onClick={() => setImgIdx(i)} className="relative shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all"
+                  style={{ opacity: imgIdx === i ? 1 : 0.45, border: imgIdx === i ? "1px solid rgba(120,220,140,0.70)" : "1px solid rgba(255,255,255,0.08)", boxShadow: imgIdx === i ? "0 0 10px -2px rgba(120,220,140,0.45)" : "none" }}>
                   <img src={src} alt="" className="w-full h-full object-cover" />
+                  {imgIdx === i && (
+                    <div className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "rgba(60,190,90,0.95)", border: "1px solid rgba(255,255,255,0.30)" }}>
+                      <Check size={9} weight="bold" style={{ color: "#fff" }} />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -907,7 +925,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          <button onClick={onSave} disabled={saved} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
+          <button onClick={() => onSave(images[imgIdx] || imageUrl)} disabled={saved} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
             style={saved
               ? { background: "rgba(120,220,140,0.10)", border: "1px solid rgba(120,220,140,0.30)", color: "rgb(120,220,140)" }
               : { background: `linear-gradient(135deg, rgba(${accentRGB},0.22), rgba(${accentRGB},0.08))`, border: `1px solid rgba(${accentRGB},0.35)`, color: "#fff", boxShadow: `0 0 20px -6px rgba(${accentRGB},0.4)` }
