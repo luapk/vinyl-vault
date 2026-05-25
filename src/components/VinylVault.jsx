@@ -1287,8 +1287,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
   const isDragging = visualDelta !== 0;
 
   // Close picker when navigating to a different record
-  const prevIndexRef = useRef(index);
-  if (prevIndexRef.current !== index) { prevIndexRef.current = index; if (showCratePicker) setShowCratePicker(false); }
+  useEffect(() => { setShowCratePicker(false); }, [index]);
 
   return (
     <div className="select-none">
