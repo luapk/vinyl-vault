@@ -1466,7 +1466,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
         )}
         {!selectMode && (
           <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "rgba(0,0,0,0.35)" }}>
-            <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/75 flex items-center justify-center">
+            <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/75 flex items-center justify-center">
               <X size={10} weight="bold" className="text-white" />
             </button>
           </div>
@@ -1760,7 +1760,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         )}
 
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <button onClick={onRemove} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
+          <button onClick={() => { if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
             <Trash size={12} />Remove from collection
           </button>
         </div>
@@ -2162,7 +2162,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                   ) : (
                     <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
                   )}
-                  <button onClick={() => onDelete(crate)} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
+                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
                 </div>
                 {/* Colour picker — only shown when editing this crate */}
                 {editingName === crate && (
