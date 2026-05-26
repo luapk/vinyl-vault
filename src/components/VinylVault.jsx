@@ -3,7 +3,7 @@ import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
-  Scan, Info, Crown, SignOut, UserCircle, GearSix,
+  Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -18,6 +18,19 @@ const GENRE_CRATES = [
   'EBM', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Funk', 'Soul', 'R&B', 'Jazz',
   'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
 ];
+
+const CONDITION_GRADES = ['', 'M', 'NM', 'VG+', 'VG', 'G+', 'G', 'F', 'P'];
+
+function conditionColor(grade) {
+  if (!grade) return null;
+  if (grade === 'M' || grade === 'NM') return '120,210,130';
+  if (grade === 'VG+' || grade === 'VG') return '220,170,60';
+  return '220,90,90';
+}
+
+function normalizeKey(artist, title) {
+  return `${artist}${title}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
 // ----- Helpers ---------------------------------------------------------------
 
@@ -449,11 +462,11 @@ export default function VinylVault() {
     }
   };
 
-  const saveRecord = (selectedCover) => {
+  const saveRecord = (selectedCover, conditions = {}) => {
     if (!release) return;
     const coverUrl = selectedCover || release.coverUrl || imageUrl || null;
     const extraImages = imageUrl ? [...(release.images || []), imageUrl] : (release.images || []);
-    const toSave = { ...release, coverUrl, images: extraImages };
+    const toSave = { ...release, coverUrl, images: extraImages, mediaCondition: conditions.mediaCondition || '', sleeveCondition: conditions.sleeveCondition || '' };
     playSaveChime();
     addRecord(toSave, pendingCrates).catch(err => setErrorMsg(`Saved locally but failed to sync: ${err.message}`));
     setSavedId(`${release.artist}|${release.title}`);
@@ -562,6 +575,7 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
+    { id: "stats", label: "Stats", icon: ChartBar },
     { id: "about", label: "About", icon: Info },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
@@ -633,7 +647,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} collection={collection} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
@@ -644,6 +658,7 @@ export default function VinylVault() {
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
         )}
+        {appView === "stats" && <StatsView collection={collection} accentRGB={accentRGB} />}
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
@@ -803,13 +818,15 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, collection = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
   const [imgIdx, setImgIdx] = useState(0);
   const [bpmDetecting, setBpmDetecting] = useState(new Set());
   const bpmTriedRef = useRef(new Set());
+  const [pendingMedia, setPendingMedia] = useState('');
+  const [pendingSleeve, setPendingSleeve] = useState('');
 
   const releaseKey = `${release?.discogsId || release?.artist}|${release?.title}`;
   useEffect(() => {
@@ -870,8 +887,22 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
   // Custom crates from existing collection (non-genre) minus already-pending
   const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c));
 
+  const duplicate = release && collection.find(r =>
+    (release.id && r.discogsId && String(r.discogsId) === String(release.id)) ||
+    normalizeKey(r.artist, r.title) === normalizeKey(release.artist || '', release.title || '')
+  );
+
   return (
     <div className="pt-6 md:pt-10 space-y-6" style={{ animation: "fadeUp 0.6s ease-out" }}>
+      {/* Duplicate warning */}
+      {duplicate && !saved && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 12, background: 'rgba(240,190,60,0.07)', border: '1px solid rgba(240,190,60,0.22)' }}>
+          <span style={{ fontSize: 14, color: 'rgba(240,190,60,0.85)' }}>!</span>
+          <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(240,190,60,0.85)' }}>
+            You already own this -- <span style={{ fontStyle: 'italic' }}>{duplicate.artist}</span> {duplicate.title}
+          </div>
+        </div>
+      )}
       {/* Top bar */}
       <div className="flex items-center">
         <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(255,255,255,0.13)", color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.04)" }}>
@@ -979,7 +1010,16 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl)} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
+          {/* Grade before saving */}
+          {!saved && (
+            <div className="flex items-center gap-4 py-1">
+              <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>Grade</span>
+              <ConditionSelect label="Vinyl" value={pendingMedia} onChange={setPendingMedia} />
+              <ConditionSelect label="Sleeve" value={pendingSleeve} onChange={setPendingSleeve} />
+            </div>
+          )}
+
+          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
             style={saved
               ? { background: "rgba(100,210,120,0.18)", border: "1px solid rgba(100,210,120,0.50)", color: "rgb(140,230,160)", boxShadow: "0 0 24px -8px rgba(100,210,120,0.4)" }
               : { background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
@@ -1483,6 +1523,11 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
             !
           </div>
         )}
+        {record.mediaCondition && !selectMode && (
+          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${conditionColor(record.mediaCondition)},0.18)`, border: `1px solid rgba(${conditionColor(record.mediaCondition)},0.35)`, color: `rgb(${conditionColor(record.mediaCondition)})`, pointerEvents: 'none' }}>
+            {record.mediaCondition}
+          </div>
+        )}
       </div>
       <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
       <div className="text-[10px] text-white/40 truncate font-mono">{record.title}</div>
@@ -1646,6 +1691,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             <div className="flex flex-wrap gap-1.5 mb-3">
               {record.label && <Pill label="Label" value={record.label} />}
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
+            </div>
+            <div className="flex items-center gap-4 mb-3">
+              <ConditionSelect label="Vinyl" value={record.mediaCondition || ''} onChange={v => onUpdate?.(record.id, { mediaCondition: v })} />
+              <ConditionSelect label="Sleeve" value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
             </div>
             <div>
               <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
@@ -2288,6 +2337,152 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
   );
 }
 
+// ----- StatsView -------------------------------------------------------------
+
+function StatsView({ collection, accentRGB }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  if (collection.length === 0) {
+    return (
+      <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto" style={{ animation: "fadeUp 0.5s ease-out" }}>
+        <ChartBar size={36} weight="thin" className="opacity-20 mb-4" />
+        <p className="text-white/30 text-sm font-mono">No records yet. Scan something first.</p>
+      </div>
+    );
+  }
+
+  const total = collection.length;
+  const allCratesSet = [...new Set(collection.flatMap(r => r.crates || []))];
+  const totalCrates = allCratesSet.length;
+  const identifiedCount = collection.filter(r => r.identified).length;
+  const gradedCount = collection.filter(r => r.mediaCondition || r.sleeveCondition).length;
+  const pctIdentified = Math.round(identifiedCount / total * 100);
+  const pctGraded = Math.round(gradedCount / total * 100);
+
+  const genreCounts = {};
+  collection.forEach(r => (r.genres || []).forEach(g => { genreCounts[g] = (genreCounts[g] || 0) + 1; }));
+  const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const maxGenre = topGenres[0]?.[1] || 1;
+
+  const decadeCounts = { '60s': 0, '70s': 0, '80s': 0, '90s': 0, '00s': 0, '10s': 0, '20s': 0 };
+  collection.forEach(r => {
+    const y = parseInt(r.year);
+    if (!y) return;
+    if (y < 1970) decadeCounts['60s']++;
+    else if (y < 1980) decadeCounts['70s']++;
+    else if (y < 1990) decadeCounts['80s']++;
+    else if (y < 2000) decadeCounts['90s']++;
+    else if (y < 2010) decadeCounts['00s']++;
+    else if (y < 2020) decadeCounts['10s']++;
+    else decadeCounts['20s']++;
+  });
+  const maxDecade = Math.max(...Object.values(decadeCounts), 1);
+
+  const labelCounts = {};
+  collection.forEach(r => { if (r.label) labelCounts[r.label] = (labelCounts[r.label] || 0) + 1; });
+  const topLabels = Object.entries(labelCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const crateSizes = allCratesSet
+    .map(c => ({ name: c, count: collection.filter(r => (r.crates || []).includes(c)).length }))
+    .sort((a, b) => b.count - a.count);
+
+  const barTrack = { flex: 1, position: 'relative', height: 20, borderRadius: 4 };
+  const barBg = (rgb) => ({ position: 'absolute', inset: 0, background: `rgba(${rgb},0.04)`, border: `1px solid rgba(${rgb},0.08)`, borderRadius: 4 });
+  const barFill = (pct, rgb, delay = 0) => ({ position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4, width: ready ? `${pct * 100}%` : '0%', transition: `width 0.55s cubic-bezier(0.4,0,0.2,1) ${delay}s`, background: `linear-gradient(90deg, rgba(${rgb},0.22), rgba(${rgb},0.50))`, boxShadow: `0 0 14px -3px rgba(${rgb},0.4)` });
+
+  return (
+    <div className="pt-8 md:pt-12 space-y-5 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
+      <div className="text-[10px] tracking-[0.35em] uppercase mb-2 text-white/25 font-mono">Collection Stats</div>
+
+      {/* Header stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Records', value: total },
+          { label: 'Crates', value: totalCrates },
+          { label: 'Identified', value: `${pctIdentified}%` },
+          { label: 'Graded', value: `${pctGraded}%` },
+        ].map(({ label, value }) => (
+          <div key={label} style={{ padding: '14px 18px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 28, fontFamily: 'monospace', color: `rgb(${accentRGB})`, lineHeight: 1 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Genres */}
+      {topGenres.length > 0 && (
+        <GlassSection title="Genres" accentRGB={accentRGB}>
+          <div className="space-y-2">
+            {topGenres.map(([genre, count], i) => (
+              <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
+                <div style={barTrack}>
+                  <div style={barBg(accentRGB)} />
+                  <div style={barFill(count / maxGenre, accentRGB, i * 0.04)} />
+                </div>
+                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+              </div>
+            ))}
+          </div>
+        </GlassSection>
+      )}
+
+      {/* Decades */}
+      {Object.values(decadeCounts).some(v => v > 0) && (
+        <GlassSection title="By Decade" accentRGB={accentRGB}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 80 }}>
+            {Object.entries(decadeCounts).map(([decade, count], i) => (
+              <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)' }}>{count || ''}</div>
+                <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: `rgba(${accentRGB},0.08)`, border: `1px solid rgba(${accentRGB},0.12)`, borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 52 }}>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.55s cubic-bezier(0.4,0,0.2,1) ${i * 0.05}s`, background: `linear-gradient(to top, rgba(${accentRGB},0.50), rgba(${accentRGB},0.22))`, boxShadow: `0 -4px 12px -3px rgba(${accentRGB},0.35)` }} />
+                </div>
+                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)' }}>{decade}</div>
+              </div>
+            ))}
+          </div>
+        </GlassSection>
+      )}
+
+      {/* Top labels */}
+      {topLabels.length > 0 && (
+        <GlassSection title="Top Labels" accentRGB={accentRGB}>
+          <div className="space-y-2">
+            {topLabels.map(([label, count], i) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
+                <div style={barTrack}>
+                  <div style={barBg(accentRGB)} />
+                  <div style={barFill(count / (topLabels[0]?.[1] || 1), accentRGB, i * 0.04)} />
+                </div>
+                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+              </div>
+            ))}
+          </div>
+        </GlassSection>
+      )}
+
+      {/* Crates */}
+      {crateSizes.length > 0 && (
+        <GlassSection title="Crates" accentRGB={accentRGB}>
+          <div className="flex flex-wrap gap-2">
+            {crateSizes.map(({ name, count }) => (
+              <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.65)' }}>{name}</span>
+                <span style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(${accentRGB},0.65)` }}>{count}</span>
+              </div>
+            ))}
+          </div>
+        </GlassSection>
+      )}
+    </div>
+  );
+}
+
 // ----- AboutView -------------------------------------------------------------
 
 function AboutView({ accentRGB }) {
@@ -2539,6 +2734,20 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
       <div className="hidden md:flex items-center justify-center">
         <PlayBtn size={9} />
       </div>
+    </div>
+  );
+}
+
+function ConditionSelect({ label, value, onChange }) {
+  const color = conditionColor(value);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)' }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: color ? `rgba(${color},0.09)` : 'rgba(255,255,255,0.04)', border: `1px solid ${color ? `rgba(${color},0.28)` : 'rgba(255,255,255,0.10)'}`, color: color ? `rgb(${color})` : 'rgba(255,255,255,0.45)', borderRadius: 20, padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
+        {CONDITION_GRADES.map(g => (
+          <option key={g} value={g} style={{ background: '#0d0d14', color: '#ccc' }}>{g || '--'}</option>
+        ))}
+      </select>
     </div>
   );
 }

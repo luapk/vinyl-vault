@@ -31,6 +31,8 @@ function recordFromRelease(release, crates) {
     confidence: release.confidence || 'high',
     source: release.source || 'discogs',
     notes: release.notes || '',
+    mediaCondition: release.mediaCondition || '',
+    sleeveCondition: release.sleeveCondition || '',
     coverUrl: release.coverUrl || null,
     images: release.images || [],
     tracklist: (release.tracklist || []).map(t => ({
@@ -247,7 +249,7 @@ export function useCollection(userId = null) {
 }
 
 export function exportCSV(collection) {
-  const cols = ['Artist','Title','Label','Cat#','Year','Country','Format','Genres','Crates','BPM','Key','Added'];
+  const cols = ['Artist','Title','Label','Cat#','Year','Country','Format','Genres','Crates','BPM','Key','Vinyl Condition','Sleeve Condition','Added'];
   const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = collection.map(r => {
     const t = r.tracklist?.[0];
@@ -257,6 +259,7 @@ export function exportCSV(collection) {
       (r.genres || []).join('; '),
       (r.crates || []).join('; '),
       t?.bpm ?? '', t?.key ?? '',
+      r.mediaCondition ?? '', r.sleeveCondition ?? '',
       new Date(r.savedAt).toISOString().slice(0, 10),
     ].map(esc).join(',');
   });
