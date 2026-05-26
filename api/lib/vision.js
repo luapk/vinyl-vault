@@ -1,8 +1,8 @@
 export const GENRE_CRATES = [
-  'Techno', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
-  'Breakbeat', 'Electro', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
-  'EBM', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Funk', 'Soul', 'R&B', 'Jazz',
-  'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
+  'Techno', 'Detroit', 'Chicago', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
+  'Breakbeat', 'Electro', 'Chuggers', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
+  'EBM', 'Wave', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Italo Disco', 'Cosmic', 'Space Disco',
+  'Funk', 'Soul', 'R&B', 'Jazz', 'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
 ];
 
 const GENRE_LIST = GENRE_CRATES.join(', ');

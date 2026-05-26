@@ -13,10 +13,10 @@ import AdminPanel from "./AdminPanel.jsx";
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
 const GENRE_CRATES = [
-  'Techno', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
-  'Breakbeat', 'Electro', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
-  'EBM', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Funk', 'Soul', 'R&B', 'Jazz',
-  'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
+  'Techno', 'Detroit', 'Chicago', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
+  'Breakbeat', 'Electro', 'Chuggers', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
+  'EBM', 'Wave', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Italo Disco', 'Cosmic', 'Space Disco',
+  'Funk', 'Soul', 'R&B', 'Jazz', 'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
 ];
 
 const CONDITION_GRADES = ['', 'M', 'NM', 'VG+', 'VG', 'G+', 'G', 'F', 'P'];
@@ -1092,7 +1092,8 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [filterCrate, setFilterCrate] = useState(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
-  const [detailRecord, setDetailRecord] = useState(null);
+  const [detailRecordId, setDetailRecordId] = useState(null);
+  const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
 
   const setCrateColor = (name, hex) => {
@@ -1196,7 +1197,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
       {/* EXPLORE MODE */}
       {collectionMode === "explore" && (
-        <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecord(r)} />
+        <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecordId(r.id)} />
       )}
 
       {/* STACKS MODE */}
@@ -1244,7 +1245,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecord(r)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1252,7 +1253,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 <RecordCard
                   key={record.id}
                   record={record}
-                  onSelect={labelSelectMode ? null : () => setDetailRecord(record)}
+                  onSelect={labelSelectMode ? null : () => setDetailRecordId(record.id)}
                   onRemove={labelSelectMode ? null : () => onRemove(record.id)}
                   accentRGB={accentRGB}
                   selectMode={labelSelectMode}
@@ -1266,7 +1267,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecord(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
       {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
       {showBatchLabelModal && (
         <BatchLabelModal
