@@ -1551,6 +1551,14 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const [localAccent, setLocalAccent] = useState(accentRGB);
   const [crateInput, setCrateInput] = useState('');
   const [showCrateEditor, setShowCrateEditor] = useState(false);
+  const [reidentifying, setReidentifying] = useState(false);
+  const [searchArtist, setSearchArtist] = useState(record.artist || '');
+  const [searchTitle, setSearchTitle] = useState(record.title || '');
+  const [searchCatno, setSearchCatno] = useState(record.catalogNumber || '');
+  const [reidentifyLoading, setReidentifyLoading] = useState(false);
+  const [reidentifyResults, setReidentifyResults] = useState(null);
+  const [reidentifyPicking, setReidentifyPicking] = useState(false);
+  const [reidentifyError, setReidentifyError] = useState(null);
   const recordCrates = record.crates || [];
   const genreChips = GENRE_CRATES.filter(g => !recordCrates.includes(g));
   const otherCrates = allCrates.filter(c => !recordCrates.includes(c) && !GENRE_CRATES.includes(c));
@@ -1641,6 +1649,63 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         tracklist: (record.tracklist || []).map((t, i) => i === trackIdx ? { ...t, hot: newHot } : t),
       });
     }
+  };
+
+  const doReidentifySearch = async () => {
+    setReidentifyLoading(true);
+    setReidentifyResults(null);
+    setReidentifyError(null);
+    try {
+      const res = await fetch('/api/discogs-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist: searchArtist, title: searchTitle, catalogNumber: searchCatno }),
+      });
+      const data = await res.json();
+      setReidentifyResults(data.matches || []);
+    } catch (err) {
+      setReidentifyError('Search failed. Check your connection.');
+    }
+    setReidentifyLoading(false);
+  };
+
+  const pickReidentifyCandidate = async (candidate) => {
+    setReidentifyPicking(true);
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discogsId: candidate.id }),
+      });
+      const data = await res.json();
+      if (data.release && onUpdate) {
+        const r = data.release;
+        onUpdate(record.id, {
+          discogsId: r.id || candidate.id,
+          artist: r.artist || record.artist,
+          title: r.title || record.title,
+          label: r.label ?? record.label,
+          catalogNumber: r.catalogNumber ?? record.catalogNumber,
+          year: r.year ?? record.year,
+          country: r.country ?? record.country,
+          format: r.format ?? record.format,
+          genres: r.genres?.length ? r.genres : record.genres,
+          tracklist: r.tracklist?.length ? r.tracklist : record.tracklist,
+          coverUrl: r.coverUrl || record.coverUrl,
+          images: r.images?.length ? r.images : record.images,
+          identified: true,
+          confidence: 'high',
+          source: r.source || 'discogs',
+          notes: r.notes || '',
+        });
+        if (r.coverUrl) extractDominantColor(r.coverUrl).then(setLocalAccent).catch(() => {});
+      }
+      setReidentifying(false);
+      setReidentifyResults(null);
+    } catch (err) {
+      setReidentifyError('Failed to load release details.');
+    }
+    setReidentifyPicking(false);
   };
 
   return (
@@ -1807,9 +1872,50 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
           </div>
         )}
 
+        {/* Re-identify panel */}
+        {reidentifying && (
+          <div className="mb-5 p-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="text-[9px] tracking-[0.22em] uppercase font-mono text-white/25 mb-3">Find correct release</div>
+            <div className="flex flex-col gap-2 mb-3">
+              {[
+                { label: 'Artist', val: searchArtist, set: setSearchArtist },
+                { label: 'Title', val: searchTitle, set: setSearchTitle },
+                { label: 'Cat #', val: searchCatno, set: setSearchCatno },
+              ].map(({ label, val, set }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span style={{ width: 40, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', flexShrink: 0 }}>{label}</span>
+                  <input value={val} onChange={e => set(e.target.value)} onKeyDown={e => e.key === 'Enter' && doReidentifySearch()} className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/70 placeholder-white/20 outline-none" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }} />
+                </div>
+              ))}
+            </div>
+            <button onClick={doReidentifySearch} disabled={reidentifyLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all disabled:opacity-40" style={{ background: `rgba(${localAccent},0.12)`, border: `1px solid rgba(${localAccent},0.25)`, color: `rgb(${localAccent})` }}>
+              {reidentifyLoading ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: `rgba(${localAccent},0.4)`, borderTopColor: 'transparent' }} />Searching...</> : <><MagnifyingGlass size={12} />Search Discogs</>}
+            </button>
+            {reidentifyError && <div className="mt-2 text-[10px] font-mono text-red-400/70">{reidentifyError}</div>}
+            {reidentifyResults !== null && reidentifyResults.length === 0 && !reidentifyLoading && (
+              <div className="mt-3 text-[11px] font-mono text-white/30">No results found. Try different search terms.</div>
+            )}
+            {reidentifyResults && reidentifyResults.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {reidentifyResults.map(c => (
+                  <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={reidentifyPicking} className="text-left p-2.5 rounded-xl text-[10px] transition-all hover:bg-white/5 disabled:opacity-40" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+                    {c.coverUrl && <img src={c.coverUrl} alt="" className="w-full aspect-square object-cover rounded-lg mb-1.5 opacity-80" />}
+                    <div className="font-mono text-white/60 truncate">{c.artist}</div>
+                    <div className="text-white/40 truncate">{c.recordTitle}</div>
+                    <div className="text-white/25 font-mono text-[9px] mt-0.5">{[c.catalogNumber, c.year].filter(Boolean).join(' · ')}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-3 flex-wrap">
           <button onClick={() => { if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
             <Trash size={12} />Remove from collection
+          </button>
+          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: reidentifying ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.30)', border: reidentifying ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(255,255,255,0.08)', background: 'transparent' }}>
+            <Scan size={12} />Re-identify
           </button>
         </div>
         </div>{/* end px-6 content wrapper */}
