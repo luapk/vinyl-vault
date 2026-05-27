@@ -2446,6 +2446,41 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
 
 // ----- StatsView -------------------------------------------------------------
 
+const STAT_PALETTE = [
+  '120, 180, 255',
+  '255, 150, 190',
+  '185, 155, 255',
+  '100, 220, 245',
+  '255, 165, 135',
+  '130, 235, 200',
+  '255, 185, 215',
+  '155, 170, 255',
+];
+
+function StatCard({ label, target, suffix = '', color, ready }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!ready) return;
+    let raf;
+    const start = performance.now();
+    const tick = (now) => {
+      const p = Math.min((now - start) / 750, 1);
+      const eased = 1 - Math.pow(1 - p, 4);
+      setVal(Math.round(eased * target));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, ready]);
+
+  return (
+    <div style={{ padding: '14px 18px', borderRadius: 16, background: `rgba(${color},0.06)`, border: `1px solid rgba(${color},0.20)`, boxShadow: `0 0 30px -10px rgba(${color},0.25)` }}>
+      <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: `rgba(${color},0.55)`, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 28, fontFamily: 'monospace', color: `rgb(${color})`, lineHeight: 1, textShadow: `0 0 24px rgba(${color},0.5)` }}>{val}{suffix}</div>
+    </div>
+  );
+}
+
 function StatsView({ collection, accentRGB }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -2498,91 +2533,99 @@ function StatsView({ collection, accentRGB }) {
     .sort((a, b) => b.count - a.count);
 
   const barTrack = { flex: 1, position: 'relative', height: 20, borderRadius: 4 };
-  const barBg = (rgb) => ({ position: 'absolute', inset: 0, background: `rgba(${rgb},0.04)`, border: `1px solid rgba(${rgb},0.08)`, borderRadius: 4 });
-  const barFill = (pct, rgb, delay = 0) => ({ position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4, width: ready ? `${pct * 100}%` : '0%', transition: `width 0.55s cubic-bezier(0.4,0,0.2,1) ${delay}s`, background: `linear-gradient(90deg, rgba(${rgb},0.22), rgba(${rgb},0.50))`, boxShadow: `0 0 14px -3px rgba(${rgb},0.4)` });
+  const barFill = (pct, c1, c2, delay = 0) => ({
+    position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4,
+    width: ready ? `${pct * 100}%` : '0%',
+    transition: `width 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}s`,
+    background: `linear-gradient(90deg, rgba(${c1},0.65), rgba(${c2},0.90))`,
+    boxShadow: `0 0 16px -3px rgba(${c2},0.45)`,
+  });
 
   return (
     <div className="pt-8 md:pt-12 space-y-5 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
       <div className="text-[10px] tracking-[0.35em] uppercase mb-2 text-white/25 font-mono">Collection Stats</div>
 
-      {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Records', value: total },
-          { label: 'Crates', value: totalCrates },
-          { label: 'Identified', value: `${pctIdentified}%` },
-          { label: 'Graded', value: `${pctGraded}%` },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ padding: '14px 18px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 6 }}>{label}</div>
-            <div style={{ fontSize: 28, fontFamily: 'monospace', color: `rgb(${accentRGB})`, lineHeight: 1 }}>{value}</div>
-          </div>
-        ))}
+        <StatCard label="Records"    target={total}          suffix=""  color={STAT_PALETTE[0]} ready={ready} />
+        <StatCard label="Crates"     target={totalCrates}    suffix=""  color={STAT_PALETTE[1]} ready={ready} />
+        <StatCard label="Identified" target={pctIdentified}  suffix="%" color={STAT_PALETTE[2]} ready={ready} />
+        <StatCard label="Graded"     target={pctGraded}      suffix="%" color={STAT_PALETTE[3]} ready={ready} />
       </div>
 
-      {/* Genres */}
       {topGenres.length > 0 && (
         <GlassSection title="Genres" accentRGB={accentRGB}>
-          <div className="space-y-2">
-            {topGenres.map(([genre, count], i) => (
-              <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
-                <div style={barTrack}>
-                  <div style={barBg(accentRGB)} />
-                  <div style={barFill(count / maxGenre, accentRGB, i * 0.04)} />
+          <div className="space-y-2.5">
+            {topGenres.map(([genre, count], i) => {
+              const c1 = STAT_PALETTE[i % STAT_PALETTE.length];
+              const c2 = STAT_PALETTE[(i + 2) % STAT_PALETTE.length];
+              return (
+                <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: `rgba(${c1},0.85)`, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
+                  <div style={barTrack}>
+                    <div style={{ position: 'absolute', inset: 0, background: `rgba(${c1},0.05)`, border: `1px solid rgba(${c1},0.10)`, borderRadius: 4 }} />
+                    <div style={barFill(count / maxGenre, c1, c2, i * 0.04)} />
+                  </div>
+                  <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: `rgba(${c1},0.60)`, textAlign: 'right', flexShrink: 0 }}>{count}</div>
                 </div>
-                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </GlassSection>
       )}
 
-      {/* Decades */}
       {Object.values(decadeCounts).some(v => v > 0) && (
         <GlassSection title="By Decade" accentRGB={accentRGB}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 80 }}>
-            {Object.entries(decadeCounts).map(([decade, count], i) => (
-              <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)' }}>{count || ''}</div>
-                <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: `rgba(${accentRGB},0.08)`, border: `1px solid rgba(${accentRGB},0.12)`, borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 52 }}>
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.55s cubic-bezier(0.4,0,0.2,1) ${i * 0.05}s`, background: `linear-gradient(to top, rgba(${accentRGB},0.50), rgba(${accentRGB},0.22))`, boxShadow: `0 -4px 12px -3px rgba(${accentRGB},0.35)` }} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 96 }}>
+            {Object.entries(decadeCounts).map(([decade, count], i) => {
+              const c1 = STAT_PALETTE[i % STAT_PALETTE.length];
+              const c2 = STAT_PALETTE[(i + 1) % STAT_PALETTE.length];
+              return (
+                <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(${c1},0.75)` }}>{count || ''}</div>
+                  <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: `rgba(${c1},0.06)`, border: `1px solid rgba(${c1},0.12)`, borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `linear-gradient(to top, rgba(${c1},0.80), rgba(${c2},0.40))`, boxShadow: `0 -6px 16px -4px rgba(${c1},0.5)` }} />
+                  </div>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)' }}>{decade}</div>
                 </div>
-                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)' }}>{decade}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </GlassSection>
       )}
 
-      {/* Top labels */}
       {topLabels.length > 0 && (
         <GlassSection title="Top Labels" accentRGB={accentRGB}>
-          <div className="space-y-2">
-            {topLabels.map(([label, count], i) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
-                <div style={barTrack}>
-                  <div style={barBg(accentRGB)} />
-                  <div style={barFill(count / (topLabels[0]?.[1] || 1), accentRGB, i * 0.04)} />
+          <div className="space-y-2.5">
+            {topLabels.map(([label, count], i) => {
+              const c1 = STAT_PALETTE[(i + 4) % STAT_PALETTE.length];
+              const c2 = STAT_PALETTE[(i + 6) % STAT_PALETTE.length];
+              return (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: `rgba(${c1},0.85)`, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
+                  <div style={barTrack}>
+                    <div style={{ position: 'absolute', inset: 0, background: `rgba(${c1},0.05)`, border: `1px solid rgba(${c1},0.10)`, borderRadius: 4 }} />
+                    <div style={barFill(count / (topLabels[0]?.[1] || 1), c1, c2, i * 0.04)} />
+                  </div>
+                  <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: `rgba(${c1},0.60)`, textAlign: 'right', flexShrink: 0 }}>{count}</div>
                 </div>
-                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </GlassSection>
       )}
 
-      {/* Crates */}
       {crateSizes.length > 0 && (
         <GlassSection title="Crates" accentRGB={accentRGB}>
           <div className="flex flex-wrap gap-2">
-            {crateSizes.map(({ name, count }) => (
-              <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.65)' }}>{name}</span>
-                <span style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(${accentRGB},0.65)` }}>{count}</span>
-              </div>
-            ))}
+            {crateSizes.map(({ name, count }, i) => {
+              const col = STAT_PALETTE[i % STAT_PALETTE.length];
+              return (
+                <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: `rgba(${col},0.07)`, border: `1px solid rgba(${col},0.20)` }}>
+                  <span style={{ fontSize: 11, fontFamily: 'monospace', color: `rgba(${col},0.80)` }}>{name}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(${col},0.50)` }}>{count}</span>
+                </div>
+              );
+            })}
           </div>
         </GlassSection>
       )}
