@@ -1,12 +1,3 @@
-export const GENRE_CRATES = [
-  'Techno', 'Detroit', 'Chicago', 'House', 'Drum & Bass', 'Jungle', 'Garage', 'Grime', 'Dubstep',
-  'Breakbeat', 'Electro', 'Chuggers', 'Ambient', 'Downtempo', 'Trip Hop', 'IDM', 'Industrial',
-  'EBM', 'Wave', 'Trance', 'Hardcore', 'Rave', 'Disco', 'Italo Disco', 'Cosmic', 'Space Disco',
-  'Funk', 'Soul', 'R&B', 'Jazz', 'Hip Hop', 'Reggae', 'Dub', 'Latin', 'Afrobeat', 'Classical', 'Experimental',
-];
-
-const GENRE_LIST = GENRE_CRATES.join(', ');
-
 const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONLY valid JSON (no markdown fences, no preamble) in this exact shape:
 
 {
@@ -39,43 +30,65 @@ If the outer sleeve has no text, look for the circular paper disc label in the i
 Context: electronic music archive. Most records: house, techno, ambient, IDM, electro, drum & bass, dub, breaks, downtempo.
 
 genres: 2-4 genre/style tags.
-suggestedBoxes: Pick 1-2 genres from this list that best match the record: ${GENRE_LIST}. Return exact strings from the list only.
+suggestedBoxes: 2-3 short evocative crate names specific to THIS record. Examples: "Deep House Workouts", "4am Closers", "Detroit Lineage", "Dub Techno Continuum", "Peak-Time Weapons".
 notes: one sentence max, notable attributes or caveats.
 
 Return ONLY the JSON object, nothing else.`;
 
-export async function identifyFromImage(image, mediaType, apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: image },
-            },
-            { type: 'text', text: PROMPT },
-          ],
-        },
-      ],
-    }),
-  });
+// Shared Claude caller with retry logic for transient 500/529 (overloaded) errors.
+async function callClaude(body, apiKey, maxRetries = 2) {
+  let delay = 1000;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+    });
 
-  if (!response.ok) {
+    if (response.ok) return response.json();
+
     const errText = await response.text();
-    throw new Error(`Anthropic API error: ${errText.slice(0, 300)}`);
-  }
+    const status = response.status;
 
-  const data = await response.json();
+    // Retry only on transient server-side failures
+    if ((status === 529 || status === 500) && attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, delay));
+      delay *= 2;
+      continue;
+    }
+
+    // Parse Anthropic error structure for a cleaner message
+    let msg = `Anthropic ${status}`;
+    try {
+      const parsed = JSON.parse(errText);
+      msg = parsed?.error?.message || parsed?.error || msg;
+    } catch { msg = errText.slice(0, 200) || msg; }
+    throw new Error(msg);
+  }
+}
+
+export async function identifyFromImage(image, mediaType, apiKey) {
+  const data = await callClaude({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 600,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: image },
+          },
+          { type: 'text', text: PROMPT },
+        ],
+      },
+    ],
+  }, apiKey);
+
   const textBlock = data.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text response from Vision');
 
@@ -116,31 +129,17 @@ catalogNumber: The alphanumeric release code, e.g. "PM-012", "WAP63". Read digit
 rawText: Copy the OCR text verbatim.
 
 Use your knowledge to identify the release if you recognise it. Context: electronic music archive — house, techno, ambient, IDM, electro, drum & bass, dub, downtempo.
-genres: 2-4 tags. suggestedBoxes: Pick 1-2 genres from this list: ${GENRE_LIST}. Exact strings only. notes: one sentence max.
+genres: 2-4 tags. suggestedBoxes: 2-3 evocative crate names. notes: one sentence max.
 
 Return ONLY the JSON object.`;
 
 export async function identifyFromText(ocrText, apiKey) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 600,
-      messages: [{ role: 'user', content: TEXT_PROMPT(ocrText) }],
-    }),
-  });
+  const data = await callClaude({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 600,
+    messages: [{ role: 'user', content: TEXT_PROMPT(ocrText) }],
+  }, apiKey);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Anthropic API error: ${errText.slice(0, 300)}`);
-  }
-
-  const data = await response.json();
   const textBlock = data.content?.find(b => b.type === 'text');
   if (!textBlock) throw new Error('No text response from Vision');
 
@@ -165,10 +164,9 @@ export async function generateCrateSuggestions(release, apiKey) {
 
   const prompt = `${context}
 
-Pick 1-2 genre crates from this list that best describe this record:
-${GENRE_LIST}
+Give 2-3 short evocative DJ crate names for this specific record. Be precise to this artist/era/sound, not generic. Good examples: "Detroit Lineage", "4am Closers", "Dub Techno Continuum", "Warp Catalogue Essentials", "Peak-Time Weapons".
 
-Return ONLY a JSON array using exact strings from the list. Example: ["Techno", "Ambient"]`;
+Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -180,7 +178,7 @@ Return ONLY a JSON array using exact strings from the list. Example: ["Techno", 
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
+        max_tokens: 100,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -193,8 +191,7 @@ Return ONLY a JSON array using exact strings from the list. Example: ["Techno", 
       .replace(/^```\s*/i, '')
       .replace(/```\s*$/i, '')
       .trim();
-    const parsed = JSON.parse(raw);
-    return parsed.filter(s => GENRE_CRATES.includes(s));
+    return JSON.parse(raw);
   } catch {
     return [];
   }
