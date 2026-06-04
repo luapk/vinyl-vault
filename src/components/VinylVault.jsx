@@ -1400,7 +1400,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           const abs = Math.abs(offset);
           const isActive = offset === 0;
           const tx = (offset + (isDragging ? visualDelta / 280 : 0)) * 48;
-          const ty = abs * 7;
+          const ty = abs * 11;
           const rot = offset * 2.5 + (isDragging && isActive ? visualDelta * 0.025 : 0);
           const scale = 1 - abs * 0.065;
           const opacity = abs > 2 ? 0 : 1 - abs * 0.15;
@@ -1408,15 +1408,28 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           return (
             <div key={record.id} onClick={() => !didDragRef.current && (isActive ? onSelect(record) : onIndexChange(index + offset))}
               style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
-              <div className="w-full h-full rounded-2xl overflow-hidden" style={{ boxShadow: isActive ? `0 40px 90px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(var(--fg),0.07), 0 0 50px -15px rgba(${accentRGB},0.35)` : "0 20px 50px -15px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--fg),0.04)" }}>
-                {record.coverUrl ? (
-                  <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
-                    <VinylRecord size={56} weight="thin" className="opacity-20" />
-                  </div>
-                )}
-                {isActive && <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 45%)" }} />}
+              {/* Glass panel frame */}
+              <div style={{
+                position: 'relative', width: '100%', height: '100%', borderRadius: 20, padding: 10,
+                background: isActive
+                  ? `linear-gradient(145deg, rgba(${accentRGB},0.18) 0%, rgba(${accentRGB},0.07) 55%, rgba(var(--fg),0.03) 100%)`
+                  : `linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.03) 100%)`,
+                backdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
+                WebkitBackdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
+                boxShadow: isActive
+                  ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.55), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.08)`
+                  : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`,
+              }}>
+                {/* Album cover inset */}
+                <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+                  {record.coverUrl
+                    ? <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
+                        <VinylRecord size={56} weight="thin" className="opacity-20" />
+                      </div>
+                  }
+                  {isActive && <div style={{ position: 'absolute', inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)", pointerEvents: 'none' }} />}
+                </div>
               </div>
             </div>
           );
