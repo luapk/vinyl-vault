@@ -2152,7 +2152,11 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
   const avatarInputRef = useRef(null);
 
   // Public profile (community) fields
-  const [username, setUsername] = useState(profile?.username || '');
+  const [username, setUsername] = useState(
+    profile?.username ||
+    (profile?.display_name || user?.user_metadata?.display_name || '')
+      .toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20)
+  );
   const [bio, setBio] = useState(profile?.bio || '');
   const [isPublic, setIsPublic] = useState(!!profile?.is_public);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -2216,7 +2220,7 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
     try {
       await onUpdateProfile({ username: uname || undefined, bio: bio.trim(), isPublic });
       setProfileSavedOk(true);
-      setTimeout(() => setProfileSavedOk(false), 3000);
+      setTimeout(() => onClose(), 1600);
     } catch (e) {
       setProfileErr(e?.message || 'Could not save profile.');
     } finally {
@@ -2370,10 +2374,10 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button onClick={saveProfile} disabled={profileSaving || profileSavedOk}
-                style={{ padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
-                {profileSaving ? '...' : profileSavedOk ? <Check size={13} weight="bold" /> : 'Save profile'}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+                {profileSaving ? 'Saving...' : profileSavedOk ? (<><Check size={13} weight="bold" />Saved!</>) : 'Save profile'}
               </button>
-              {profile?.username && profile?.is_public && (
+              {!profileSaving && !profileSavedOk && profile?.username && profile?.is_public && (
                 <button onClick={() => onViewProfile?.(profile.username)}
                   style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   View my profile →
