@@ -19,7 +19,7 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, role, avatar_url')
+      .select('id, email, role, avatar_url, display_name, username, bio, is_public')
       .eq('id', userId)
       .single();
     return data || null;
@@ -97,10 +97,34 @@ export function useAuth() {
     if (!supabase) throw new Error('Supabase not configured');
     const { error } = await supabase.auth.updateUser({ data: { display_name: name } });
     if (error) throw error;
+    // Mirror to the profiles row so other users can read it (auth metadata is private).
+    await supabase.rpc('update_own_profile', { p_display_name: name });
     // Force-refresh user state so display name and greeting update immediately.
     const { data } = await supabase.auth.getUser();
     if (data?.user) setUser(data.user);
+    setProfile(p => p ? { ...p, display_name: name } : p);
   }, []);
+
+  // Update username / bio / public-visibility on the profiles row via the
+  // update_own_profile RPC. Pass only the fields you want to change.
+  // Throws on username collision (Postgres unique violation, code 23505).
+  const updateProfile = useCallback(async ({ username, bio, isPublic } = {}) => {
+    if (!supabase) throw new Error('Supabase not configured');
+    if (!user?.id) throw new Error('Not logged in');
+    const { error } = await supabase.rpc('update_own_profile', {
+      p_username: username ?? null,
+      p_bio: bio ?? null,
+      p_is_public: typeof isPublic === 'boolean' ? isPublic : null,
+    });
+    if (error) {
+      if (error.code === '23505') throw new Error('That username is already taken.');
+      if (error.code === '23514') throw new Error('Username must be 3-20 characters: lowercase letters, numbers, underscores.');
+      throw error;
+    }
+    const fresh = await fetchProfile(user.id);
+    if (fresh) setProfile(fresh);
+    return fresh;
+  }, [user, fetchProfile]);
 
   // Stores the resized avatar data URL in the profiles table.
   // Optimistic update so the header swaps immediately; DB write is capped at 8 s.
@@ -123,5 +147,5 @@ export function useAuth() {
 
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateAvatar };
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar };
 }

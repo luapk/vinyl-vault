@@ -1,0 +1,220 @@
+import { supabase } from './supabase';
+
+// ─── Profiles ─────────────────────────────────────────────────────────────────
+
+const PROFILE_FIELDS = 'id, username, display_name, avatar_url, bio, is_public';
+
+export async function getProfileByUsername(username) {
+  if (!supabase || !username) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_FIELDS)
+    .eq('username', username.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function getProfileById(id) {
+  if (!supabase || !id) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_FIELDS)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// Search public profiles by username or display name.
+export async function searchUsers(query, currentUserId, limit = 20) {
+  if (!supabase || !query || query.trim().length < 2) return [];
+  const q = query.trim();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_FIELDS)
+    .eq('is_public', true)
+    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .limit(limit);
+  if (error) throw error;
+  return (data || []).filter(p => p.id !== currentUserId);
+}
+
+// ─── Public collection ────────────────────────────────────────────────────────
+
+// Pulls a page of a public user's records. Returns the inner data jsonb blobs
+// (same shape the local collection uses) plus the DB row created_at.
+export async function getPublicCollection(userId, { limit = 60, offset = 0 } = {}) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from('records')
+    .select('id, data, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return (data || []).map(row => ({ ...row.data, _dbId: row.id, _addedAt: row.created_at }));
+}
+
+export async function getCollectionCount(userId) {
+  if (!supabase || !userId) return 0;
+  const { count, error } = await supabase
+    .from('records')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  if (error) throw error;
+  return count || 0;
+}
+
+// ─── Follows ──────────────────────────────────────────────────────────────────
+
+export async function getFollowState(targetId, currentUserId) {
+  if (!supabase || !targetId) return { isFollowing: false, followers: 0, following: 0 };
+
+  const [{ count: followers }, { count: following }, mine] = await Promise.all([
+    supabase.from('follows').select('follower_id', { count: 'exact', head: true }).eq('following_id', targetId),
+    supabase.from('follows').select('following_id', { count: 'exact', head: true }).eq('follower_id', targetId),
+    currentUserId
+      ? supabase.from('follows').select('follower_id').eq('follower_id', currentUserId).eq('following_id', targetId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  return {
+    isFollowing: !!mine?.data,
+    followers: followers || 0,
+    following: following || 0,
+  };
+}
+
+export async function followUser(targetId, currentUserId) {
+  if (!supabase) throw new Error('Not configured');
+  const { error } = await supabase.from('follows').insert({ follower_id: currentUserId, following_id: targetId });
+  if (error && error.code !== '23505') throw error; // ignore duplicate
+}
+
+export async function unfollowUser(targetId, currentUserId) {
+  if (!supabase) throw new Error('Not configured');
+  const { error } = await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', targetId);
+  if (error) throw error;
+}
+
+// ─── Feed ─────────────────────────────────────────────────────────────────────
+
+// Recent records added by people the current user follows.
+export async function getFeed(limit = 40) {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('get_social_feed', { p_limit: limit });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    record: { ...row.record_data, _dbId: row.record_db_id },
+    addedAt: row.added_at,
+    owner: {
+      id: row.owner_id,
+      display_name: row.owner_name,
+      username: row.owner_username,
+      avatar_url: row.owner_avatar,
+    },
+  }));
+}
+
+// ─── Reactions ────────────────────────────────────────────────────────────────
+
+export const REACTION_EMOJI = ['🔥', '❤️', '👀', '🎧', '💎'];
+
+// Fetch all reactions for a single record (owner + local id).
+export async function getReactions(ownerUserId, recordLocalId) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('record_reactions')
+    .select('emoji, reactor_user_id')
+    .eq('owner_user_id', ownerUserId)
+    .eq('record_local_id', recordLocalId);
+  if (error) throw error;
+  return data || [];
+}
+
+// Batch: fetch reactions for many records of one owner at once.
+// Returns a map: { [recordLocalId]: [{ emoji, reactor_user_id }] }
+export async function getReactionsForRecords(ownerUserId, recordLocalIds = []) {
+  if (!supabase || recordLocalIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('record_reactions')
+    .select('record_local_id, emoji, reactor_user_id')
+    .eq('owner_user_id', ownerUserId)
+    .in('record_local_id', recordLocalIds);
+  if (error) throw error;
+  const map = {};
+  for (const r of data || []) {
+    (map[r.record_local_id] ||= []).push({ emoji: r.emoji, reactor_user_id: r.reactor_user_id });
+  }
+  return map;
+}
+
+// Toggle a reaction: if the current user already reacted with this emoji, remove
+// it; otherwise add it. Returns 'added' | 'removed'.
+export async function toggleReaction(ownerUserId, recordLocalId, emoji, reactorUserId) {
+  if (!supabase) throw new Error('Not configured');
+  const { data: existing } = await supabase
+    .from('record_reactions')
+    .select('id')
+    .eq('owner_user_id', ownerUserId)
+    .eq('record_local_id', recordLocalId)
+    .eq('reactor_user_id', reactorUserId)
+    .eq('emoji', emoji)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase.from('record_reactions').delete().eq('id', existing.id);
+    if (error) throw error;
+    return 'removed';
+  }
+  const { error } = await supabase.from('record_reactions').insert({
+    owner_user_id: ownerUserId,
+    record_local_id: recordLocalId,
+    reactor_user_id: reactorUserId,
+    emoji,
+  });
+  if (error) throw error;
+  return 'added';
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+// Comments for a record, with each commenter's profile joined.
+export async function getComments(ownerUserId, recordLocalId) {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('record_comments')
+    .select('id, body, created_at, user_id, profiles:user_id (username, display_name, avatar_url)')
+    .eq('owner_user_id', ownerUserId)
+    .eq('record_local_id', recordLocalId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(c => ({
+    id: c.id,
+    body: c.body,
+    createdAt: c.created_at,
+    userId: c.user_id,
+    author: c.profiles || null,
+  }));
+}
+
+export async function addComment(ownerUserId, recordLocalId, body, userId) {
+  if (!supabase) throw new Error('Not configured');
+  const trimmed = (body || '').trim();
+  if (!trimmed) throw new Error('Comment is empty');
+  if (trimmed.length > 300) throw new Error('Comment too long (300 char max)');
+  const { data, error } = await supabase
+    .from('record_comments')
+    .insert({ owner_user_id: ownerUserId, record_local_id: recordLocalId, user_id: userId, body: trimmed })
+    .select('id, body, created_at, user_id')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteComment(commentId) {
+  if (!supabase) throw new Error('Not configured');
+  const { error } = await supabase.from('record_comments').delete().eq('id', commentId);
+  if (error) throw error;
+}

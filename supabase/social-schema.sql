@@ -9,6 +9,23 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS bio          text,
   ADD COLUMN IF NOT EXISTS is_public    boolean NOT NULL DEFAULT false;
 
+-- Username format: 3-20 chars, lowercase letters, digits, underscores.
+-- Stored normalised; UI lowercases before saving.
+DO $$ BEGIN
+  ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_username_format
+    CHECK (username IS NULL OR username ~ '^[a-z0-9_]{3,20}$');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Bio length cap
+DO $$ BEGIN
+  ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_bio_length
+    CHECK (bio IS NULL OR length(bio) <= 160);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Back-fill display_name from auth metadata for existing users
 UPDATE public.profiles p
 SET display_name = (
