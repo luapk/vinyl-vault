@@ -1417,7 +1417,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                 backdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
                 WebkitBackdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
                 boxShadow: isActive
-                  ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.55), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.08)`
+                  ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.28), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
                   : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`,
               }}>
                 {/* Album cover inset */}
