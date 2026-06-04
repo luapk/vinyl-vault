@@ -16,16 +16,16 @@ function parseTitle(combined) {
     : { artist: combined.slice(0, idx), title: combined.slice(idx + 3) };
 }
 
-async function queryGenre(style, year, headers) {
+// Query Discogs by style sorted by most-wanted -- the native hype signal.
+async function queryStyle(style, headers) {
   try {
     const params = new URLSearchParams({
       style,
       type: 'release',
       format: 'Vinyl',
-      year: String(year),
-      sort: 'date_added',
+      sort: 'want',
       sort_order: 'desc',
-      per_page: '8',
+      per_page: '10',
     });
     const res = await fetch(`${BASE}/database/search?${params}`, { headers });
     if (!res.ok) return [];
@@ -42,43 +42,46 @@ export default async function handler(req, res) {
   const token = process.env.DISCOGS_PERSONAL_ACCESS_TOKEN;
   if (!token) return res.status(503).json({ error: 'Discogs not configured', results: [] });
 
-  const genres = (req.query.genres || '')
+  const tags = (req.query.tags || '')
     .split(',')
-    .map(g => g.trim())
+    .map(t => t.trim())
     .filter(Boolean)
     .slice(0, 5);
 
-  if (!genres.length) return res.status(400).json({ error: 'genres param required', results: [] });
+  if (!tags.length) return res.status(400).json({ error: 'tags param required', results: [] });
 
   const headers = authHeaders(token);
-  const currentYear = new Date().getFullYear();
-  const seen = new Set();
-  const results = [];
 
-  for (const year of [currentYear, currentYear - 1]) {
-    if (results.length >= 3) break;
-    const batches = await Promise.all(genres.map(g => queryGenre(g, year, headers)));
-    for (const batch of batches) {
-      for (const r of batch) {
-        if (results.length >= 3) break;
-        if (seen.has(r.id) || !r.title) continue;
-        seen.add(r.id);
-        const { artist, title } = parseTitle(r.title);
-        if (!title) continue;
-        results.push({
-          id: String(r.id),
-          artist,
-          title,
-          label: Array.isArray(r.label) ? r.label[0] : (r.label || null),
-          year: r.year || null,
-          thumb: r.cover_image || r.thumb || null,
-          genre: (r.style || r.genre || [genres[0]])[0] || null,
-          buyUrl: `https://www.discogs.com/sell/list?release_id=${r.id}`,
-        });
-      }
-      if (results.length >= 3) break;
+  // Query all tags in parallel, then merge by want count so the hottest records win.
+  const batches = await Promise.all(tags.map(t => queryStyle(t, headers)));
+
+  // Flatten, dedupe by release id, then sort descending by want count.
+  const seen = new Set();
+  const pool = [];
+  for (const batch of batches) {
+    for (const r of batch) {
+      if (seen.has(r.id) || !r.title) continue;
+      seen.add(r.id);
+      pool.push(r);
     }
   }
+  pool.sort((a, b) => (b.community?.want ?? b.want ?? 0) - (a.community?.want ?? a.want ?? 0));
 
-  return res.status(200).json({ results: results.slice(0, 3) });
+  const results = pool.slice(0, 3).map(r => {
+    const { artist, title } = parseTitle(r.title);
+    const wants = r.community?.want ?? r.want ?? null;
+    return {
+      id: String(r.id),
+      artist,
+      title,
+      label: Array.isArray(r.label) ? r.label[0] : (r.label || null),
+      year: r.year || null,
+      thumb: r.cover_image || r.thumb || null,
+      genre: (r.style || r.genre || [tags[0]])[0] || null,
+      wants,
+      buyUrl: `https://www.discogs.com/sell/list?release_id=${r.id}`,
+    };
+  });
+
+  return res.status(200).json({ results });
 }

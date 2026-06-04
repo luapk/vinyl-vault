@@ -796,15 +796,12 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
     const counts = {};
     for (const record of collection) {
       for (const g of (record.genres || [])) counts[g] = (counts[g] || 0) + 1;
-      for (const c of (record.crates || [])) {
-        if (GENRE_CRATES.includes(c)) counts[c] = (counts[c] || 0) + 1;
-      }
       for (const t of (record.tags || [])) counts[t] = (counts[t] || 0) + 1;
     }
-    const genres = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
-    if (!genres.length) return;
-    setRecsGenres(genres.slice(0, 3));
-    fetch(`/api/recommendations?genres=${encodeURIComponent(genres.join(','))}`)
+    const tags = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
+    if (!tags.length) return;
+    setRecsGenres(tags.slice(0, 3));
+    fetch(`/api/recommendations?tags=${encodeURIComponent(tags.join(','))}`)
       .then(r => r.ok ? r.json() : { results: [] })
       .then(data => setRecs(data.results || []))
       .catch(() => {});
@@ -897,9 +894,14 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                 <div style={{ padding: '10px 10px 10px' }}>
                   <div style={{ fontSize: 9, color: 'rgba(var(--fg),0.4)', fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 6 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
+                  {rec.wants > 0 && (
+                    <div style={{ fontSize: 8, fontFamily: 'monospace', color: `rgba(${accentRGB},0.7)`, marginBottom: 5, letterSpacing: '0.08em' }}>
+                      {rec.wants >= 1000 ? `${(rec.wants / 1000).toFixed(1)}k` : rec.wants} wants
+                    </div>
+                  )}
                   <div style={{ fontSize: 8, fontFamily: 'monospace', color: 'rgba(var(--fg),0.2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgba(${accentRGB},0.14)`, border: `1px solid rgba(${accentRGB},0.28)`, color: `rgb(${accentRGB})`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase' }}
