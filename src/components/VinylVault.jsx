@@ -679,7 +679,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} />}
+            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
             {phase === "disambiguation" && (
               <>
@@ -787,8 +787,28 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
+function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
   const [showCamera, setShowCamera] = useState(false);
+  const [recs, setRecs] = useState([]);
+  const [recsGenres, setRecsGenres] = useState([]);
+
+  useEffect(() => {
+    const counts = {};
+    for (const record of collection) {
+      for (const g of (record.genres || [])) counts[g] = (counts[g] || 0) + 1;
+      for (const c of (record.crates || [])) {
+        if (GENRE_CRATES.includes(c)) counts[c] = (counts[c] || 0) + 1;
+      }
+      for (const t of (record.tags || [])) counts[t] = (counts[t] || 0) + 1;
+    }
+    const genres = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
+    if (!genres.length) return;
+    setRecsGenres(genres.slice(0, 3));
+    fetch(`/api/recommendations?genres=${encodeURIComponent(genres.join(','))}`)
+      .then(r => r.ok ? r.json() : { results: [] })
+      .then(data => setRecs(data.results || []))
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCapture = (file) => {
     setShowCamera(false);
@@ -853,6 +873,46 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting }) {
       </div>
 
       {showCamera && <CameraModal onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
+
+      {/* Recommendations */}
+      {recs.length > 0 && (
+        <div className="mt-16 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
+          <div className="flex items-baseline justify-between mb-4">
+            <div className="text-[10px] tracking-[0.35em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.3)' }}>Picked for you</div>
+            {recsGenres.length > 0 && (
+              <div className="text-[9px] font-mono" style={{ color: 'rgba(var(--fg),0.2)', letterSpacing: '0.15em' }}>
+                {recsGenres.join(' / ')}
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {recs.map(rec => (
+              <div key={rec.id} style={{ background: 'linear-gradient(145deg, rgba(var(--fg),0.07) 0%, rgba(var(--fg),0.02) 100%)', border: '1px solid rgba(var(--fg),0.08)', borderRadius: 14, overflow: 'hidden' }}>
+                <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden' }}>
+                  {rec.thumb
+                    ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><VinylRecord size={24} weight="thin" className="opacity-20" /></div>
+                  }
+                </div>
+                <div style={{ padding: '10px 10px 10px' }}>
+                  <div style={{ fontSize: 9, color: 'rgba(var(--fg),0.4)', fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 8 }}>
+                    {[rec.label, rec.year].filter(Boolean).join(' · ')}
+                  </div>
+                  <div style={{ fontSize: 8, fontFamily: 'monospace', color: 'rgba(var(--fg),0.2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
+                  <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgba(${accentRGB},0.14)`, border: `1px solid rgba(${accentRGB},0.28)`, color: `rgb(${accentRGB})`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = `rgba(${accentRGB},0.25)`; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = `rgba(${accentRGB},0.14)`; }}>
+                    Buy now
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
