@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "functions": {
     "api/identify.js": { "maxDuration": 30 },
     "api/scan.js": { "maxDuration": 60 },
