@@ -36,12 +36,12 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{
-      background: 'radial-gradient(ellipse at 40% 10%, rgba(255,255,255,0.07) 0%, transparent 55%), radial-gradient(ellipse at 70% 90%, rgba(255,255,255,0.04) 0%, transparent 50%), #06060a',
+      background: 'radial-gradient(ellipse at 40% 10%, rgba(var(--fg),0.07) 0%, transparent 55%), radial-gradient(ellipse at 70% 90%, rgba(var(--fg),0.04) 0%, transparent 50%), var(--bg-hex)',
     }}>
       {/* Subtle depth layers */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 40%)',
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(var(--fg),0.05) 0%, transparent 40%)',
       }} />
 
       <div className="w-full max-w-sm relative">
@@ -50,7 +50,7 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
           <img
             src="/logo.png"
             alt="Vinyl Vault"
-            style={{ height: 86, mixBlendMode: 'screen', opacity: 0.95, filter: 'drop-shadow(0 0 24px rgba(255,255,255,0.15))' }}
+            style={{ height: 86, mixBlendMode: 'screen', opacity: 0.95, filter: 'drop-shadow(0 0 24px rgba(var(--fg),0.15))' }}
           />
         </div>
 
@@ -58,20 +58,20 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
         <div style={{
           borderRadius: 24,
           padding: '28px 28px 24px',
-          background: 'linear-gradient(160deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.02) 100%)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          background: 'rgba(var(--bg),0.95)',
+          border: '1px solid rgba(var(--fg),0.12)',
           backdropFilter: 'blur(32px)',
           WebkitBackdropFilter: 'blur(32px)',
-          boxShadow: '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.3)',
+          boxShadow: '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(var(--fg),0.12), inset 0 -1px 0 rgba(0,0,0,0.3)',
         }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.9)', marginBottom: 20, letterSpacing: '-0.01em' }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.9)', marginBottom: 20, letterSpacing: '-0.01em' }}>
             {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h2>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {mode === 'signup' && (
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
+                <label style={{ display: 'block', fontSize: 11, color: 'rgba(var(--fg),0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
                   Your name
                 </label>
                 <input
@@ -84,19 +84,19 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', borderRadius: 12,
                     fontSize: 13, color: '#fff',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(var(--fg),0.05)',
+                    border: '1px solid rgba(var(--fg),0.1)',
                     outline: 'none', transition: 'border-color 0.15s',
                   }}
                   className="placeholder-white/20"
-                  onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.35)'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                  onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.35)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
                 />
               </div>
             )}
 
             <div>
-              <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
+              <label style={{ display: 'block', fontSize: 11, color: 'rgba(var(--fg),0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
                 Email
               </label>
               <input
@@ -110,18 +110,18 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
                   width: '100%', boxSizing: 'border-box',
                   padding: '10px 14px', borderRadius: 12,
                   fontSize: 13, color: '#fff',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(var(--fg),0.05)',
+                  border: '1px solid rgba(var(--fg),0.1)',
                   outline: 'none', transition: 'border-color 0.15s',
                 }}
                 className="placeholder-white/20"
-                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.35)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.35)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
+              <label style={{ display: 'block', fontSize: 11, color: 'rgba(var(--fg),0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
                 Password
               </label>
               <input
@@ -135,13 +135,13 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
                   width: '100%', boxSizing: 'border-box',
                   padding: '10px 14px', borderRadius: 12,
                   fontSize: 13, color: '#fff',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(var(--fg),0.05)',
+                  border: '1px solid rgba(var(--fg),0.1)',
                   outline: 'none', transition: 'border-color 0.15s',
                 }}
                 className="placeholder-white/20"
-                onFocus={e => e.target.style.borderColor = 'rgba(255,255,255,0.35)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.35)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
             </div>
 
@@ -151,7 +151,7 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
               </p>
             )}
             {success && (
-              <p style={{ fontSize: 12, borderRadius: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.12)', margin: 0 }}>
+              <p style={{ fontSize: 12, borderRadius: 10, padding: '8px 12px', background: 'rgba(var(--fg),0.06)', color: 'rgba(var(--fg),0.7)', border: '1px solid rgba(var(--fg),0.12)', margin: 0 }}>
                 {success}
               </p>
             )}
@@ -164,10 +164,10 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
                 fontSize: 13, fontWeight: 600,
                 color: isLoading ? 'rgba(0,0,0,0.5)' : '#000',
                 background: isLoading
-                  ? 'rgba(255,255,255,0.25)'
-                  : 'linear-gradient(160deg, rgba(255,255,255,0.95) 0%, rgba(220,220,220,0.9) 100%)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                boxShadow: isLoading ? 'none' : '0 4px 20px rgba(255,255,255,0.15), inset 0 1px 0 rgba(255,255,255,0.6)',
+                  ? 'rgba(var(--fg),0.25)'
+                  : 'linear-gradient(160deg, rgba(var(--fg),0.95) 0%, rgba(220,220,220,0.9) 100%)',
+                border: '1px solid rgba(var(--fg),0.2)',
+                boxShadow: isLoading ? 'none' : '0 4px 20px rgba(var(--fg),0.15), inset 0 1px 0 rgba(var(--fg),0.6)',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s',
                 marginTop: 4,
@@ -176,18 +176,18 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading })
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.25)', marginTop: 20, marginBottom: 0 }}>
+          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(var(--fg),0.25)', marginTop: 20, marginBottom: 0 }}>
             {mode === 'signup' ? (
               <>Already have an account?{' '}
                 <button onClick={() => { setMode('signin'); setError(''); setSuccess(''); }}
-                  style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
+                  style={{ color: 'rgba(var(--fg),0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
                   Sign in
                 </button>
               </>
             ) : (
               <>New here?{' '}
                 <button onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
-                  style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
+                  style={{ color: 'rgba(var(--fg),0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
                   Create an account
                 </button>
               </>

@@ -8,6 +8,9 @@ export default {
         sans: ["'Hanken Grotesk'", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "monospace"],
       },
+      colors: {
+        white: 'rgb(var(--color-white) / <alpha-value>)',
+      },
     },
   },
   plugins: [],
