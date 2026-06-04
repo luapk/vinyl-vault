@@ -3,13 +3,14 @@ import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
-  Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar,
+  Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useTheme } from "../hooks/useTheme.js";
 import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
+import CommunityView from "./Community.jsx";
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -312,7 +313,7 @@ function getGreeting(name) {
 
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateAvatar } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar } = useAuth();
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -340,6 +341,43 @@ export default function VinylVault() {
   const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
   const [showAccount, setShowAccount] = useState(false);
+  // Community routing: which public profile is open (null = community home).
+  // Mirrored to the URL (?u=username) via History API for shareable links.
+  const [profileUsername, setProfileUsername] = useState(null);
+
+  const openProfile = useCallback((username) => {
+    if (!username) return;
+    setProfileUsername(username);
+    setAppView('community');
+    const url = `${window.location.pathname}?u=${encodeURIComponent(username)}`;
+    if (`?u=${encodeURIComponent(username)}` !== window.location.search) {
+      window.history.pushState({ u: username }, '', url);
+    }
+  }, []);
+
+  const openCommunityHome = useCallback(() => {
+    setProfileUsername(null);
+    setAppView('community');
+    if (window.location.search) window.history.pushState({}, '', window.location.pathname);
+  }, []);
+
+  // On first load, open a shared profile link if present (?u=username).
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get('u');
+    if (u) { setProfileUsername(u); setAppView('community'); }
+  }, []);
+
+  // Browser back/forward: re-sync the open profile from the URL.
+  useEffect(() => {
+    const onPop = () => {
+      const u = new URLSearchParams(window.location.search).get('u');
+      if (u) { setProfileUsername(u); setAppView('community'); }
+      else { setProfileUsername(null); }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const [labelSelectMode, setLabelSelectMode] = useState(false);
   const [selectedForLabels, setSelectedForLabels] = useState(new Set());
   const [showBatchLabelModal, setShowBatchLabelModal] = useState(false);
@@ -578,6 +616,7 @@ export default function VinylVault() {
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
     { id: "stats", label: "Stats", icon: ChartBar },
+    ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users }] : []),
     { id: "about", label: "About", icon: Info },
     ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
@@ -601,7 +640,11 @@ export default function VinylVault() {
           {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => { setAppView(id); if (id === "scan" && appView !== "scan") reset(); }}
+              onClick={() => {
+                if (id === "community") { openCommunityHome(); return; }
+                setAppView(id);
+                if (id === "scan" && appView !== "scan") reset();
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 12px -4px rgba(${accentRGB},0.3)` }
@@ -661,6 +704,17 @@ export default function VinylVault() {
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
         )}
         {appView === "stats" && <StatsView collection={collection} accentRGB={accentRGB} />}
+        {appView === "community" && (
+          <CommunityView
+            currentUser={user}
+            currentProfile={profile}
+            accentRGB={accentRGB}
+            profileUsername={profileUsername}
+            onOpenProfile={openProfile}
+            onOpenHome={openCommunityHome}
+            onOpenAccount={() => setShowAccount(true)}
+          />
+        )}
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
 
@@ -682,7 +736,9 @@ export default function VinylVault() {
           onClose={() => setShowAccount(false)}
           onSignOut={() => { setShowAccount(false); signOut(); }}
           onUpdateDisplayName={updateDisplayName}
+          onUpdateProfile={updateProfile}
           onUpdateAvatar={updateAvatar}
+          onViewProfile={(username) => { setShowAccount(false); openProfile(username); }}
           onPrintLabels={() => { setShowAccount(false); setAppView('collection'); enterLabelMode(); }}
           onDownloadCSV={() => downloadCSV(collection)}
         />
@@ -2082,7 +2138,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateAvatar, onPrintLabels, onDownloadCSV }) {
+function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2094,6 +2150,14 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
   const avatarInputRef = useRef(null);
+
+  // Public profile (community) fields
+  const [username, setUsername] = useState(profile?.username || '');
+  const [bio, setBio] = useState(profile?.bio || '');
+  const [isPublic, setIsPublic] = useState(!!profile?.is_public);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSavedOk, setProfileSavedOk] = useState(false);
+  const [profileErr, setProfileErr] = useState('');
 
   const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
 
@@ -2134,6 +2198,29 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
       setErrorMsg(e?.message || 'Could not save. Try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveProfile() {
+    setProfileErr('');
+    const uname = username.trim().toLowerCase();
+    if (uname && !/^[a-z0-9_]{3,20}$/.test(uname)) {
+      setProfileErr('Username: 3-20 chars, lowercase letters, numbers, underscores.');
+      return;
+    }
+    if (isPublic && !uname) {
+      setProfileErr('Choose a username before making your collection public.');
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      await onUpdateProfile({ username: uname || undefined, bio: bio.trim(), isPublic });
+      setProfileSavedOk(true);
+      setTimeout(() => setProfileSavedOk(false), 3000);
+    } catch (e) {
+      setProfileErr(e?.message || 'Could not save profile.');
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -2215,14 +2302,14 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
                 onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
                 onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
                 placeholder="Your name"
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: '#fff', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
                 onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
               <button onClick={saveDisplayName} disabled={saving || savedOk}
                 style={{
                   padding: '8px 13px', borderRadius: 9, fontSize: 12, fontWeight: 600,
-                  color: '#000',
+                  color: 'var(--bg-hex)',
                   background: saving ? 'rgba(var(--fg),0.3)' : savedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)',
                   border: 'none',
                   cursor: (saving || savedOk) ? 'default' : 'pointer',
@@ -2231,6 +2318,67 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
                 }}>
                 {saving ? '...' : savedOk ? <Check size={13} weight="bold" /> : 'Save'}
               </button>
+            </div>
+          </AccountSection>
+
+          <AccountSection label="Public profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
+            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+              Claim a username and make your collection public so others can browse it, follow you, and react.
+            </p>
+
+            <label style={{ display: 'block', fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <span style={{ fontSize: 14, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>@</span>
+              <input
+                type="text"
+                value={username}
+                onChange={e => { setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setProfileSavedOk(false); setProfileErr(''); }}
+                placeholder="username"
+                maxLength={20}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
+                onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
+              />
+            </div>
+
+            <label style={{ display: 'block', fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Bio</label>
+            <textarea
+              value={bio}
+              onChange={e => { setBio(e.target.value.slice(0, 160)); setProfileSavedOk(false); setProfileErr(''); }}
+              placeholder="A line about your taste, your rig, your scene…"
+              rows={2}
+              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', resize: 'none', marginBottom: 4 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
+            />
+            <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', textAlign: 'right', marginBottom: 12 }}>{bio.length}/160</div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 12, color: 'rgba(var(--fg),0.7)' }}>Public collection</div>
+                <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
+              </div>
+              <button
+                onClick={() => { setIsPublic(v => !v); setProfileSavedOk(false); setProfileErr(''); }}
+                aria-label="Toggle public collection"
+                style={{ position: 'relative', width: 44, height: 24, borderRadius: 12, background: isPublic ? 'rgba(120,220,140,0.45)' : 'rgba(var(--fg),0.12)', border: '1px solid rgba(var(--fg),0.15)', cursor: 'pointer', padding: 0, flexShrink: 0, transition: 'background 0.2s' }}>
+                <span style={{ position: 'absolute', top: 3, left: isPublic ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', transition: 'left 0.2s cubic-bezier(0.34,1.4,0.64,1)' }} />
+              </button>
+            </div>
+
+            {profileErr && <p style={{ fontSize: 11, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{profileErr}</p>}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={saveProfile} disabled={profileSaving || profileSavedOk}
+                style={{ padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+                {profileSaving ? '...' : profileSavedOk ? <Check size={13} weight="bold" /> : 'Save profile'}
+              </button>
+              {profile?.username && profile?.is_public && (
+                <button onClick={() => onViewProfile?.(profile.username)}
+                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  View my profile →
+                </button>
+              )}
             </div>
           </AccountSection>
 
