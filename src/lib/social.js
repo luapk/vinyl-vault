@@ -305,22 +305,35 @@ export async function getConversations(userId) {
   if (!supabase || !userId) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('id, from_user_id, to_user_id, body, created_at, read_at, from_profile:from_user_id(id, username, display_name, avatar_url), to_profile:to_user_id(id, username, display_name, avatar_url)')
+    .select('id, from_user_id, to_user_id, body, created_at, read_at')
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;
+
   const map = new Map();
+  const partnerIds = new Set();
   for (const msg of data || []) {
     const otherId = msg.from_user_id === userId ? msg.to_user_id : msg.from_user_id;
-    const otherProfile = msg.from_user_id === userId ? msg.to_profile : msg.from_profile;
+    partnerIds.add(otherId);
     if (!map.has(otherId)) {
-      map.set(otherId, { userId: otherId, profile: otherProfile, lastMessage: msg, unread: 0 });
+      map.set(otherId, { userId: otherId, profile: null, lastMessage: msg, unread: 0 });
     }
     if (msg.to_user_id === userId && !msg.read_at) {
       map.get(otherId).unread++;
     }
   }
+
+  if (partnerIds.size > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url')
+      .in('id', [...partnerIds]);
+    for (const p of profiles || []) {
+      if (map.has(p.id)) map.get(p.id).profile = p;
+    }
+  }
+
   return [...map.values()];
 }
 
