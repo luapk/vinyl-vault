@@ -908,7 +908,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       {/* Heading section - left-aligned */}
       <div className="w-full max-w-2xl mb-14 md:mb-20">
         <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
-        <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
+        <h1 className="text-[38px] md:text-[58px] leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
           {greeting
             ? <>{greeting.split('.')[0]}{/[?!]$/.test(greeting.split('.')[0]) ? '' : '.'}<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>
             : <>Stack your wax<br /><span className="text-white/35">the easy way.</span></>
