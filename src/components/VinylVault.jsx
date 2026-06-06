@@ -1112,8 +1112,8 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // AI-suggested crates for this record minus already-pending
-  const suggestedCrates = (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c));
+  // AI-suggested crates for this record minus already-pending, capped at 3
+  const suggestedCrates = (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c)).slice(0, 3);
   // Custom crates from existing collection (non-genre) minus already-pending and suggestions
   const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c) && !(release.suggestedBoxes || []).includes(c));
 
