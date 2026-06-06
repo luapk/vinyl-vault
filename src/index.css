@@ -23,22 +23,22 @@
 
 /* Remap Tailwind text-white/* opacity classes to dark equivalents in light mode.
    These classes hard-code white and become invisible on a light background. */
-[data-theme="light"] .text-white\/20  { color: rgba(10,10,13,0.38) !important; }
-[data-theme="light"] .text-white\/22  { color: rgba(10,10,13,0.40) !important; }
-[data-theme="light"] .text-white\/25  { color: rgba(10,10,13,0.42) !important; }
-[data-theme="light"] .text-white\/28  { color: rgba(10,10,13,0.44) !important; }
-[data-theme="light"] .text-white\/30  { color: rgba(10,10,13,0.48) !important; }
-[data-theme="light"] .text-white\/35  { color: rgba(10,10,13,0.52) !important; }
-[data-theme="light"] .text-white\/40  { color: rgba(10,10,13,0.58) !important; }
-[data-theme="light"] .text-white\/45  { color: rgba(10,10,13,0.62) !important; }
-[data-theme="light"] .text-white\/50  { color: rgba(10,10,13,0.68) !important; }
-[data-theme="light"] .text-white\/55  { color: rgba(10,10,13,0.72) !important; }
-[data-theme="light"] .text-white\/60  { color: rgba(10,10,13,0.76) !important; }
-[data-theme="light"] .text-white\/65  { color: rgba(10,10,13,0.80) !important; }
-[data-theme="light"] .text-white\/70  { color: rgba(10,10,13,0.83) !important; }
-[data-theme="light"] .text-white\/80  { color: rgba(10,10,13,0.88) !important; }
-[data-theme="light"] .text-white\/85  { color: rgba(10,10,13,0.92) !important; }
-[data-theme="light"] .text-white\/90  { color: rgba(10,10,13,0.96) !important; }
+[data-theme="light"] .text-white\/20  { color: rgba(10,10,13,0.45) !important; }
+[data-theme="light"] .text-white\/22  { color: rgba(10,10,13,0.47) !important; }
+[data-theme="light"] .text-white\/25  { color: rgba(10,10,13,0.50) !important; }
+[data-theme="light"] .text-white\/28  { color: rgba(10,10,13,0.53) !important; }
+[data-theme="light"] .text-white\/30  { color: rgba(10,10,13,0.56) !important; }
+[data-theme="light"] .text-white\/35  { color: rgba(10,10,13,0.62) !important; }
+[data-theme="light"] .text-white\/40  { color: rgba(10,10,13,0.66) !important; }
+[data-theme="light"] .text-white\/45  { color: rgba(10,10,13,0.70) !important; }
+[data-theme="light"] .text-white\/50  { color: rgba(10,10,13,0.74) !important; }
+[data-theme="light"] .text-white\/55  { color: rgba(10,10,13,0.78) !important; }
+[data-theme="light"] .text-white\/60  { color: rgba(10,10,13,0.82) !important; }
+[data-theme="light"] .text-white\/65  { color: rgba(10,10,13,0.85) !important; }
+[data-theme="light"] .text-white\/70  { color: rgba(10,10,13,0.88) !important; }
+[data-theme="light"] .text-white\/80  { color: rgba(10,10,13,0.92) !important; }
+[data-theme="light"] .text-white\/85  { color: rgba(10,10,13,0.94) !important; }
+[data-theme="light"] .text-white\/90  { color: rgba(10,10,13,0.97) !important; }
 
 /* bg-white/* and border-white/* similarly become invisible on light backgrounds */
 [data-theme="light"] .bg-white\/5    { background-color: rgba(10,10,13,0.05) !important; }

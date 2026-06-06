@@ -946,16 +946,16 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       {recs.length > 0 && (
         <div className="mt-16 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
           <div className="flex items-baseline justify-between mb-4">
-            <div className="text-[10px] tracking-[0.35em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.3)' }}>Picked for you</div>
+            <div className="text-[10px] tracking-[0.35em] uppercase font-mono" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
             {recsSource.length > 0 && (
-              <div className="text-[9px] font-mono" style={{ color: 'rgba(var(--fg),0.2)', letterSpacing: '0.12em' }}>
+              <div className="text-[9px] font-mono" style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.2})`, letterSpacing: '0.12em' }}>
                 {recsSource.join(' / ')}
               </div>
             )}
           </div>
           <div className="grid grid-cols-3 gap-3">
             {recs.map(rec => (
-              <div key={rec.id} style={{ background: 'linear-gradient(145deg, rgba(var(--fg),0.07) 0%, rgba(var(--fg),0.02) 100%)', border: '1px solid rgba(var(--fg),0.08)', borderRadius: 14, overflow: 'hidden' }}>
+              <div key={rec.id} style={{ background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden' }}>
                   {rec.thumb
                     ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
@@ -963,15 +963,15 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   }
                 </div>
                 <div style={{ padding: '10px 10px 10px' }}>
-                  <div style={{ fontSize: 9, color: 'rgba(var(--fg),0.4)', fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 9, color: `rgba(var(--fg),${isLight ? 0.55 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 5 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.52 : 0.28})`, marginBottom: 5 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
                   {rec.reason && (
-                    <div style={{ fontSize: 9, fontStyle: 'italic', color: `rgba(${accentRGB},0.7)`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
+                    <div style={{ fontSize: 9, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 1 : 0.7})`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
                   )}
-                  <div style={{ fontSize: 8, fontFamily: 'monospace', color: 'rgba(var(--fg),0.2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
+                  <div style={{ fontSize: 8, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
                     style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgba(${accentRGB},0.14)`, border: `1px solid rgba(${accentRGB},0.28)`, color: `rgb(${accentRGB})`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase' }}
                     onMouseEnter={e => { e.currentTarget.style.background = `rgba(${accentRGB},0.25)`; }}
@@ -1707,6 +1707,12 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 // ----- RecordCard (grid) -----------------------------------------------------
 
 function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect, localOnly = false }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const condColor = conditionColor(record.mediaCondition);
+  const condColorDark = record.mediaCondition === 'M' || record.mediaCondition === 'NM' ? '40,140,55'
+    : record.mediaCondition === 'VG+' || record.mediaCondition === 'VG' ? '140,100,10'
+    : condColor ? '180,45,45' : null;
+  const displayCondColor = isLight ? condColorDark : condColor;
   return (
     <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect}>
       <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
@@ -1737,8 +1743,8 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
             !
           </div>
         )}
-        {record.mediaCondition && !selectMode && (
-          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${conditionColor(record.mediaCondition)},0.18)`, border: `1px solid rgba(${conditionColor(record.mediaCondition)},0.35)`, color: `rgb(${conditionColor(record.mediaCondition)})`, pointerEvents: 'none' }}>
+        {record.mediaCondition && !selectMode && displayCondColor && (
+          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${displayCondColor},${isLight ? 0.14 : 0.18})`, border: `1px solid rgba(${displayCondColor},${isLight ? 0.40 : 0.35})`, color: `rgb(${displayCondColor})`, pointerEvents: 'none' }}>
             {record.mediaCondition}
           </div>
         )}
@@ -1752,6 +1758,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 // ----- RecordDetailModal -----------------------------------------------------
 
 function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [] }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
@@ -2047,7 +2054,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                 <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {record.tags.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},0.07)`, border: `1px solid rgba(${localAccent},0.16)`, color: `rgba(${localAccent},0.65)` }}>{t}</span>
+                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},${isLight ? 0.12 : 0.07})`, border: `1px solid rgba(${localAccent},${isLight ? 0.28 : 0.16})`, color: `rgba(${localAccent},${isLight ? 1 : 0.65})` }}>{t}</span>
                   ))}
                 </div>
               </div>
@@ -3244,13 +3251,18 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
 }
 
 function ConditionSelect({ label, value, onChange }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const color = conditionColor(value);
+  const darkColor = value === 'M' || value === 'NM' ? '40,140,55'
+    : value === 'VG+' || value === 'VG' ? '140,100,10'
+    : value ? '180,45,45' : null;
+  const displayColor = isLight ? darkColor : color;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.30)' }}>{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: color ? `rgba(${color},0.09)` : 'rgba(var(--fg),0.04)', border: `1px solid ${color ? `rgba(${color},0.28)` : 'rgba(var(--fg),0.10)'}`, color: color ? `rgb(${color})` : 'rgba(var(--fg),0.45)', borderRadius: 20, padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
+      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: `rgba(var(--fg),${isLight ? 0.52 : 0.30})` }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: displayColor ? `rgba(${displayColor},${isLight ? 0.10 : 0.09})` : 'rgba(var(--fg),0.04)', border: `1px solid ${displayColor ? `rgba(${displayColor},${isLight ? 0.35 : 0.28})` : 'rgba(var(--fg),0.10)'}`, color: displayColor ? `rgb(${displayColor})` : `rgba(var(--fg),${isLight ? 0.52 : 0.45})`, borderRadius: 20, padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
         {CONDITION_GRADES.map(g => (
-          <option key={g} value={g} style={{ background: '#0d0d14', color: '#ccc' }}>{g || '--'}</option>
+          <option key={g} value={g}>{g || '--'}</option>
         ))}
       </select>
     </div>
