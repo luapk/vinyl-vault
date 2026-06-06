@@ -981,7 +981,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
       {/* Recommendations */}
       {recs.length > 0 && (
-        <div className="mt-8 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
+        <div className="mt-8 w-full" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
           <div className="mb-4">
             <div className="text-[10px] tracking-[0.35em] uppercase font-mono whitespace-nowrap" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
             {recsSource.length > 0 && (
@@ -990,8 +990,8 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            {recs.map(rec => (
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+            {recs.slice(0, 6).map(rec => (
               <div key={rec.id} style={{ background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden' }}>
                   {rec.thumb
