@@ -46,6 +46,7 @@
 
 /* Placeholder text */
 [data-theme="light"] .placeholder-white\/20::placeholder { color: rgba(10,10,13,0.38) !important; }
+[data-theme="light"] .placeholder-white\/30::placeholder { color: rgba(10,10,13,0.48) !important; }
 
 /* Stronger header border so it reads as a real separator */
 [data-theme="light"] header {

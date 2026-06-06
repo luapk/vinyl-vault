@@ -1347,7 +1347,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
-                : { background: "transparent", color: "rgba(var(--fg),0.35)" }}>
+                : { background: "transparent", color: "rgba(var(--fg),0.52)" }}>
               {label}
             </button>
           ))}
@@ -1357,13 +1357,13 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           <div className="flex items-center gap-2">
             {!labelSelectMode ? (
               <>
-                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
+                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <PencilSimple size={12} />Crates
                 </button>
-                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
+                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <DownloadSimple size={12} />CSV
                 </button>
-                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
+                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <Printer size={12} />Labels
                 </button>
               </>
@@ -1401,7 +1401,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
             <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(var(--fg),0.08)" }}>
               {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }].map(({ id, Icon }) => (
-                <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(var(--fg),0.09)" : "transparent", color: viewMode === id ? "rgba(var(--fg),0.85)" : "rgba(var(--fg),0.30)" }}>
+                <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(var(--fg),0.09)" : "transparent", color: viewMode === id ? "rgba(var(--fg),0.85)" : "rgba(var(--fg),0.50)" }}>
                   <Icon size={14} />
                 </button>
               ))}
@@ -1419,8 +1419,8 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
                     style={{
                       background: active ? (col ? `${col}22` : 'rgba(var(--fg),0.10)') : (col ? `${col}0d` : 'rgba(var(--fg),0.025)'),
-                      border: active ? `1px solid ${col || 'rgba(var(--fg),0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(var(--fg),0.07)'}`,
-                      color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.38)',
+                      border: active ? `1px solid ${col || 'rgba(var(--fg),0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(var(--fg),0.12)'}`,
+                      color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.52)',
                       boxShadow: active && col ? `0 0 14px -3px ${col}66` : 'none',
                     }}>
                     <RotatingCube color={col || 'rgba(var(--fg),0.4)'} size={8} />
@@ -1431,9 +1431,9 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           )}
 
-          <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+          <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
 
-          {filtered.length === 0 && <div className="text-center py-16 text-white/25 text-sm font-mono">No records match.</div>}
+          {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
             <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} />
@@ -1750,7 +1750,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
         )}
       </div>
       <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
-      <div className="text-[10px] text-white/40 truncate font-mono">{record.title}</div>
+      <div className="text-[10px] text-white/50 truncate font-mono">{record.title}</div>
     </div>
   );
 }
@@ -1971,9 +1971,9 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             )}
           </div>
           <div className="flex flex-col justify-center">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-white/45 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
             <div className="text-xl leading-tight mb-0.5 font-display"><span className="italic">{record.artist}</span></div>
-            <div className="text-base text-white/55 font-display mb-3">{record.title}</div>
+            <div className="text-base text-white/65 font-display mb-3">{record.title}</div>
             <div className="flex flex-wrap gap-1.5 mb-3">
               {record.label && <Pill label="Label" value={record.label} />}
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
@@ -1983,7 +1983,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               <ConditionSelect label="Sleeve" value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
             </div>
             <div>
-              <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Crates</div>
+              <div className="text-[9px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {recordCrates.map((c) => {
                   const col = crateColors[c] || null;
@@ -2051,7 +2051,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             </div>
             {record.tags && record.tags.length > 0 && (
               <div className="mt-2">
-                <div className="text-[9px] tracking-[0.2em] uppercase text-white/25 font-mono mb-1.5">Tags</div>
+                <div className="text-[9px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {record.tags.map((t) => (
                     <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},${isLight ? 0.12 : 0.07})`, border: `1px solid rgba(${localAccent},${isLight ? 0.28 : 0.16})`, color: `rgba(${localAccent},${isLight ? 1 : 0.65})` }}>{t}</span>
@@ -2064,7 +2064,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
         {record.tracklist && record.tracklist.length > 0 && (
           <div className="mb-5">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-3 font-mono">Tracklist</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
             <div className="space-y-0.5">
               {record.tracklist.map((track, i) => (
                 <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null, hot: localHots[i] ?? track.hot ?? false }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={toggleHot} />
@@ -3146,7 +3146,7 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
 
   return (
     <div className="relative">
-      <MagnifyingGlass size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none z-10" />
+      <MagnifyingGlass size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/45 pointer-events-none z-10" />
       <input
         ref={inputRef}
         value={value}
@@ -3155,7 +3155,7 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={handleKey}
         placeholder="Search artist, title, label, cat #..."
-        className="w-full rounded-full pl-8 pr-4 py-2 text-[12px] font-mono text-white/65 placeholder-white/20 outline-none transition-all"
+        className="w-full rounded-full pl-8 pr-4 py-2 text-[12px] font-mono text-white/65 placeholder-white/30 outline-none transition-all"
         style={{ background: "rgba(var(--fg),0.04)", border: open && suggestions.length > 0 ? `1px solid rgba(${accentRGB},0.3)` : "1px solid rgba(var(--fg),0.08)" }}
       />
       {value && (
@@ -3189,8 +3189,8 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
       style={{
         width: size === 9 ? 24 : 28, height: size === 9 ? 24 : 28,
         background: isPlaying ? `rgba(${accentRGB},0.18)` : "transparent",
-        border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(var(--fg),0.09)",
-        color: isPlaying ? `rgb(${accentRGB})` : "rgba(var(--fg),0.30)",
+        border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(var(--fg),0.13)",
+        color: isPlaying ? `rgb(${accentRGB})` : "rgba(var(--fg),0.50)",
       }}>
       {isPlaying ? <Pause size={size} weight="fill" /> : <Play size={size} weight="fill" />}
     </button>
@@ -3198,14 +3198,14 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
 
   return (
     <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
-      <div className="text-[10px] tracking-[0.12em] text-white/35 font-mono">{track.position}</div>
+      <div className="text-[10px] tracking-[0.12em] text-white/50 font-mono">{track.position}</div>
       <div className="min-w-0 flex items-start gap-1.5">
         {/* Hot toggle: clickable when onHotToggle provided, display-only when track.hot */}
         {(onHotToggle || track.hot) && (
           <button
             onClick={onHotToggle ? () => onHotToggle(index) : undefined}
             className="shrink-0 leading-none transition-opacity"
-            style={{ fontSize: 13, opacity: track.hot ? 1 : 0.18, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
+            style={{ fontSize: 13, opacity: track.hot ? 1 : 0.22, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
             title={onHotToggle ? (track.hot ? "Unmark as hot" : "Mark as hot") : undefined}
           >
             🔥
@@ -3214,14 +3214,14 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
         <div className="min-w-0">
           <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
           {/* Mobile: duration + BPM + key inline */}
-          <div className="md:hidden text-[10px] text-white/30 mt-0.5 flex items-center gap-1.5 font-mono">
+          <div className="md:hidden text-[10px] text-white/42 mt-0.5 flex items-center gap-1.5 font-mono">
             {track.duration && <><span>{track.duration}</span><span>·</span></>}
             {bpmLoading
               ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
               : <span>{track.bpm != null ? `${track.bpm} BPM` : ""}</span>
             }
             {track.bpm != null && <span>·</span>}
-            <span style={{ color: keyColor || "rgba(var(--fg),0.2)" }}>{track.key || ""}</span>
+            <span style={{ color: keyColor || "rgba(var(--fg),0.38)" }}>{track.key || ""}</span>
           </div>
         </div>
       </div>
@@ -3230,18 +3230,19 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
         <PlayBtn size={10} />
       </div>
       {/* Desktop columns */}
-      <div className="hidden md:flex items-center gap-1 text-[11px] text-white/35 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
+      <div className="hidden md:flex items-center gap-1 text-[11px] text-white/50 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
       <div className="hidden md:flex items-center gap-1 text-[11px] tabular-nums min-w-[72px] justify-end font-mono">
-        <span className="text-white/22 text-[9px]">BPM</span>
+        <span className="text-white/35 text-[9px]">BPM</span>
         {bpmLoading
-          ? <span className="text-white/30" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
-          : <span style={{ color: track.bpm != null ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.2)" }}>{track.bpm != null ? track.bpm : "—"}</span>
+          ? <span className="text-white/40" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
+          : <span style={{ color: track.bpm != null ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.40)" }}>{track.bpm != null ? track.bpm : "—"}</span>
         }
       </div>
-      <div className="flex items-center justify-center w-10 md:w-12 h-6 md:h-7">
+      {/* Key badge — hidden on mobile (already shown inline above) */}
+      <div className="hidden md:flex items-center justify-center md:w-12 h-7">
         {keyColor ? (
-          <div className="w-full h-full rounded-full flex items-center justify-center text-[10px] md:text-[11px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
-        ) : <span className="text-white/20 text-[10px] font-mono">—</span>}
+          <div className="w-full h-full rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
+        ) : <span className="text-white/35 text-[10px] font-mono">—</span>}
       </div>
       <div className="hidden md:flex items-center justify-center">
         <PlayBtn size={9} />
@@ -3275,9 +3276,9 @@ function GlassSection({ title, subtitle, icon, accentRGB, children }) {
       <div className="flex items-baseline justify-between mb-5">
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="text-[10px] tracking-[0.3em] uppercase font-medium font-mono text-white/55">{title}</h3>
+          <h3 className="text-[10px] tracking-[0.3em] uppercase font-medium font-mono text-white/60">{title}</h3>
         </div>
-        {subtitle && <div className="text-[10px] tracking-[0.12em] uppercase text-white/25 font-mono">{subtitle}</div>}
+        {subtitle && <div className="text-[10px] tracking-[0.12em] uppercase text-white/40 font-mono">{subtitle}</div>}
       </div>
       {children}
     </section>
@@ -3287,8 +3288,8 @@ function GlassSection({ title, subtitle, icon, accentRGB, children }) {
 function Pill({ label, value, mono }) {
   return (
     <div className="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(var(--fg),0.035)", border: "1px solid rgba(var(--fg),0.07)" }}>
-      <span className="text-[9px] tracking-[0.2em] uppercase text-white/30 font-mono">{label}</span>
-      <span className={`text-[13px] text-white/80 ${mono ? "font-mono" : ""}`}>{value}</span>
+      <span className="text-[9px] tracking-[0.2em] uppercase text-white/45 font-mono">{label}</span>
+      <span className={`text-[13px] text-white/85 ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
   );
 }
