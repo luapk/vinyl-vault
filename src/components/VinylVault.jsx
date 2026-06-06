@@ -791,20 +791,48 @@ function SaveConfirmation({ release, accentRGB }) {
 function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
   const [showCamera, setShowCamera] = useState(false);
   const [recs, setRecs] = useState([]);
-  const [recsGenres, setRecsGenres] = useState([]);
+  const [recsSource, setRecsSource] = useState([]);
 
   useEffect(() => {
-    const counts = {};
+    const CACHE_KEY = 'vv_recs_v3';
+    const CACHE_TTL = 24 * 60 * 60 * 1000;
+
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.ts < CACHE_TTL && cached.results?.length) {
+        setRecs(cached.results);
+        setRecsSource(cached.source || []);
+        return;
+      }
+    } catch {}
+
+    const labelCounts = {}, artistCounts = {}, genreCounts = {};
     for (const record of collection) {
-      for (const g of (record.genres || [])) counts[g] = (counts[g] || 0) + 1;
-      for (const t of (record.tags || [])) counts[t] = (counts[t] || 0) + 1;
+      if (record.label) labelCounts[record.label] = (labelCounts[record.label] || 0) + 1;
+      if (record.artist) artistCounts[record.artist] = (artistCounts[record.artist] || 0) + 1;
+      for (const g of (record.genres || [])) genreCounts[g] = (genreCounts[g] || 0) + 1;
+      for (const t of (record.tags || [])) genreCounts[t] = (genreCounts[t] || 0) + 1;
     }
-    const tags = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
-    if (!tags.length) return;
-    setRecsGenres(tags.slice(0, 3));
-    fetch(`/api/recommendations?tags=${encodeURIComponent(tags.join(','))}`)
+    const topLabels  = Object.entries(labelCounts).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([l]) => l);
+    const topArtists = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([a]) => a);
+    const topGenres  = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
+
+    if (!topLabels.length && !topArtists.length) return;
+    const source = topLabels.slice(0, 3);
+    setRecsSource(source);
+
+    const params = new URLSearchParams();
+    if (topLabels.length)  params.set('labels',  topLabels.join(','));
+    if (topArtists.length) params.set('artists', topArtists.join(','));
+    if (topGenres.length)  params.set('genres',  topGenres.join(','));
+
+    fetch(`/api/recommendations?${params}`)
       .then(r => r.ok ? r.json() : { results: [] })
-      .then(data => setRecs(data.results || []))
+      .then(data => {
+        const results = data.results || [];
+        setRecs(results);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ results, source, ts: Date.now() })); } catch {}
+      })
       .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -877,9 +905,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
         <div className="mt-16 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
           <div className="flex items-baseline justify-between mb-4">
             <div className="text-[10px] tracking-[0.35em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.3)' }}>Picked for you</div>
-            {recsGenres.length > 0 && (
-              <div className="text-[9px] font-mono" style={{ color: 'rgba(var(--fg),0.2)', letterSpacing: '0.15em' }}>
-                {recsGenres.join(' / ')}
+            {recsSource.length > 0 && (
+              <div className="text-[9px] font-mono" style={{ color: 'rgba(var(--fg),0.2)', letterSpacing: '0.12em' }}>
+                {recsSource.join(' / ')}
               </div>
             )}
           </div>
@@ -895,13 +923,11 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                 <div style={{ padding: '10px 10px 10px' }}>
                   <div style={{ fontSize: 9, color: 'rgba(var(--fg),0.4)', fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 6 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 5 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
-                  {rec.wants > 0 && (
-                    <div style={{ fontSize: 8, fontFamily: 'monospace', color: `rgba(${accentRGB},0.7)`, marginBottom: 5, letterSpacing: '0.08em' }}>
-                      {rec.wants >= 1000 ? `${(rec.wants / 1000).toFixed(1)}k` : rec.wants} wants
-                    </div>
+                  {rec.reason && (
+                    <div style={{ fontSize: 9, fontStyle: 'italic', color: `rgba(${accentRGB},0.7)`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
                   )}
                   <div style={{ fontSize: 8, fontFamily: 'monospace', color: 'rgba(var(--fg),0.2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
