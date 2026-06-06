@@ -981,7 +981,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
       {/* Recommendations */}
       {recs.length > 0 && (
-        <div className="mt-8 w-full" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
+        <div className="mt-14 w-full" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
           <div className="mb-4">
             <div className="text-[13px] tracking-[0.35em] uppercase font-mono whitespace-nowrap" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
             {recsSource.length > 0 && (
