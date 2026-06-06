@@ -53,7 +53,9 @@ const resizeImage = (file, maxDim = 1500, quality = 0.85) =>
         const canvas = document.createElement("canvas");
         canvas.width = width; canvas.height = height;
         canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        canvas.width = 0; canvas.height = 0;
+        resolve(dataUrl);
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -486,7 +488,7 @@ export default function VinylVault() {
         setPhase("disambiguation");
       } else if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
         const coverSrc = data.release.coverUrl || null;
         if (coverSrc) { const c = await extractDominantColor(coverSrc); setAccent(c); }
@@ -515,7 +517,7 @@ export default function VinylVault() {
       const data = await response.json();
       if (data.status === "complete") {
         setRelease(data.release);
-        setPendingCrates(data.release.suggestedBoxes || []);
+        setPendingCrates([]);
         setPhase("result");
         if (data.release.coverUrl) { const c = await extractDominantColor(data.release.coverUrl); setAccent(c); }
       } else {
@@ -1110,8 +1112,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // Custom crates from existing collection (non-genre) minus already-pending
-  const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c));
+  // AI-suggested crates for this record minus already-pending
+  const suggestedCrates = (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c));
+  // Custom crates from existing collection (non-genre) minus already-pending and suggestions
+  const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c) && !(release.suggestedBoxes || []).includes(c));
 
   const duplicate = release && collection.find(r =>
     (release.id && r.discogsId && String(r.discogsId) === String(release.id)) ||
@@ -1217,6 +1221,20 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
                   <Check size={11} weight="bold" />{name}<X size={10} className="opacity-50 ml-0.5" />
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* AI-suggested crates — opt-in */}
+          {suggestedCrates.length > 0 && (
+            <div>
+              <div className="text-[9px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>Suggested</div>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedCrates.map((name) => (
+                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.38)" }}>
+                    <Plus size={9} />{name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -3457,31 +3475,38 @@ function CameraModal({ onCapture, onClose }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const streamRef = useRef(null);
+
+  const stopStream = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+  };
 
   useEffect(() => {
     let mounted = true;
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     }).then(stream => {
       if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => setReady(true);
+        videoRef.current.onloadedmetadata = () => { if (mounted) setReady(true); };
       }
     }).catch(err => {
       if (mounted) setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : err.message);
     });
     return () => {
       mounted = false;
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      stopStream();
     };
   }, []);
 
   const capture = () => {
-    if (!videoRef.current || !ready) return;
+    if (!videoRef.current || !ready || capturing) return;
+    setCapturing(true);
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
     const v = videoRef.current;
@@ -3489,7 +3514,9 @@ function CameraModal({ onCapture, onClose }) {
     canvas.width = v.videoWidth;
     canvas.height = v.videoHeight;
     canvas.getContext('2d').drawImage(v, 0, 0);
+    stopStream();
     canvas.toBlob(blob => {
+      canvas.width = 0; canvas.height = 0;
       if (blob) onCapture(new File([blob], 'scan.jpg', { type: 'image/jpeg' }));
     }, 'image/jpeg', 0.92);
   };
