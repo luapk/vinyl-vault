@@ -2461,7 +2461,7 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 12, color: 'rgba(var(--fg),0.7)' }}>Public collection</div>
+                <div style={{ fontSize: 12, color: isPublic ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.7)', transition: 'color 0.2s' }}>{isPublic ? 'Public collection' : 'Private collection'}</div>
                 <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
               </div>
               <button
