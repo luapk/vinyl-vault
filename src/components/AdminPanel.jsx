@@ -19,7 +19,7 @@ export default function AdminPanel({ onBack }) {
       // Admins can see all profiles via the RLS policy.
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, email, role, created_at')
+        .select('id, email, role, created_at, display_name, username, is_public')
         .order('created_at', { ascending: true });
       if (error) throw error;
 
@@ -152,12 +152,22 @@ export default function AdminPanel({ onBack }) {
                     : <UserCircle size={14} className="text-violet-400" weight="duotone" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{u.email}</p>
-                  <p className="text-xs text-white/30">
-                    {u.role === 'admin' ? 'Admin' : 'User'} &middot; {u.recordCount} record{u.recordCount !== 1 ? 's' : ''}
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-white truncate">
+                      {u.display_name || u.email}
+                    </p>
+                    {u.username && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{ background: u.is_public ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: u.is_public ? '#86efac' : 'rgba(255,255,255,0.3)', border: `1px solid ${u.is_public ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+                        @{u.username}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/30 truncate">
+                    {u.email} &middot; {u.role === 'admin' ? 'Admin' : 'User'} &middot; {u.recordCount} record{u.recordCount !== 1 ? 's' : ''}
                   </p>
                 </div>
-                <span className="text-xs text-white/20">
+                <span className="text-xs text-white/20 flex-shrink-0">
                   {new Date(u.created_at).toLocaleDateString()}
                 </span>
               </li>

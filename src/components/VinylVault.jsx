@@ -618,7 +618,6 @@ export default function VinylVault() {
     { id: "stats", label: "Stats", icon: ChartBar },
     ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users }] : []),
     { id: "about", label: "About", icon: Info },
-    ...(isAdmin ? [{ id: "admin", label: "Admin", icon: Crown }] : []),
   ];
 
   return (
@@ -741,6 +740,8 @@ export default function VinylVault() {
           onViewProfile={(username) => { setShowAccount(false); openProfile(username); }}
           onPrintLabels={() => { setShowAccount(false); setAppView('collection'); enterLabelMode(); }}
           onDownloadCSV={() => downloadCSV(collection)}
+          isAdmin={isAdmin}
+          onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
         />
       )}
     </div>
@@ -2213,7 +2214,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV }) {
+function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, isAdmin, onOpenAdmin }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2532,9 +2533,21 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
 
         </div>
 
+        {/* Admin panel shortcut */}
+        {isAdmin && (
+          <button onClick={onOpenAdmin}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-5"
+            style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', color: 'rgba(251,191,36,0.7)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(251,191,36,0.14)'; e.currentTarget.style.color = 'rgba(251,191,36,0.95)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(251,191,36,0.07)'; e.currentTarget.style.color = 'rgba(251,191,36,0.7)'; }}>
+            <Crown size={14} />
+            Admin panel
+          </button>
+        )}
+
         {/* Sign out */}
         <button onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-5"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-2"
           style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.45)' }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#fca5a5'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.04)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.08)'; e.currentTarget.style.color = 'rgba(var(--fg),0.45)'; }}>
