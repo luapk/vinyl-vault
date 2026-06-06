@@ -1335,8 +1335,6 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
-  const [showCrateManager, setShowCrateManager] = useState(false);
-  const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [detailRecordId, setDetailRecordId] = useState(null);
   const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
@@ -1397,7 +1395,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       {/* Mode toggle: Stacks vs Explore */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.08)" }}>
-          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore tags" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
+          {[{ id: "stacks", label: "Collection" }, { id: "crates", label: "Crates" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
@@ -1428,9 +1426,9 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         )}
       </div>
 
-      {/* EXPLORE MODE */}
-      {collectionMode === "explore" && (
-        <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecordId(r.id)} />
+      {/* CRATES MODE */}
+      {collectionMode === "crates" && (
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />
       )}
 
       {/* STATS MODE */}
@@ -1484,16 +1482,8 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           )}
 
-          <div className="flex items-center gap-3 mb-5">
+          <div className="mb-5">
             <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
-            <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.35)", background: "transparent" }}>
-              <Wrench size={10} />Crates
-            </button>
-            {collection.length >= 2 && (
-              <button onClick={() => setShowSmartCrates(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.35)", background: "transparent" }}>
-                <Sparkle size={10} />Smart Crates
-              </button>
-            )}
           </div>
 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
@@ -1522,8 +1512,6 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       )}
 
       {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
-      {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
-      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -3059,6 +3047,86 @@ function SmartCratesModal({ collection, onUpdate, onClose }) {
   );
 }
 
+// ----- CratesTabView ---------------------------------------------------------
+
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor }) {
+  const [showSmartCrates, setShowSmartCrates] = useState(false);
+  const [editingName, setEditingName] = useState(null);
+  const [newName, setNewName] = useState("");
+
+  const commitRename = () => {
+    if (newName.trim() && newName.trim() !== editingName) onRename(editingName, newName.trim());
+    setEditingName(null);
+  };
+
+  return (
+    <div className="pt-2 max-w-sm">
+      {/* Smart Crates */}
+      <div className="mb-8">
+        <button
+          onClick={() => collection.length >= 2 && setShowSmartCrates(true)}
+          disabled={collection.length < 2}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[13px] font-mono transition-all mb-2"
+          style={{ border: "1px solid rgba(var(--fg),0.10)", color: collection.length >= 2 ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.25)", background: "rgba(var(--fg),0.03)", cursor: collection.length >= 2 ? "pointer" : "not-allowed" }}
+        >
+          <Sparkle size={13} />Smart Crates
+        </button>
+        <p className="text-[12px] font-mono leading-relaxed" style={{ color: "rgba(var(--fg),0.25)" }}>
+          AI groups your collection into collector-meaningful crates based on sound, era, and scene.
+        </p>
+      </div>
+
+      {/* Crate list */}
+      <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-3" style={{ color: "rgba(var(--fg),0.25)" }}>Your crates</div>
+      {allCrates.length === 0 ? (
+        <p className="text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.25)" }}>No crates yet. Open a record and assign it to a crate to get started.</p>
+      ) : (
+        <div className="space-y-2">
+          {allCrates.map((crate) => {
+            const activeColor = crateColors[crate] || null;
+            return (
+              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '44' : 'rgba(var(--fg),0.06)'}`, boxShadow: activeColor ? `0 0 16px -6px ${activeColor}55` : 'none' }}>
+                <div className="flex items-center gap-2.5 p-3">
+                  <RotatingCube color={activeColor || 'rgba(var(--fg),0.35)'} size={10} />
+                  {editingName === crate ? (
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
+                  ) : (
+                    <span className="flex-1 text-sm font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
+                  )}
+                  {editingName === crate ? (
+                    <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>
+                  ) : (
+                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                  )}
+                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
+                </div>
+                {editingName === crate && (
+                  <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                    <span className="text-[11px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
+                    {CRATE_PALETTE.map(({ id, hex }) => {
+                      const isActive = activeColor === hex;
+                      return (
+                        <button key={id} onClick={() => onSetColor(crate, isActive ? null : hex)} title={id}
+                          style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, background: hex, border: isActive ? '2px solid rgba(var(--fg),0.85)' : '1.5px solid rgba(var(--fg),0.12)', boxShadow: isActive ? `0 0 8px ${hex}` : 'none', transition: 'all 0.15s', transform: isActive ? 'scale(1.2)' : 'scale(1)' }}
+                        />
+                      );
+                    })}
+                    {activeColor && (
+                      <button onClick={() => onSetColor(crate, null)} className="text-[11px] font-mono tracking-wide ml-1 transition-all" style={{ color: 'rgba(var(--fg),0.22)', borderBottom: '1px solid rgba(var(--fg),0.10)', lineHeight: '1.1' }}>clear</button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} />}
+    </div>
+  );
+}
+
 // ----- BatchView -------------------------------------------------------------
 
 function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
@@ -4172,7 +4240,7 @@ function WalkthroughOverlay({ onDismiss, accentRGB }) {
     {
       icon: Stack,
       title: 'Organise',
-      body: 'File records into crates, explore your collection by tag, or dig through the carousel.',
+      body: 'File records into crates, sort them with Smart Crates AI, or dig through the carousel.',
     },
     {
       icon: Printer,
