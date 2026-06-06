@@ -855,7 +855,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
   const [recsSource, setRecsSource] = useState([]);
 
   useEffect(() => {
-    const CACHE_KEY = 'vv_recs_v3';
+    const CACHE_KEY = 'vv_recs_v4';
     const CACHE_TTL = 24 * 60 * 60 * 1000;
 
     try {
@@ -990,9 +990,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
             {recs.slice(0, 6).map(rec => (
-              <div key={rec.id} style={{ background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden' }}>
+              <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden' }}>
                   {rec.thumb
                     ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />

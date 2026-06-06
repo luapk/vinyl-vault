@@ -23,7 +23,7 @@ async function queryDiscogs(params, headers) {
       format: 'Vinyl',
       sort: 'date_added',
       sort_order: 'desc',
-      per_page: '5',
+      per_page: '10',
       ...params,
     })}`;
     const res = await fetch(url, { headers });
@@ -50,10 +50,10 @@ Their collection taste profile:
 These are new releases on their favourite labels and by their favourite artists:
 ${list}
 
-Pick exactly 3 that would most excite this collector based on what they already own. Prefer variety -- avoid picking 3 from the same artist. For each pick write one sentence of max 10 words explaining why it fits their taste.
+Pick exactly 6 that would most excite this collector based on what they already own. Prefer variety -- avoid picking more than 2 from the same artist. For each pick write one sentence of max 10 words explaining why it fits their taste.
 
 Return ONLY a JSON array, no other text:
-[{"index": 1, "reason": "..."}, {"index": 2, "reason": "..."}, {"index": 3, "reason": "..."}]`;
+[{"index": 1, "reason": "..."}, {"index": 2, "reason": "..."}, {"index": 3, "reason": "..."}, {"index": 4, "reason": "..."}, {"index": 5, "reason": "..."}, {"index": 6, "reason": "..."}]`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -65,7 +65,7 @@ Return ONLY a JSON array, no other text:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 250,
+        max_tokens: 450,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -137,12 +137,12 @@ export default async function handler(req, res) {
           return rec ? { ...rec, reason: p.reason || null } : null;
         })
         .filter(Boolean);
-      if (mapped.length >= 3) results = mapped.slice(0, 3);
+      if (mapped.length >= 3) results = mapped.slice(0, 6);
     }
   }
 
   // Fallback: first 3 from pool, no reason text
-  if (!results) results = pool.slice(0, 3).map(r => ({ ...r, reason: null }));
+  if (!results) results = pool.slice(0, 6).map(r => ({ ...r, reason: null }));
 
   return res.status(200).json({ results });
 }
