@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, CaretLeft, MagnifyingGlass, Users, ShareNetwork, PaperPlaneRight,
-  Trash, VinylRecord, ChatCircle, Check, Clock, Bell,
+  Trash, VinylRecord, ChatCircle, Check, Clock, Bell, PaperPlaneTilt,
 } from "@phosphor-icons/react";
 import {
   getProfileByUsername, getPublicCollection, getCollectionCount,
@@ -289,7 +289,7 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
 
 const PAGE = 60;
 
-function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenProfile, onShare }) {
+function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenProfile, onShare, onOpenChat }) {
   const [profile, setProfile] = useState(null);
   const [state, setState] = useState('loading'); // loading | ready | notfound | private
   const [records, setRecords] = useState([]);
@@ -403,6 +403,12 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
             className="w-10 h-10 rounded-full flex items-center justify-center transition-all" style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.55)', background: 'rgba(var(--fg),0.04)' }}>
             <ShareNetwork size={16} />
           </button>
+          {!isMe && currentUserId && onOpenChat && (
+            <button onClick={() => onOpenChat(profile)} title="Send message"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all" style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.55)', background: 'rgba(var(--fg),0.04)' }}>
+              <PaperPlaneTilt size={16} />
+            </button>
+          )}
           {!isMe && currentUserId && (
             <button onClick={onFollowToggle} disabled={followBusy}
               className="px-5 py-2.5 rounded-full text-[12px] tracking-[0.1em] uppercase font-mono transition-all"
@@ -455,7 +461,7 @@ function ProfileMessage({ title, body, onBack, profile }) {
 
 // ─── Community home (feed + search + your profile) ────────────────────────────
 
-function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection }) {
+function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection, onOpenChat }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -525,14 +531,22 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {following.map(p => (
-              <button key={p.id} onClick={() => p.username && onOpenProfile(p.username)}
-                className="flex flex-col items-center gap-1.5 shrink-0 px-2.5 py-2 rounded-xl transition-all"
+              <div key={p.id} className="flex flex-col items-center gap-1.5 shrink-0 px-2.5 py-2 rounded-xl"
                 style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 60 }}>
-                <Avatar profile={p} size={32} />
-                <span className="text-[9px] font-mono text-white/50 max-w-[52px] truncate leading-tight">
-                  {p.display_name || p.username || 'User'}
-                </span>
-              </button>
+                <button onClick={() => p.username && onOpenProfile(p.username)} className="flex flex-col items-center gap-1">
+                  <Avatar profile={p} size={32} />
+                  <span className="text-[9px] font-mono text-white/50 max-w-[52px] truncate leading-tight">
+                    {p.display_name || p.username || 'User'}
+                  </span>
+                </button>
+                {onOpenChat && (
+                  <button onClick={() => onOpenChat(p)} title="Message"
+                    className="flex items-center justify-center transition-opacity hover:opacity-70"
+                    style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid rgba(var(--fg),0.12)', background: 'rgba(var(--fg),0.05)', color: 'rgba(var(--fg),0.45)' }}>
+                    <PaperPlaneTilt size={10} />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -709,7 +723,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
 // ─── Top-level Community view ─────────────────────────────────────────────────
 
-export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection }) {
+export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection, onOpenChat }) {
   const [toast, setToast] = useState('');
 
   const share = useCallback((username) => {
@@ -734,6 +748,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onBack={onOpenHome}
           onOpenProfile={onOpenProfile}
           onShare={share}
+          onOpenChat={onOpenChat}
         />
       ) : (
         <CommunityHome
@@ -744,6 +759,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onShare={share}
           onOpenAccount={onOpenAccount}
           collection={collection}
+          onOpenChat={onOpenChat}
         />
       )}
 

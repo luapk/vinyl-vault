@@ -131,3 +131,7 @@ body {
   from { opacity: 1; transform: translateX(-50%) translateY(0)      scale(1); }
   to   { opacity: 0; transform: translateX(-50%) translateY(-10px)  scale(0.94); }
 }
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}

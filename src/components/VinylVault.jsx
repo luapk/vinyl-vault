@@ -4,6 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
+  ChatCircle,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -11,7 +12,8 @@ import { useTheme } from "../hooks/useTheme.js";
 import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
-import { getNotificationCount, getLastSeenTs, markNotifsSeen } from '../lib/social.js';
+import ChatPanel from "./ChatPanel.jsx";
+import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -346,6 +348,9 @@ export default function VinylVault() {
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
   const [notifCount, setNotifCount] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatRecipient, setChatRecipient] = useState(null); // profile object
+  const [msgUnread, setMsgUnread] = useState(0);
 
   const openProfile = useCallback((username) => {
     if (!username) return;
@@ -384,6 +389,12 @@ export default function VinylVault() {
   useEffect(() => {
     if (!user?.id || !isSupabaseEnabled) { setNotifCount(0); return; }
     getNotificationCount(user.id, getLastSeenTs()).then(setNotifCount).catch(() => {});
+  }, [user?.id, isSupabaseEnabled]);
+
+  // Unread message badge
+  useEffect(() => {
+    if (!user?.id || !isSupabaseEnabled) { setMsgUnread(0); return; }
+    getUnreadMessageCount(user.id).then(setMsgUnread).catch(() => {});
   }, [user?.id, isSupabaseEnabled]);
 
   useEffect(() => {
@@ -678,6 +689,20 @@ export default function VinylVault() {
           ))}
         </nav>
 
+        {/* Chat button */}
+        {isSupabaseEnabled && user && (
+          <button onClick={() => { setChatRecipient(null); setChatOpen(p => !p); }} title="Messages"
+            className="relative w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-opacity hover:opacity-70"
+            style={{ border: chatOpen ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.18)', background: chatOpen ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.06)', color: chatOpen ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>
+            <ChatCircle size={14} weight={chatOpen ? 'fill' : 'regular'} />
+            {msgUnread > 0 && (
+              <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 8, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                {msgUnread > 9 ? '9+' : msgUnread}
+              </span>
+            )}
+          </button>
+        )}
+
         {/* Account button */}
         {isSupabaseEnabled && user && (
           <button onClick={() => setShowAccount(true)} title="Account settings"
@@ -735,10 +760,22 @@ export default function VinylVault() {
             onOpenHome={openCommunityHome}
             onOpenAccount={() => setShowAccount(true)}
             collection={collection}
+            onOpenChat={(recipient) => { setChatRecipient(recipient); setChatOpen(true); }}
           />
         )}
         {appView === "about" && <AboutView accentRGB={accentRGB} />}
       </main>
+
+      {/* Chat panel overlay */}
+      {chatOpen && user && (
+        <ChatPanel
+          currentUser={user}
+          accentRGB={accentRGB}
+          initialRecipient={chatRecipient}
+          onClose={() => { setChatOpen(false); setChatRecipient(null); }}
+          onUnreadChange={setMsgUnread}
+        />
+      )}
 
       {showWalkthrough && appView === 'scan' && (
         <WalkthroughOverlay onDismiss={() => {

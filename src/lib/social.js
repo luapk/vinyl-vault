@@ -298,3 +298,75 @@ export async function deleteComment(commentId) {
   const { error } = await supabase.from('record_comments').delete().eq('id', commentId);
   if (error) throw error;
 }
+
+// ─── Direct messages ──────────────────────────────────────────────────────────
+
+export async function getConversations(userId) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, from_user_id, to_user_id, body, created_at, read_at, from_profile:from_user_id(id, username, display_name, avatar_url), to_profile:to_user_id(id, username, display_name, avatar_url)')
+    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const map = new Map();
+  for (const msg of data || []) {
+    const otherId = msg.from_user_id === userId ? msg.to_user_id : msg.from_user_id;
+    const otherProfile = msg.from_user_id === userId ? msg.to_profile : msg.from_profile;
+    if (!map.has(otherId)) {
+      map.set(otherId, { userId: otherId, profile: otherProfile, lastMessage: msg, unread: 0 });
+    }
+    if (msg.to_user_id === userId && !msg.read_at) {
+      map.get(otherId).unread++;
+    }
+  }
+  return [...map.values()];
+}
+
+export async function getMessages(userId, otherUserId, limit = 80) {
+  if (!supabase || !userId || !otherUserId) return [];
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, from_user_id, to_user_id, body, created_at, read_at')
+    .or(`and(from_user_id.eq.${userId},to_user_id.eq.${otherUserId}),and(from_user_id.eq.${otherUserId},to_user_id.eq.${userId})`)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function sendMessage(fromUserId, toUserId, body) {
+  if (!supabase) throw new Error('Not configured');
+  const trimmed = (body || '').trim();
+  if (!trimmed) throw new Error('Message is empty');
+  if (trimmed.length > 500) throw new Error('Message too long (500 char max)');
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ from_user_id: fromUserId, to_user_id: toUserId, body: trimmed })
+    .select('id, from_user_id, to_user_id, body, created_at, read_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function markMessagesRead(toUserId, fromUserId) {
+  if (!supabase) return;
+  await supabase
+    .from('messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('to_user_id', toUserId)
+    .eq('from_user_id', fromUserId)
+    .is('read_at', null);
+}
+
+export async function getUnreadMessageCount(userId) {
+  if (!supabase || !userId) return 0;
+  const { count, error } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('to_user_id', userId)
+    .is('read_at', null);
+  if (error) return 0;
+  return count || 0;
+}
