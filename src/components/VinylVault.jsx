@@ -641,7 +641,6 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
-    { id: "stats", label: "Stats", icon: ChartBar },
     ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
     { id: "about", label: "About", icon: Info },
   ];
@@ -749,7 +748,6 @@ export default function VinylVault() {
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
         )}
-        {appView === "stats" && <StatsView collection={collection} accentRGB={accentRGB} />}
         {appView === "community" && (
           <CommunityView
             currentUser={user}
@@ -1380,7 +1378,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       {/* Mode toggle: Stacks vs Explore */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.08)" }}>
-          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore by tag" }].map(({ id, label }) => (
+          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore by tag" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
@@ -1426,6 +1424,11 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       {/* EXPLORE MODE */}
       {collectionMode === "explore" && (
         <ExploreView collection={collection} accentRGB={accentRGB} onSelectRecord={(r) => setDetailRecordId(r.id)} />
+      )}
+
+      {/* STATS MODE */}
+      {collectionMode === "stats" && (
+        <StatsView collection={collection} accentRGB={accentRGB} />
       )}
 
       {/* STACKS MODE */}
