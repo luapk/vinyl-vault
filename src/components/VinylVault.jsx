@@ -913,7 +913,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
             : <>Stack your wax<br /><span className="text-white/35">the easy way.</span></>
           }
         </h1>
-        <p className="text-white/45 text-base md:text-lg max-w-lg leading-relaxed">
+        <p className="text-white/45 text-sm md:text-base max-w-lg leading-relaxed">
           Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM data attached, and the record filed exactly where you want it.
         </p>
       </div>
