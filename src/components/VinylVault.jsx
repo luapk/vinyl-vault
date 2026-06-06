@@ -3071,8 +3071,8 @@ function StatCard({ label, target, suffix = '', ready }) {
 
   return (
     <div style={{ padding: '14px 18px', borderRadius: 16, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.09)' }}>
-      <div style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 44, fontFamily: 'monospace', color: 'rgba(var(--fg),0.88)', lineHeight: 1 }}>{val}{suffix}</div>
+      <div style={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 37, fontFamily: 'monospace', color: 'rgba(var(--fg),0.88)', lineHeight: 1 }}>{val}{suffix}</div>
     </div>
   );
 }
@@ -3159,11 +3159,11 @@ function StatsView({ collection, accentRGB }) {
           <div className="space-y-2.5">
             {topGenres.map(([genre, count], i) => (
               <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
+                <div style={{ width: 76, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / maxGenre, i, i * 0.04)} />
                 </div>
-                <div style={{ width: 24, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+                <div style={{ width: 24, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
             ))}
           </div>
@@ -3177,11 +3177,11 @@ function StatsView({ collection, accentRGB }) {
               const c = barColors[i % barColors.length];
               return (
                 <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
+                  <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
                   <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `linear-gradient(to top, rgba(${c},0.80) 0%, rgba(${c},0.60) 50%, rgba(${c},0.85) 100%)`, boxShadow: `inset 1px 0 0 rgba(255,255,255,0.22), inset -1px 0 0 rgba(0,0,0,0.08), inset 0 2px 0 rgba(255,255,255,0.18), 0 0 8px rgba(${c},0.25)`, border: `1px solid rgba(${c},0.28)`, borderBottom: 'none' }} />
                   </div>
-                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
+                  <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
                 </div>
               );
             })}
@@ -3194,11 +3194,11 @@ function StatsView({ collection, accentRGB }) {
           <div className="space-y-2.5">
             {topLabels.map(([label, count], i) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
+                <div style={{ width: 76, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / (topLabels[0]?.[1] || 1), i, i * 0.04)} />
                 </div>
-                <div style={{ width: 24, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+                <div style={{ width: 24, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
             ))}
           </div>
@@ -3210,8 +3210,8 @@ function StatsView({ collection, accentRGB }) {
           <div className="flex flex-wrap gap-2">
             {crateSizes.map(({ name, count }) => (
               <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)' }}>
-                <span style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.62)' }}>{name}</span>
-                <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.32)' }}>{count}</span>
+                <span style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.62)' }}>{name}</span>
+                <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.32)' }}>{count}</span>
               </div>
             ))}
           </div>
