@@ -1293,11 +1293,11 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 // ----- Crate colour system ---------------------------------------------------
 
 const CRATE_PALETTE = [
-  { id: 'cyan',    hex: '#22d3ee' },
-  { id: 'amber',   hex: '#f59e0b' },
-  { id: 'rose',    hex: '#f43f5e' },
-  { id: 'violet',  hex: '#8b5cf6' },
-  { id: 'emerald', hex: '#10b981' },
+  { id: 'cyan',    hex: '#7dd9e8' },
+  { id: 'amber',   hex: '#f5c97a' },
+  { id: 'rose',    hex: '#f5a0b0' },
+  { id: 'violet',  hex: '#bba8f5' },
+  { id: 'emerald', hex: '#7dd4b5' },
 ];
 
 function loadCrateColors() {
@@ -1474,14 +1474,18 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 const active = filterCrate === c;
                 return (
                   <button key={c} onClick={() => setFilterCrate(active ? null : c)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] tracking-[0.12em] uppercase font-mono transition-all"
-                    style={{
-                      background: active ? (col ? `${col}22` : 'rgba(var(--fg),0.10)') : (col ? `${col}0d` : 'rgba(var(--fg),0.025)'),
-                      border: active ? `1px solid ${col || 'rgba(var(--fg),0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(var(--fg),0.12)'}`,
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={col ? {
+                      background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
+                      border: `1px solid ${col}70`,
+                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
+                      color: 'rgba(var(--fg),0.92)',
+                      opacity: active ? 1 : 0.78,
+                    } : {
+                      background: active ? 'rgba(var(--fg),0.10)' : 'rgba(var(--fg),0.025)',
+                      border: `1px solid ${active ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
                       color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.52)',
-                      boxShadow: active && col ? `0 0 14px -3px ${col}66` : 'none',
                     }}>
-                    <RotatingCube color={col || 'rgba(var(--fg),0.4)'} size={8} />
                     {c}
                   </button>
                 );
@@ -1648,14 +1652,17 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           {(current.crates || []).map((c) => {
             const col = crateColors[c] || null;
             return (
-              <span key={c} className="inline-flex items-center gap-1.5 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
-                style={{
-                  background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
-                  border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
+              <span key={c} className="inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+                style={col ? {
+                  background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
+                  border: `1px solid ${col}70`,
+                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
+                  color: 'rgba(var(--fg),0.92)',
+                } : {
+                  background: `rgba(${accentRGB},0.10)`,
+                  border: `1px solid rgba(${accentRGB},0.22)`,
                   color: 'rgba(var(--fg),0.65)',
-                  boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
                 }}>
-                <RotatingCube color={col || `rgb(${accentRGB})`} size={7} />
                 {c}
               </span>
             );
@@ -2065,14 +2072,17 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   const col = crateColors[c] || null;
                   return (
                     <button key={c} onClick={() => toggleRecordCrate(c)}
-                      className="inline-flex items-center gap-1.5 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
-                      style={{
-                        background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
-                        border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
+                      className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
+                      style={col ? {
+                        background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
+                        border: `1px solid ${col}70`,
+                        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
+                        color: 'rgba(var(--fg),0.92)',
+                      } : {
+                        background: `rgba(${localAccent},0.10)`,
+                        border: `1px solid rgba(${localAccent},0.22)`,
                         color: 'rgba(var(--fg),0.65)',
-                        boxShadow: col ? `0 0 10px -3px ${col}55` : 'none',
                       }}>
-                      <RotatingCube color={col || `rgb(${localAccent})`} size={7} />
                       {c}
                       <X size={9} className="opacity-50 ml-0.5" />
                     </button>
