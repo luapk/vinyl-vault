@@ -1748,19 +1748,29 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <button onClick={onPrev} disabled={index === 0} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretLeft size={14} />
         </button>
-        {/* Progress track — click to seek */}
-        <div className="relative flex-1 max-w-[180px] h-[2px] rounded-full cursor-pointer"
-          style={{ background: "rgba(var(--fg),0.10)" }}
+        {/* Progress dots — click to seek */}
+        <div className="relative flex-1 max-w-[180px] flex items-center justify-between cursor-pointer"
+          style={{ height: 16 }}
           onClick={e => {
             const rect = e.currentTarget.getBoundingClientRect();
             const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
             onIndexChange(Math.round(ratio * (records.length - 1)));
           }}>
-          <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-200"
-            style={{ width: `${(index / Math.max(1, records.length - 1)) * 100}%`, background: "rgba(var(--fg),0.38)" }} />
-          {/* Thumb */}
-          <div className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full transition-all duration-200 -translate-x-1/2"
-            style={{ left: `${(index / Math.max(1, records.length - 1)) * 100}%`, background: `rgb(${accentRGB})`, boxShadow: `0 0 0 2px rgba(${accentRGB},0.22)` }} />
+          {Array.from({ length: records.length }, (_, i) => (
+            <div key={i} style={{
+              width: i === index ? 4 : 2,
+              height: i === index ? 4 : 2,
+              borderRadius: '50%',
+              flexShrink: 0,
+              transition: 'all 0.2s',
+              background: i === index
+                ? `rgb(${accentRGB})`
+                : i < index
+                  ? 'rgba(var(--fg),0.32)'
+                  : 'rgba(var(--fg),0.12)',
+              boxShadow: i === index ? `0 0 0 2px rgba(${accentRGB},0.22)` : 'none',
+            }} />
+          ))}
         </div>
         <button onClick={onNext} disabled={index === records.length - 1} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretRight size={14} />
