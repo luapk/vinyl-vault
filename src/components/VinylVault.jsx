@@ -2983,13 +2983,18 @@ function StatsView({ collection, accentRGB }) {
     .map(c => ({ name: c, count: collection.filter(r => (r.crates || []).includes(c)).length }))
     .sort((a, b) => b.count - a.count);
 
+  const barColors = [accentRGB, '130, 175, 255', '255, 145, 175'];
+
   const barTrack = { flex: 1, position: 'relative', height: 18, borderRadius: 4, background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.08)' };
-  const barFill = (pct, delay = 0) => ({
-    position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4,
-    width: ready ? `${pct * 100}%` : '0%',
-    transition: `width 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}s`,
-    background: `rgba(${accentRGB},0.55)`,
-  });
+  const barFill = (pct, colorIdx = 0, delay = 0) => {
+    const c = barColors[colorIdx % barColors.length];
+    return {
+      position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4,
+      width: ready ? `${pct * 100}%` : '0%',
+      transition: `width 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}s`,
+      background: `rgba(${c},0.60)`,
+    };
+  };
 
   return (
     <div className="pt-8 md:pt-12 space-y-5 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
@@ -3009,7 +3014,7 @@ function StatsView({ collection, accentRGB }) {
               <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
                 <div style={barTrack}>
-                  <div style={barFill(count / maxGenre, i * 0.04)} />
+                  <div style={barFill(count / maxGenre, i, i * 0.04)} />
                 </div>
                 <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
@@ -3021,15 +3026,18 @@ function StatsView({ collection, accentRGB }) {
       {Object.values(decadeCounts).some(v => v > 0) && (
         <GlassSection title="By Decade" accentRGB={accentRGB}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 96 }}>
-            {Object.entries(decadeCounts).map(([decade, count], i) => (
-              <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
-                <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `rgba(${accentRGB},0.55)` }} />
+            {Object.entries(decadeCounts).map(([decade, count], i) => {
+              const c = barColors[i % barColors.length];
+              return (
+                <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
+                  <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `rgba(${c},0.60)` }} />
+                  </div>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
                 </div>
-                <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </GlassSection>
       )}
@@ -3041,7 +3049,7 @@ function StatsView({ collection, accentRGB }) {
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
                 <div style={barTrack}>
-                  <div style={barFill(count / (topLabels[0]?.[1] || 1), i * 0.04)} />
+                  <div style={barFill(count / (topLabels[0]?.[1] || 1), i, i * 0.04)} />
                 </div>
                 <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
