@@ -21,7 +21,9 @@ export default async function handler(req, res) {
 
   const systemPrompt = `You are a knowledgeable vinyl collector with deep expertise across electronic music, jazz, hip-hop, soul, and underground scenes. You have encyclopaedic knowledge of labels, producers, regional scenes, and the lineage connecting records.`;
 
-  const userPrompt = `Study this collection and create up to 20 smart crates grouping records in insightful, collector-meaningful ways.
+  const userPrompt = `Study this collection and create smart crates grouping records in insightful, collector-meaningful ways.
+
+Use as few crates as needed to meaningfully sort the collection -- 5 to 10 is ideal. Only create more if the collection genuinely spans many distinct worlds. Never pad with weak groupings just to reach a higher number.
 
 Naming rules:
 - Name crates as you would label a physical record crate: by sound, era, geography, scene, or artist lineage
