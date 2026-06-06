@@ -1413,12 +1413,6 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <PencilSimple size={12} />Crates
                 </button>
-                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
-                  <DownloadSimple size={12} />CSV
-                </button>
-                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
-                  <Printer size={12} />Labels
-                </button>
               </>
             ) : (
               <>
@@ -2702,15 +2696,24 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             )}
           </AccountSection>
 
-          <AccountSection label="Print labels" open={openSection === 'labels'} onToggle={() => toggleSection('labels')}>
-            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
-            <button onClick={onPrintLabels}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
-              style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
-              <Printer size={13} />Go to collection
-            </button>
+          <AccountSection label="Export" open={openSection === 'export'} onToggle={() => toggleSection('export')}>
+            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>Download your collection as a spreadsheet, or print sleeve labels for selected records.</p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={onDownloadCSV}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
+                style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
+                <DownloadSimple size={13} />CSV
+              </button>
+              <button onClick={onPrintLabels}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
+                style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
+                <Printer size={13} />Labels
+              </button>
+            </div>
           </AccountSection>
 
           <AccountSection label="Import from Discogs" open={openSection === 'discogs-import'} onToggle={() => toggleSection('discogs-import')}>
@@ -2789,17 +2792,6 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                 </button>
               </div>
             )}
-          </AccountSection>
-
-          <AccountSection label="Download CSV" open={openSection === 'csv'} onToggle={() => toggleSection('csv')}>
-            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
-            <button onClick={onDownloadCSV}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
-              style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
-              <DownloadSimple size={13} />Download
-            </button>
           </AccountSection>
 
           <AccountSection label="About" open={openSection === 'about'} onToggle={() => toggleSection('about')}>
