@@ -9,13 +9,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'records array required' });
   }
 
-  const inventory = records.map(r => {
+  // Use integer indices instead of UUIDs -- reduces output tokens ~18x
+  const inventory = records.map((r, i) => {
     const genreStr = Array.isArray(r.genres) && r.genres.length ? r.genres.slice(0, 3).join('/') : '';
     const parts = [`${r.artist} - ${r.title}`];
     if (r.year) parts.push(String(r.year));
     if (r.label) parts.push(r.label);
     if (genreStr) parts.push(genreStr);
-    return `[${r.id}] ${parts.join(' | ')}`;
+    return `[${i}] ${parts.join(' | ')}`;
   }).join('\n');
 
   const systemPrompt = `You are a knowledgeable vinyl collector with deep expertise across electronic music, jazz, hip-hop, soul, and underground scenes. You have encyclopaedic knowledge of labels, producers, regional scenes, and the lineage connecting records.`;
@@ -32,10 +33,12 @@ Naming rules:
 - A record may appear in multiple crates if genuinely fitting
 - Leave records unassigned rather than forcing weak groupings
 
-Respond ONLY with valid JSON:
-{"crates":[{"name":"...","description":"One sentence on what unifies these.","ids":["id1","id2"]}]}
+Use the integer index from the inventory (the number in brackets) to reference records.
 
-Collection (format: [id] artist - title | year | label | genres):
+Respond ONLY with valid JSON:
+{"crates":[{"name":"...","description":"One sentence on what unifies these.","indices":[0,1,5]}]}
+
+Collection (format: [index] artist - title | year | label | genres):
 ${inventory}`;
 
   try {
@@ -48,7 +51,7 @@ ${inventory}`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       }),
@@ -68,8 +71,18 @@ ${inventory}`;
     const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found in response');
 
-    const result = JSON.parse(jsonMatch[0]);
-    return res.status(200).json(result);
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Map integer indices back to record IDs
+    const crates = (parsed.crates || []).map(crate => ({
+      name: crate.name,
+      description: crate.description,
+      ids: (crate.indices || [])
+        .filter(idx => idx >= 0 && idx < records.length)
+        .map(idx => records[idx].id),
+    }));
+
+    return res.status(200).json({ crates });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Smart crates generation failed' });
   }
