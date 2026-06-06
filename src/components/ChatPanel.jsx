@@ -130,17 +130,17 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
         <>
           {/* List header */}
           <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.65)' }}>Messages</span>
+            <span style={{ fontSize: 19, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.65)' }}>Messages</span>
             <button onClick={onClose} style={btnStyle}><X size={13} weight="bold" /></button>
           </div>
 
           {/* Conversation list */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {conversations.length === 0 ? (
-              <div style={{ padding: '52px 24px', textAlign: 'center', color: 'rgba(var(--fg),0.35)', fontSize: 12, fontFamily: 'monospace' }}>
+              <div style={{ padding: '52px 24px', textAlign: 'center', color: 'rgba(var(--fg),0.35)', fontSize: 19, fontFamily: 'monospace' }}>
                 <ChatCircleDots size={34} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.28 }} />
                 <div style={{ marginBottom: 4 }}>No conversations yet</div>
-                <div style={{ fontSize: 11, color: 'rgba(var(--fg),0.25)' }}>Open a profile and tap Message to start.</div>
+                <div style={{ fontSize: 18, color: 'rgba(var(--fg),0.25)' }}>Open a profile and tap Message to start.</div>
               </div>
             ) : conversations.map(conv => (
               <button key={conv.userId} onClick={() => openThread(conv.profile)}
@@ -148,17 +148,17 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <ChatAvatar profile={conv.profile} size={40} />
                   {conv.unread > 0 && (
-                    <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, background: `rgb(${accentRGB})`, fontSize: 9, fontWeight: 800, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{conv.unread > 9 ? '9+' : conv.unread}</span>
+                    <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, background: `rgb(${accentRGB})`, fontSize: 14, fontWeight: 800, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{conv.unread > 9 ? '9+' : conv.unread}</span>
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: conv.unread > 0 ? 700 : 500, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+                    <span style={{ fontSize: 20, fontWeight: conv.unread > 0 ? 700 : 500, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
                       {conv.profile?.display_name || conv.profile?.username || 'User'}
                     </span>
-                    <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', flexShrink: 0, marginLeft: 8 }}>{msgTime(conv.lastMessage?.created_at)}</span>
+                    <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', flexShrink: 0, marginLeft: 8 }}>{msgTime(conv.lastMessage?.created_at)}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: conv.unread > 0 ? 'rgba(var(--fg),0.62)' : 'rgba(var(--fg),0.38)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 19, color: conv.unread > 0 ? 'rgba(var(--fg),0.62)' : 'rgba(var(--fg),0.38)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                     {conv.lastMessage?.from_user_id === currentUser.id ? 'You: ' : ''}{conv.lastMessage?.body || ''}
                   </div>
                 </div>
@@ -173,10 +173,10 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
             <button onClick={() => setView('list')} style={btnStyle}><ArrowLeft size={13} weight="bold" /></button>
             {recipient && <ChatAvatar profile={recipient} size={32} />}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 20, fontWeight: 600, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {recipient?.display_name || recipient?.username || 'User'}
               </div>
-              {recipient?.username && <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>@{recipient.username}</div>}
+              {recipient?.username && <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>@{recipient.username}</div>}
             </div>
             <button onClick={onClose} style={btnStyle}><X size={13} weight="bold" /></button>
           </div>
@@ -184,7 +184,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
           {/* Message thread */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
             {messages.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(var(--fg),0.28)', fontSize: 12, fontFamily: 'monospace' }}>
+              <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(var(--fg),0.28)', fontSize: 19, fontFamily: 'monospace' }}>
                 Start the conversation
               </div>
             )}
@@ -195,7 +195,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
               return (
                 <div key={msg.id}>
                   {showTime && (
-                    <div style={{ textAlign: 'center', fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', margin: '6px 0 10px' }}>{msgTime(msg.created_at)}</div>
+                    <div style={{ textAlign: 'center', fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', margin: '6px 0 10px' }}>{msgTime(msg.created_at)}</div>
                   )}
                   <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
                     <div style={{
@@ -203,7 +203,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       background: isMe ? `rgba(${accentRGB},0.16)` : 'rgba(var(--fg),0.07)',
                       border: `1px solid ${isMe ? `rgba(${accentRGB},0.24)` : 'rgba(var(--fg),0.10)'}`,
-                      fontSize: 13, lineHeight: 1.45,
+                      fontSize: 20, lineHeight: 1.45,
                       color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.82)',
                       wordBreak: 'break-word',
                     }}>
@@ -225,7 +225,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               placeholder="Message..."
               rows={1}
-              style={{ flex: 1, background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)', borderRadius: 16, padding: '9px 14px', fontSize: 13, fontFamily: 'inherit', color: 'rgba(var(--fg),0.85)', resize: 'none', outline: 'none', lineHeight: 1.4, maxHeight: 90, overflowY: 'auto' }}
+              style={{ flex: 1, background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)', borderRadius: 16, padding: '9px 14px', fontSize: 20, fontFamily: 'inherit', color: 'rgba(var(--fg),0.85)', resize: 'none', outline: 'none', lineHeight: 1.4, maxHeight: 90, overflowY: 'auto' }}
               onInput={e => { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 90) + 'px'; }}
             />
             <button onClick={handleSend} disabled={!input.trim() || sending}

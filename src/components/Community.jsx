@@ -59,13 +59,13 @@ function PublicRecordCard({ record, accentRGB, reactionCount, onSelect }) {
               <VinylRecord size={28} weight="thin" className="opacity-20" />
             </div>}
         {reactionCount > 0 && (
-          <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, fontFamily: 'monospace', padding: '2px 7px', borderRadius: 10, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', color: '#fff', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ fontSize: 10 }}>♥</span>{reactionCount}
+          <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 14, fontFamily: 'monospace', padding: '2px 7px', borderRadius: 10, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', color: '#fff', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ fontSize: 16 }}>♥</span>{reactionCount}
           </div>
         )}
       </div>
-      <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
-      <div className="text-[10px] text-white/40 truncate font-mono">{record.title}</div>
+      <div className="text-[14px] leading-snug font-display truncate text-white/85">{record.artist}</div>
+      <div className="text-[13px] text-white/40 truncate font-mono">{record.title}</div>
     </div>
   );
 }
@@ -122,8 +122,8 @@ function ReactionBar({ ownerUserId, recordLocalId, currentUserId, accentRGB }) {
               cursor: currentUserId ? 'pointer' : 'default',
               opacity: currentUserId ? 1 : 0.5,
             }}>
-            <span style={{ fontSize: 14, lineHeight: 1 }}>{emoji}</span>
-            {count > 0 && <span style={{ fontSize: 11, fontFamily: 'monospace', color: active ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>{count}</span>}
+            <span style={{ fontSize: 23, lineHeight: 1 }}>{emoji}</span>
+            {count > 0 && <span style={{ fontSize: 18, fontFamily: 'monospace', color: active ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>{count}</span>}
           </button>
         );
       })}
@@ -169,7 +169,7 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
 
   return (
     <div>
-      <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/35 mb-3 flex items-center gap-1.5">
+      <div className="text-[13px] tracking-[0.25em] uppercase font-mono text-white/35 mb-3 flex items-center gap-1.5">
         <ChatCircle size={12} /> Comments {comments.length > 0 && `(${comments.length})`}
       </div>
 
@@ -187,17 +187,17 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <button onClick={() => c.author?.username && onOpenProfile?.(c.author.username)}
-                    className="text-[12px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>
+                    className="text-[15px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>
                     {nameFor(c.author)}
                   </button>
-                  <span className="text-[10px] font-mono text-white/25">{relativeTime(c.createdAt)}</span>
+                  <span className="text-[13px] font-mono text-white/25">{relativeTime(c.createdAt)}</span>
                   {c.userId === currentUserId && (
                     <button onClick={() => remove(c.id)} className="ml-auto text-white/20 hover:text-red-400 transition-colors">
                       <Trash size={11} />
                     </button>
                   )}
                 </div>
-                <div className="text-[13px] leading-snug" style={{ color: 'rgba(var(--fg),0.65)' }}>{c.body}</div>
+                <div className="text-[16px] leading-snug" style={{ color: 'rgba(var(--fg),0.65)' }}>{c.body}</div>
               </div>
             </div>
           ))}
@@ -212,7 +212,7 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
             placeholder="Add a comment…"
             rows={1}
-            className="flex-1 resize-none rounded-xl px-3 py-2 text-[13px] outline-none"
+            className="flex-1 resize-none rounded-xl px-3 py-2 text-[16px] outline-none"
             style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.1)', color: 'var(--fg-hex)' }}
             onFocus={e => e.target.style.borderColor = `rgba(${accentRGB},0.4)`}
             onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
@@ -243,7 +243,7 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
 
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3"
           style={{ background: 'rgba(var(--bg),0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(var(--fg),0.06)' }}>
-          <span className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/35">Record</span>
+          <span className="text-[13px] tracking-[0.25em] uppercase font-mono text-white/35">Record</span>
           <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: '1px solid rgba(var(--fg),0.1)', color: 'rgba(var(--fg),0.45)' }}><X size={13} /></button>
         </div>
 
@@ -257,7 +257,7 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
             <div className="min-w-0 flex-1">
               <div className="text-lg font-display leading-tight" style={{ color: 'rgba(var(--fg),0.9)' }}>{record.artist}</div>
               <div className="text-sm font-mono text-white/50 mb-2">{record.title}</div>
-              <div className="text-[11px] font-mono text-white/35 space-y-0.5">
+              <div className="text-[14px] font-mono text-white/35 space-y-0.5">
                 {record.label && <div>{record.label}{record.catalogNumber ? ` · ${record.catalogNumber}` : ''}</div>}
                 {(record.year || record.country) && <div>{[record.year, record.country].filter(Boolean).join(' · ')}</div>}
               </div>
@@ -267,7 +267,7 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
           {(record.tags?.length > 0 || record.genres?.length > 0) && (
             <div className="flex flex-wrap gap-1.5 mb-5">
               {[...new Set([...(record.genres || []), ...(record.tags || [])])].slice(0, 8).map(t => (
-                <span key={t} className="px-2.5 py-1 rounded-full text-[10px] font-mono" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.5)' }}>{t}</span>
+                <span key={t} className="px-2.5 py-1 rounded-full text-[13px] font-mono" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.5)' }}>{t}</span>
               ))}
             </div>
           )}
@@ -381,7 +381,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
 
   return (
     <div className="pt-6 md:pt-10" style={{ animation: 'fadeUp 0.4s ease-out' }}>
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono mb-6 transition-all" style={{ border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.5)', background: 'rgba(var(--fg),0.03)' }}>
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono mb-6 transition-all" style={{ border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.5)', background: 'rgba(var(--fg),0.03)' }}>
         <CaretLeft size={12} /> Community
       </button>
 
@@ -391,8 +391,8 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
         <div className="flex-1 min-w-0">
           <h1 className="text-3xl md:text-4xl font-display leading-tight" style={{ color: 'rgba(var(--fg),0.92)' }}>{nameFor(profile)}</h1>
           {profile.username && <div className="text-sm font-mono text-white/40">@{profile.username}</div>}
-          {profile.bio && <p className="text-[14px] mt-2 max-w-md leading-relaxed" style={{ color: 'rgba(var(--fg),0.6)' }}>{profile.bio}</p>}
-          <div className="flex items-center gap-4 mt-3 text-[12px] font-mono text-white/45">
+          {profile.bio && <p className="text-[18px] mt-2 max-w-md leading-relaxed" style={{ color: 'rgba(var(--fg),0.6)' }}>{profile.bio}</p>}
+          <div className="flex items-center gap-4 mt-3 text-[15px] font-mono text-white/45">
             <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{total}</span> records</span>
             <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.followers}</span> followers</span>
             <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.following}</span> following</span>
@@ -411,7 +411,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
           )}
           {!isMe && currentUserId && (
             <button onClick={onFollowToggle} disabled={followBusy}
-              className="px-5 py-2.5 rounded-full text-[12px] tracking-[0.1em] uppercase font-mono transition-all"
+              className="px-5 py-2.5 rounded-full text-[15px] tracking-[0.1em] uppercase font-mono transition-all"
               style={follow.isFollowing
                 ? { border: '1px solid rgba(var(--fg),0.15)', color: 'rgba(var(--fg),0.6)', background: 'rgba(var(--fg),0.05)' }
                 : { border: `1px solid rgba(${accentRGB},0.5)`, color: '#000', background: `rgb(${accentRGB})` }}>
@@ -433,7 +433,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
           </div>
           {records.length < total && (
             <div className="flex justify-center mt-8">
-              <button onClick={loadMore} disabled={loadingMore} className="px-6 py-2.5 rounded-full text-[12px] font-mono transition-all" style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', background: 'rgba(var(--fg),0.04)' }}>
+              <button onClick={loadMore} disabled={loadingMore} className="px-6 py-2.5 rounded-full text-[15px] font-mono transition-all" style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', background: 'rgba(var(--fg),0.04)' }}>
                 {loadingMore ? 'Loading…' : `Load more (${total - records.length})`}
               </button>
             </div>
@@ -499,7 +499,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
   return (
     <div className="pt-6 md:pt-10 max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.4s ease-out' }}>
-      <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">Community</div>
+      <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">Community</div>
       <h1 className="text-4xl md:text-5xl leading-[0.95] mb-8 font-display tracking-tight">
         Find your people,<br /><span className="text-white/35 italic">browse tracks.</span>
       </h1>
@@ -508,25 +508,25 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
       <div className="rounded-2xl p-4 mb-4 flex items-center gap-3" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
         <Avatar profile={currentProfile} size={44} />
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(currentProfile)}</div>
+          <div className="text-[18px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(currentProfile)}</div>
           {hasUsername
-            ? <div className="text-[11px] font-mono text-white/40">@{currentProfile.username} · {isPublic ? 'Public' : 'Private'}</div>
-            : <div className="text-[11px] font-mono text-white/40">Set a username to share your vault</div>}
+            ? <div className="text-[14px] font-mono text-white/40">@{currentProfile.username} · {isPublic ? 'Public' : 'Private'}</div>
+            : <div className="text-[14px] font-mono text-white/40">Set a username to share your vault</div>}
         </div>
         {hasUsername && isPublic ? (
           <div className="flex items-center gap-2">
             <button onClick={() => onShare(currentProfile.username)} title="Copy profile link" className="w-9 h-9 rounded-full flex items-center justify-center" style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.55)' }}><ShareNetwork size={15} /></button>
-            <button onClick={() => onOpenProfile(currentProfile.username)} className="px-4 py-2 rounded-full text-[11px] font-mono uppercase tracking-[0.1em]" style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>View</button>
+            <button onClick={() => onOpenProfile(currentProfile.username)} className="px-4 py-2 rounded-full text-[14px] font-mono uppercase tracking-[0.1em]" style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>View</button>
           </div>
         ) : (
-          <button onClick={onOpenAccount} className="px-4 py-2 rounded-full text-[11px] font-mono uppercase tracking-[0.1em]" style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>Set up</button>
+          <button onClick={onOpenAccount} className="px-4 py-2 rounded-full text-[14px] font-mono uppercase tracking-[0.1em]" style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>Set up</button>
         )}
       </div>
 
       {/* People you follow */}
       {following.length > 0 && (
         <div className="mb-6">
-          <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/30 mb-2.5 flex items-center gap-1.5">
+          <div className="text-[13px] tracking-[0.25em] uppercase font-mono text-white/30 mb-2.5 flex items-center gap-1.5">
             <Users size={11} /> Following ({following.length})
           </div>
           <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -535,7 +535,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                 className="flex flex-col items-center gap-2 shrink-0 px-3 py-3 rounded-xl transition-all hover:opacity-80"
                 style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 72 }}>
                 <Avatar profile={p} size={44} />
-                <span className="text-[10px] font-mono text-white/55 max-w-[64px] truncate leading-tight">
+                <span className="text-[13px] font-mono text-white/55 max-w-[64px] truncate leading-tight">
                   {p.display_name || p.username || 'User'}
                 </span>
               </button>
@@ -566,8 +566,8 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                 <button key={p.id} onClick={() => onOpenProfile(p.username)} className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left" style={{ background: 'rgba(var(--fg),0.03)', border: '1px solid rgba(var(--fg),0.06)' }}>
                   <Avatar profile={p} size={36} />
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{nameFor(p)}</div>
-                    <div className="text-[11px] font-mono text-white/35 truncate">@{p.username}{p.bio ? ` · ${p.bio}` : ''}</div>
+                    <div className="text-[16px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{nameFor(p)}</div>
+                    <div className="text-[14px] font-mono text-white/35 truncate">@{p.username}{p.bio ? ` · ${p.bio}` : ''}</div>
                   </div>
                 </button>
               ))}
@@ -579,7 +579,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
       {/* Notifications */}
       {notifications.length > 0 && (
         <div className="mb-6">
-          <div className="text-[10px] tracking-[0.25em] uppercase font-mono mb-3 flex items-center gap-1.5" style={{ color: 'rgba(34,197,94,0.7)' }}>
+          <div className="text-[13px] tracking-[0.25em] uppercase font-mono mb-3 flex items-center gap-1.5" style={{ color: 'rgba(34,197,94,0.7)' }}>
             <Bell size={12} weight="fill" /> New activity on your records
           </div>
           <div className="space-y-1.5">
@@ -591,7 +591,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                   style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', cursor: record ? 'pointer' : 'default' }}>
                   <Avatar profile={notif.actor} size={30} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] leading-snug" style={{ color: 'rgba(var(--fg),0.8)' }}>
+                    <div className="text-[15px] leading-snug" style={{ color: 'rgba(var(--fg),0.8)' }}>
                       <span className="font-medium">{nameFor(notif.actor)}</span>
                       {notif.type === 'reaction'
                         ? <span className="text-white/45"> reacted {notif.emoji} to your record</span>
@@ -599,10 +599,10 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                       {record && <span className="font-medium" style={{ color: 'rgba(var(--fg),0.65)' }}> {record.artist} {record.title ? `— ${record.title}` : ''}</span>}
                     </div>
                     {notif.type === 'comment' && notif.body && (
-                      <div className="text-[11px] font-mono text-white/35 truncate mt-0.5">"{notif.body}"</div>
+                      <div className="text-[14px] font-mono text-white/35 truncate mt-0.5">"{notif.body}"</div>
                     )}
                   </div>
-                  <div className="text-[10px] font-mono text-white/25 shrink-0">{relativeTime(notif.createdAt)}</div>
+                  <div className="text-[13px] font-mono text-white/25 shrink-0">{relativeTime(notif.createdAt)}</div>
                 </button>
               );
             })}
@@ -611,7 +611,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
       )}
 
       {/* Feed */}
-      <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/35 mb-4 mt-4 flex items-center gap-1.5">
+      <div className="text-[13px] tracking-[0.25em] uppercase font-mono text-white/35 mb-4 mt-4 flex items-center gap-1.5">
         <Users size={12} /> Recent adds from people you follow
       </div>
       {feedLoading ? (
@@ -653,16 +653,16 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                     <Avatar profile={group.owner} size={38} />
                   </button>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.88)' }}>
+                    <div className="text-[16px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.88)' }}>
                       {nameFor(group.owner)}
                     </div>
-                    <div className="text-[10px] font-mono text-white/30">
+                    <div className="text-[13px] font-mono text-white/30">
                       {group.records.length} record{group.records.length !== 1 ? 's' : ''}&nbsp;·&nbsp;{relativeTime(group.latestAt)}
                     </div>
                   </div>
                   {group.owner.username && (
                     <button onClick={() => onOpenProfile(group.owner.username)}
-                      className="shrink-0 flex items-center gap-1 text-[11px] font-mono px-3 py-1.5 rounded-full transition-all"
+                      className="shrink-0 flex items-center gap-1 text-[14px] font-mono px-3 py-1.5 rounded-full transition-all"
                       style={{ border: `1px solid rgba(${accentRGB},0.3)`, color: `rgba(${accentRGB},0.85)`, background: `rgba(${accentRGB},0.08)` }}>
                       View
                     </button>
@@ -680,14 +680,14 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                           : <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.08)` }}><VinylRecord size={14} weight="thin" className="opacity-20" /></div>}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[12px] font-display truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{record.artist}</div>
-                        <div className="text-[10px] font-mono text-white/35 truncate">{record.title}{record.year ? ` · ${record.year}` : ''}</div>
+                        <div className="text-[15px] font-display truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{record.artist}</div>
+                        <div className="text-[13px] font-mono text-white/35 truncate">{record.title}{record.year ? ` · ${record.year}` : ''}</div>
                       </div>
                     </div>
                   ))}
                   {group.records.length > 5 && (
                     <button onClick={() => group.owner.username && onOpenProfile(group.owner.username)}
-                      className="w-full text-left text-[10px] font-mono text-white/30 hover:text-white/50 transition-colors px-2 py-1.5">
+                      className="w-full text-left text-[13px] font-mono text-white/30 hover:text-white/50 transition-colors px-2 py-1.5">
                       +{group.records.length - 5} more in their vault
                     </button>
                   )}
@@ -756,7 +756,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '10px 18px', borderRadius: 24, background: 'rgba(8,8,14,0.92)', backdropFilter: 'blur(20px)', border: `1px solid rgba(${accentRGB},0.35)`, color: '#fff', fontSize: 12, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '10px 18px', borderRadius: 24, background: 'rgba(8,8,14,0.92)', backdropFilter: 'blur(20px)', border: `1px solid rgba(${accentRGB},0.35)`, color: '#fff', fontSize: 19, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Check size={13} weight="bold" style={{ color: `rgb(${accentRGB})` }} /> {toast}
         </div>
       )}

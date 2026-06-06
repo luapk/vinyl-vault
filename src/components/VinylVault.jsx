@@ -450,7 +450,7 @@ export default function VinylVault() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg-hex)" }}>
         <img src="/logo.png" alt="Vinyl Vault" style={{ height: 192, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
         <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(var(--fg),0.1)", borderTopColor: "rgba(var(--fg),0.5)" }} />
-        <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)' }}>Connecting...</span>
+        <span style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)' }}>Connecting...</span>
       </div>
     );
   }
@@ -670,7 +670,7 @@ export default function VinylVault() {
                 setAppView(id);
                 if (id === "scan" && appView !== "scan") reset();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 12px -4px rgba(${accentRGB},0.3)` }
                 : { background: "transparent", border: `1px solid rgba(var(--fg),${isDark ? 0.07 : 0.15})`, color: `rgba(var(--fg),${isDark ? 0.4 : 0.6})` }
@@ -679,7 +679,7 @@ export default function VinylVault() {
               <span className="relative inline-flex items-center">
                 <Icon size={16} weight={appView === id ? "bold" : "regular"} />
                 {badge > 0 && (
-                  <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 14, height: 14, borderRadius: 7, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#000', lineHeight: 1, padding: '0 3px' }}>
+                  <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 14, height: 14, borderRadius: 7, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#000', lineHeight: 1, padding: '0 3px' }}>
                     {badge > 9 ? '9+' : badge}
                   </span>
                 )}
@@ -696,7 +696,7 @@ export default function VinylVault() {
             style={{ border: chatOpen ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.18)', background: chatOpen ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.06)', color: chatOpen ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>
             <ChatCircle size={14} weight={chatOpen ? 'fill' : 'regular'} />
             {msgUnread > 0 && (
-              <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 8, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+              <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
                 {msgUnread > 9 ? '9+' : msgUnread}
               </span>
             )}
@@ -710,7 +710,7 @@ export default function VinylVault() {
             style={{ border: "1px solid rgba(var(--fg),0.18)", background: "rgba(var(--fg),0.06)" }}>
             {profile?.avatar_url
               ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)', lineHeight: 1 }}>
+              : <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)', lineHeight: 1 }}>
                   {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
                 </span>
             }
@@ -730,7 +730,7 @@ export default function VinylVault() {
             {phase === "disambiguation" && (
               <>
                 <div className="flex justify-center pt-4 pb-1">
-                  <button onClick={reset} className="text-[11px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "rgba(var(--fg),0.03)" }}>
+                  <button onClick={reset} className="text-[14px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "rgba(var(--fg),0.03)" }}>
                     New scan
                   </button>
                 </div>
@@ -837,8 +837,8 @@ function SaveConfirmation({ release, accentRGB }) {
           <Check size={14} weight="bold" />
         </div>
         <div style={{ overflow: 'hidden', minWidth: 0 }}>
-          <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 1.5 }}>Added to collection</div>
-          <div style={{ fontSize: 12, color: 'rgba(var(--fg),0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
+          <div style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 1.5 }}>Added to collection</div>
+          <div style={{ fontSize: 19, color: 'rgba(var(--fg),0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
         </div>
         <VinylRecord size={15} weight="fill" style={{ color: `rgba(${accentRGB},0.65)`, flexShrink: 0, marginLeft: 2 }} />
       </div>
@@ -906,7 +906,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
     <div className="pt-10 md:pt-20 flex flex-col items-center">
       {/* Heading section - left-aligned */}
       <div className="w-full max-w-2xl mb-14 md:mb-20">
-        <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
+        <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
         <h1 className="text-5xl md:text-7xl leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
           {greeting
             ? <>{greeting.split('.')[0]}{/[?!]$/.test(greeting.split('.')[0]) ? '' : '.'}<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>
@@ -940,7 +940,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
+              <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
               <div className="text-lg font-display">Scan a sleeve</div>
             </div>
           </div>
@@ -959,7 +959,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               <GridNine size={22} weight="light" style={{ color: isLight ? 'rgba(120,90,220,0.80)' : undefined }} className={isLight ? '' : 'text-white/45'} />
             </div>
             <div>
-              <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
+              <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
               <div className="text-lg font-display text-white/70">Batch queue</div>
             </div>
           </div>
@@ -970,7 +970,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
       {/* "or choose from library" centred below the grid */}
       <div className="mt-4 flex justify-center">
-        <label className="inline-flex items-center gap-1.5 text-[11px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
+        <label className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
           <Upload size={11} />
           or choose a photo from library
           <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
@@ -983,9 +983,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       {recs.length > 0 && (
         <div className="mt-8 w-full" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
           <div className="mb-4">
-            <div className="text-[10px] tracking-[0.35em] uppercase font-mono whitespace-nowrap" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
+            <div className="text-[13px] tracking-[0.35em] uppercase font-mono whitespace-nowrap" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
             {recsSource.length > 0 && (
-              <div className="text-[9px] font-mono mt-1 truncate" style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.2})`, letterSpacing: '0.10em' }}>
+              <div className="text-[11px] font-mono mt-1 truncate" style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.2})`, letterSpacing: '0.10em' }}>
                 {recsSource.slice(0, 2).join(' / ')}{recsSource.length > 2 ? ` +${recsSource.length - 2}` : ''}
               </div>
             )}
@@ -1000,17 +1000,17 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   }
                 </div>
                 <div style={{ padding: '10px 10px 10px' }}>
-                  <div style={{ fontSize: 9, color: `rgba(var(--fg),${isLight ? 0.65 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.52 : 0.28})`, marginBottom: 5 }}>
+                  <div style={{ fontSize: 14, color: `rgba(var(--fg),${isLight ? 0.65 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
+                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.52 : 0.28})`, marginBottom: 5 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
                   {rec.reason && (
-                    <div style={{ fontSize: 9, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 1 : 0.7})`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
+                    <div style={{ fontSize: 14, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 1 : 0.7})`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
                   )}
-                  <div style={{ fontSize: 8, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
+                  <div style={{ fontSize: 13, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
+                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 16, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
                     onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
                     onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
                     Buy now
@@ -1036,7 +1036,7 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: `linear-gradient(rgba(var(--fg),0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--fg),0.025) 1px, transparent 1px)`, backgroundSize: "28px 28px" }} />
         <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: `inset 0 0 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(var(--fg),0.06)` }} />
       </div>
-      <div className="mt-7 text-[11px] tracking-[0.3em] uppercase flex items-center gap-2.5 font-mono" style={{ color: `rgb(${accentRGB})` }}>
+      <div className="mt-7 text-[14px] tracking-[0.3em] uppercase flex items-center gap-2.5 font-mono" style={{ color: `rgb(${accentRGB})` }}>
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: `rgb(${accentRGB})`, animation: "pulse 1.4s ease-in-out infinite" }} />
         {status}
       </div>
@@ -1127,15 +1127,15 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       {/* Duplicate warning */}
       {duplicate && !saved && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 12, background: 'rgba(240,190,60,0.07)', border: '1px solid rgba(240,190,60,0.22)' }}>
-          <span style={{ fontSize: 14, color: 'rgba(240,190,60,0.85)' }}>!</span>
-          <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(240,190,60,0.85)' }}>
+          <span style={{ fontSize: 23, color: 'rgba(240,190,60,0.85)' }}>!</span>
+          <div style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(240,190,60,0.85)' }}>
             You already own this -- <span style={{ fontStyle: 'italic' }}>{duplicate.artist}</span> {duplicate.title}
           </div>
         </div>
       )}
       {/* Top bar */}
       <div className="flex items-center">
-        <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
+        <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
           <CaretLeft size={12} />New scan
         </button>
       </div>
@@ -1143,11 +1143,11 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       <div className="flex items-center gap-3 flex-wrap">
         <ConfidenceBadge confidence={release.confidence} identified={release.identified} accentRGB={accentRGB} />
         {release.source && release.source !== "vision" && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono text-white/35" style={{ border: "1px solid rgba(var(--fg),0.07)" }}>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] tracking-[0.2em] uppercase font-mono text-white/35" style={{ border: "1px solid rgba(var(--fg),0.07)" }}>
             {release.source === "discogs+spotify" ? "Discogs + Spotify" : "Discogs"}
           </div>
         )}
-        {release.notes && <div className="text-[11px] text-white/40 font-mono">{release.notes}</div>}
+        {release.notes && <div className="text-[14px] text-white/40 font-mono">{release.notes}</div>}
       </div>
 
       {/* Cover + details */}
@@ -1187,7 +1187,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
         {/* Info */}
         <div className="flex flex-col justify-center">
-          <div className="text-[10px] tracking-[0.3em] uppercase text-white/35 mb-3 font-mono">
+          <div className="text-[13px] tracking-[0.3em] uppercase text-white/35 mb-3 font-mono">
             {[release.format, release.year, release.country].filter(Boolean).join(" · ")}
           </div>
           <h1 className="text-3xl md:text-5xl leading-[1.02] mb-1.5 font-display tracking-tight">
@@ -1217,7 +1217,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           {pendingCrates.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {pendingCrates.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ background: "rgba(var(--fg),0.09)", border: "1px solid rgba(var(--fg),0.22)", color: "rgba(var(--fg),0.85)" }}>
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ background: "rgba(var(--fg),0.09)", border: "1px solid rgba(var(--fg),0.22)", color: "rgba(var(--fg),0.85)" }}>
                   <Check size={11} weight="bold" />{name}<X size={10} className="opacity-50 ml-0.5" />
                 </button>
               ))}
@@ -1227,10 +1227,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           {/* AI-suggested crates — opt-in */}
           {suggestedCrates.length > 0 && (
             <div>
-              <div className="text-[9px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>Suggested</div>
+              <div className="text-[11px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>Suggested</div>
               <div className="flex flex-wrap gap-1.5">
                 {suggestedCrates.map((name) => (
-                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.38)" }}>
+                  <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.38)" }}>
                     <Plus size={9} />{name}
                   </button>
                 ))}
@@ -1242,7 +1242,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           {existingCustom.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {existingCustom.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.32)" }}>
+                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.32)" }}>
                   <Plus size={9} />{name}
                 </button>
               ))}
@@ -1250,20 +1250,20 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
           )}
 
           <div className="flex items-center gap-2">
-            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-4 py-2 text-[12px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.09)" }} />
-            <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[11px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "transparent" }}>Add</button>
+            <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCustomCrate()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-4 py-2 text-[15px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.09)" }} />
+            <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[14px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "transparent" }}>Add</button>
           </div>
 
           {/* Grade before saving */}
           {!saved && (
             <div className="flex items-center gap-4 py-1">
-              <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.25)' }}>Grade</span>
+              <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.25)' }}>Grade</span>
               <ConditionSelect label="Vinyl" value={pendingMedia} onChange={setPendingMedia} />
               <ConditionSelect label="Sleeve" value={pendingSleeve} onChange={setPendingSleeve} />
             </div>
           )}
 
-          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })} className="w-full py-3 rounded-xl text-[12px] tracking-[0.2em] uppercase font-mono transition-all"
+          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })} className="w-full py-3 rounded-xl text-[15px] tracking-[0.2em] uppercase font-mono transition-all"
             style={saved
               ? { background: "rgba(100,210,120,0.18)", border: "1px solid rgba(100,210,120,0.50)", color: "rgb(140,230,160)", boxShadow: "0 0 24px -8px rgba(100,210,120,0.4)" }
               : { background: "rgba(var(--fg),0.10)", border: "1px solid rgba(var(--fg),0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
@@ -1397,7 +1397,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.08)" }}>
           {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore by tag" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
-            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
                 : { background: "transparent", color: "rgba(var(--fg),0.52)" }}>
@@ -1410,27 +1410,27 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           <div className="flex items-center gap-2">
             {!labelSelectMode ? (
               <>
-                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
+                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <PencilSimple size={12} />Crates
                 </button>
-                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
+                <button onClick={onDownloadCSV} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <DownloadSimple size={12} />CSV
                 </button>
-                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
+                <button onClick={onEnterLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
                   <Printer size={12} />Labels
                 </button>
               </>
             ) : (
               <>
-                <span className="text-[11px] font-mono text-white/40">{selectedForLabels.size} selected</span>
+                <span className="text-[14px] font-mono text-white/40">{selectedForLabels.size} selected</span>
                 <button
                   onClick={() => onShowBatchLabelModal(true)}
                   disabled={selectedForLabels.size === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all"
                   style={{ border: `1px solid rgba(${accentRGB},${selectedForLabels.size > 0 ? '0.4' : '0.12'})`, color: selectedForLabels.size > 0 ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.2)', background: selectedForLabels.size > 0 ? `rgba(${accentRGB},0.12)` : 'transparent', cursor: selectedForLabels.size === 0 ? 'not-allowed' : 'pointer' }}>
                   <Printer size={12} />Preview Labels
                 </button>
-                <button onClick={onExitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
+                <button onClick={onExitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
                   Cancel
                 </button>
               </>
@@ -1474,7 +1474,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 const active = filterCrate === c;
                 return (
                   <button key={c} onClick={() => setFilterCrate(active ? null : c)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] tracking-[0.12em] uppercase font-mono transition-all"
                     style={{
                       background: active ? (col ? `${col}22` : 'rgba(var(--fg),0.10)') : (col ? `${col}0d` : 'rgba(var(--fg),0.025)'),
                       border: active ? `1px solid ${col || 'rgba(var(--fg),0.28)'}` : `1px solid ${col ? col + '55' : 'rgba(var(--fg),0.12)'}`,
@@ -1489,7 +1489,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           )}
 
-          <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+          <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
@@ -1637,7 +1637,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
       {/* Info */}
       <div className="mt-7 text-center">
         <div key={current.id} style={{ animation: "fadeOnly 0.12s ease-out" }}>
-        <div className="text-[10px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
+        <div className="text-[13px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
           {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
         </div>
         <div className="text-xl md:text-2xl leading-tight font-display"><span className="italic">{current.artist}</span></div>
@@ -1648,7 +1648,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           {(current.crates || []).map((c) => {
             const col = crateColors[c] || null;
             return (
-              <span key={c} className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
+              <span key={c} className="inline-flex items-center gap-1.5 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
                 style={{
                   background: col ? `${col}1a` : `rgba(${accentRGB},0.1)`,
                   border: `1px solid ${col ? col + '55' : `rgba(${accentRGB},0.22)`}`,
@@ -1662,7 +1662,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           })}
           {!selectMode && onUpdate && (
             <button onClick={() => { setShowCratePicker(p => !p); setCratePickerInput(''); }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all"
               style={{ border: `1px solid ${showCratePicker ? 'rgba(var(--fg),0.22)' : 'rgba(var(--fg),0.1)'}`, color: showCratePicker ? 'rgba(var(--fg),0.65)' : 'rgba(var(--fg),0.3)', background: showCratePicker ? 'rgba(var(--fg),0.07)' : 'transparent' }}>
               {showCratePicker ? <X size={9} /> : <Plus size={9} />}
               {showCratePicker ? 'Done' : 'Crates'}
@@ -1690,7 +1690,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
               {recordCrates.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-1.5">
                   {recordCrates.map(c => (
-                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all" style={{ background: 'rgba(var(--fg),0.09)', border: '1px solid rgba(var(--fg),0.22)', color: 'rgba(var(--fg),0.85)' }}>
+                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all" style={{ background: 'rgba(var(--fg),0.09)', border: '1px solid rgba(var(--fg),0.22)', color: 'rgba(var(--fg),0.85)' }}>
                       <Check size={9} weight="bold" />{c}<X size={8} className="opacity-50 ml-0.5" />
                     </button>
                   ))}
@@ -1699,7 +1699,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
               {/* Genre list */}
               <div className="flex flex-wrap justify-center gap-1.5">
                 {GENRE_CRATES.filter(g => !recordCrates.includes(g)).map(g => (
-                  <button key={g} onClick={() => toggleCrate(g)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                  <button key={g} onClick={() => toggleCrate(g)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
                     <Plus size={9} />{g}
                   </button>
                 ))}
@@ -1708,7 +1708,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
               {customOther.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-1.5">
                   {customOther.map(c => (
-                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
                       <Plus size={9} />{c}
                     </button>
                   ))}
@@ -1716,14 +1716,14 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
               )}
               {/* Custom input */}
               <div className="flex gap-2">
-                <input value={cratePickerInput} onChange={e => setCratePickerInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.09)' }} />
-                <button onClick={addCustom} className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70" style={{ border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)', background: 'transparent' }}>Add</button>
+                <input value={cratePickerInput} onChange={e => setCratePickerInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustom()} placeholder="Create a custom crate..." className="flex-1 rounded-full px-3 py-1.5 text-[14px] font-mono text-white/60 placeholder-white/20 outline-none" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.09)' }} />
+                <button onClick={addCustom} className="px-3 py-1.5 rounded-full text-[13px] font-mono transition-all hover:text-white/70" style={{ border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)', background: 'transparent' }}>Add</button>
               </div>
             </div>
           );
         })()}
 
-        <div className="text-[10px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
+        <div className="text-[13px] tracking-[0.18em] uppercase text-white/20 font-mono">{index + 1} of {records.length}</div>
         </div>
       </div>
 
@@ -1731,7 +1731,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <div className="mt-4 flex justify-center">
           <button
             onClick={() => onToggleSelect(current.id)}
-            className="flex items-center gap-2 px-5 py-2 rounded-full text-[11px] font-mono transition-all"
+            className="flex items-center gap-2 px-5 py-2 rounded-full text-[14px] font-mono transition-all"
             style={{
               background: selectedIds.has(current.id) ? `rgba(${accentRGB},0.18)` : 'rgba(var(--fg),0.05)',
               border: `1px solid ${selectedIds.has(current.id) ? `rgba(${accentRGB},0.45)` : 'rgba(var(--fg),0.12)'}`,
@@ -1815,18 +1815,18 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
         {localOnly && !selectMode && (
           <div title="Saved locally, not yet synced to database"
             className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center group-hover:opacity-0 transition-opacity"
-            style={{ background: 'rgba(251,146,60,0.92)', fontSize: 9, fontWeight: 800, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>
+            style={{ background: 'rgba(251,146,60,0.92)', fontSize: 14, fontWeight: 800, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>
             !
           </div>
         )}
         {record.mediaCondition && !selectMode && displayCondColor && (
-          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${displayCondColor},${isLight ? 0.14 : 0.18})`, border: `1px solid rgba(${displayCondColor},${isLight ? 0.40 : 0.35})`, color: `rgb(${displayCondColor})`, pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${displayCondColor},${isLight ? 0.14 : 0.18})`, border: `1px solid rgba(${displayCondColor},${isLight ? 0.40 : 0.35})`, color: `rgb(${displayCondColor})`, pointerEvents: 'none' }}>
             {record.mediaCondition}
           </div>
         )}
       </div>
-      <div className="text-[11px] leading-snug font-display truncate text-white/85">{record.artist}</div>
-      <div className="text-[10px] text-white/50 truncate font-mono">{record.title}</div>
+      <div className="text-[14px] leading-snug font-display truncate text-white/85">{record.artist}</div>
+      <div className="text-[13px] text-white/50 truncate font-mono">{record.title}</div>
     </div>
   );
 }
@@ -2012,7 +2012,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         {/* Close bar: drag handle + label. Full-width tap target, especially useful on mobile. */}
         <button onClick={onClose} className="w-full flex flex-col items-center gap-1.5 pt-3 pb-3 transition-opacity hover:opacity-70 active:opacity-50" aria-label="Close">
           <div className="w-10 h-1 rounded-full" style={{ background: "rgba(var(--fg),0.18)" }} />
-          <span className="text-[10px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.22)" }}>Close</span>
+          <span className="text-[13px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.22)" }}>Close</span>
         </button>
 
         <div className="px-6 md:px-8 pb-8">
@@ -2047,7 +2047,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             )}
           </div>
           <div className="flex flex-col justify-center">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/45 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
+            <div className="text-[13px] tracking-[0.2em] uppercase text-white/45 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
             <div className="text-xl leading-tight mb-0.5 font-display"><span className="italic">{record.artist}</span></div>
             <div className="text-base text-white/65 font-display mb-3">{record.title}</div>
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -2059,13 +2059,13 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               <ConditionSelect label="Sleeve" value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
             </div>
             <div>
-              <div className="text-[9px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>
+              <div className="text-[11px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {recordCrates.map((c) => {
                   const col = crateColors[c] || null;
                   return (
                     <button key={c} onClick={() => toggleRecordCrate(c)}
-                      className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
+                      className="inline-flex items-center gap-1.5 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
                       style={{
                         background: col ? `${col}1a` : `rgba(${localAccent},0.1)`,
                         border: `1px solid ${col ? col + '55' : `rgba(${localAccent},0.22)`}`,
@@ -2079,10 +2079,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   );
                 })}
                 {recordCrates.length === 0 && !showCrateEditor && (
-                  <span className="text-[10px] font-mono text-white/25">Not in any crate yet.</span>
+                  <span className="text-[13px] font-mono text-white/25">Not in any crate yet.</span>
                 )}
                 <button onClick={() => { setShowCrateEditor(p => !p); setCrateInput(''); }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono transition-all"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all"
                   style={{ border: `1px solid ${showCrateEditor ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`, color: showCrateEditor ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.28)', background: 'transparent' }}>
                   {showCrateEditor ? <X size={9} /> : <Plus size={9} />}
                   {showCrateEditor ? 'Done' : 'Edit'}
@@ -2093,7 +2093,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   <div className="flex flex-wrap gap-1.5">
                     {genreChips.map((g) => (
                       <button key={g} onClick={() => toggleRecordCrate(g)}
-                        className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
+                        className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
                         style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
                         <Plus size={9} />{g}
                       </button>
@@ -2103,7 +2103,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                     <div className="flex flex-wrap gap-1.5">
                       {otherCrates.map((c) => (
                         <button key={c} onClick={() => toggleRecordCrate(c)}
-                          className="inline-flex items-center gap-1 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                          className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
                           style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.35)' }}>
                           <Plus size={10} />{c}
                         </button>
@@ -2114,10 +2114,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                     <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && addNewCrate()}
                       placeholder="Create a custom crate..."
-                      className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/65 placeholder-white/20 outline-none"
+                      className="flex-1 rounded-full px-3 py-1.5 text-[14px] font-mono text-white/65 placeholder-white/20 outline-none"
                       style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.09)' }} />
                     <button onClick={addNewCrate}
-                      className="px-3 py-1.5 rounded-full text-[10px] font-mono transition-all hover:text-white/70"
+                      className="px-3 py-1.5 rounded-full text-[13px] font-mono transition-all hover:text-white/70"
                       style={{ border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)', background: 'transparent' }}>
                       Add
                     </button>
@@ -2127,10 +2127,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             </div>
             {record.tags && record.tags.length > 0 && (
               <div className="mt-2">
-                <div className="text-[9px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Tags</div>
+                <div className="text-[11px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Tags</div>
                 <div className="flex flex-wrap gap-1.5">
                   {record.tags.map((t) => (
-                    <span key={t} className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},${isLight ? 0.12 : 0.07})`, border: `1px solid rgba(${localAccent},${isLight ? 0.28 : 0.16})`, color: `rgba(${localAccent},${isLight ? 1 : 0.65})` }}>{t}</span>
+                    <span key={t} className="inline-flex items-center gap-1 text-[13px] px-2.5 py-1 rounded-full font-mono" style={{ background: `rgba(${localAccent},${isLight ? 0.12 : 0.07})`, border: `1px solid rgba(${localAccent},${isLight ? 0.28 : 0.16})`, color: `rgba(${localAccent},${isLight ? 1 : 0.65})` }}>{t}</span>
                   ))}
                 </div>
               </div>
@@ -2140,7 +2140,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
         {record.tracklist && record.tracklist.length > 0 && (
           <div className="mb-5">
-            <div className="text-[10px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
+            <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
             <div className="space-y-0.5">
               {record.tracklist.map((track, i) => (
                 <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null, hot: localHots[i] ?? track.hot ?? false }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={toggleHot} />
@@ -2153,7 +2153,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         {record.discogsId && (
           <div className="mb-5">
             {price === null && (
-              <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.45)", background: "rgba(var(--fg),0.025)" }}>
+              <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.45)", background: "rgba(var(--fg),0.025)" }}>
                 {priceLoading
                   ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "rgba(var(--fg),0.3)", borderTopColor: "transparent" }} />Checking prices...</>
                   : <><MagnifyingGlass size={12} />Check marketplace price</>
@@ -2161,7 +2161,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               </button>
             )}
             {price === false && (
-              <div className="text-[11px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
+              <div className="text-[14px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
             )}
             {price && typeof price === "object" && (
               <PriceGraph price={price} accentRGB={localAccent} />
@@ -2172,7 +2172,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         {/* Re-identify panel */}
         {reidentifying && (
           <div className="mb-5 p-4 rounded-2xl" style={{ background: 'rgba(var(--fg),0.03)', border: '1px solid rgba(var(--fg),0.08)' }}>
-            <div className="text-[9px] tracking-[0.22em] uppercase font-mono text-white/25 mb-3">Find correct release</div>
+            <div className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/25 mb-3">Find correct release</div>
             <div className="flex flex-col gap-2 mb-3">
               {[
                 { label: 'Artist', val: searchArtist, set: setSearchArtist },
@@ -2180,26 +2180,26 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                 { label: 'Cat #', val: searchCatno, set: setSearchCatno },
               ].map(({ label, val, set }) => (
                 <div key={label} className="flex items-center gap-2">
-                  <span style={{ width: 40, fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.28)', flexShrink: 0 }}>{label}</span>
-                  <input value={val} onChange={e => set(e.target.value)} onKeyDown={e => e.key === 'Enter' && doReidentifySearch()} className="flex-1 rounded-full px-3 py-1.5 text-[11px] font-mono text-white/70 placeholder-white/20 outline-none" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)' }} />
+                  <span style={{ width: 40, fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.28)', flexShrink: 0 }}>{label}</span>
+                  <input value={val} onChange={e => set(e.target.value)} onKeyDown={e => e.key === 'Enter' && doReidentifySearch()} className="flex-1 rounded-full px-3 py-1.5 text-[14px] font-mono text-white/70 placeholder-white/20 outline-none" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)' }} />
                 </div>
               ))}
             </div>
-            <button onClick={doReidentifySearch} disabled={reidentifyLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all disabled:opacity-40" style={{ background: `rgba(${localAccent},0.12)`, border: `1px solid rgba(${localAccent},0.25)`, color: `rgb(${localAccent})` }}>
+            <button onClick={doReidentifySearch} disabled={reidentifyLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-40" style={{ background: `rgba(${localAccent},0.12)`, border: `1px solid rgba(${localAccent},0.25)`, color: `rgb(${localAccent})` }}>
               {reidentifyLoading ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: `rgba(${localAccent},0.4)`, borderTopColor: 'transparent' }} />Searching...</> : <><MagnifyingGlass size={12} />Search Discogs</>}
             </button>
-            {reidentifyError && <div className="mt-2 text-[10px] font-mono text-red-400/70">{reidentifyError}</div>}
+            {reidentifyError && <div className="mt-2 text-[13px] font-mono text-red-400/70">{reidentifyError}</div>}
             {reidentifyResults !== null && reidentifyResults.length === 0 && !reidentifyLoading && (
-              <div className="mt-3 text-[11px] font-mono text-white/30">No results found. Try different search terms.</div>
+              <div className="mt-3 text-[14px] font-mono text-white/30">No results found. Try different search terms.</div>
             )}
             {reidentifyResults && reidentifyResults.length > 0 && (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {reidentifyResults.map(c => (
-                  <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={reidentifyPicking} className="text-left p-2.5 rounded-xl text-[10px] transition-all hover:bg-white/5 disabled:opacity-40" style={{ border: '1px solid rgba(var(--fg),0.07)' }}>
+                  <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={reidentifyPicking} className="text-left p-2.5 rounded-xl text-[13px] transition-all hover:bg-white/5 disabled:opacity-40" style={{ border: '1px solid rgba(var(--fg),0.07)' }}>
                     {c.coverUrl && <img src={c.coverUrl} alt="" className="w-full aspect-square object-cover rounded-lg mb-1.5 opacity-80" />}
                     <div className="font-mono text-white/60 truncate">{c.artist}</div>
                     <div className="text-white/40 truncate">{c.recordTitle}</div>
-                    <div className="text-white/25 font-mono text-[9px] mt-0.5">{[c.catalogNumber, c.year].filter(Boolean).join(' · ')}</div>
+                    <div className="text-white/25 font-mono text-[11px] mt-0.5">{[c.catalogNumber, c.year].filter(Boolean).join(' · ')}</div>
                   </button>
                 ))}
               </div>
@@ -2208,10 +2208,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         )}
 
         <div className="flex items-center gap-3 mb-3 flex-wrap">
-          <button onClick={() => { if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
+          <button onClick={() => { if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
             <Trash size={12} />Remove from collection
           </button>
-          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all" style={{ color: reidentifying ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.30)', border: reidentifying ? '1px solid rgba(var(--fg),0.18)' : '1px solid rgba(var(--fg),0.08)', background: 'transparent' }}>
+          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all" style={{ color: reidentifying ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.30)', border: reidentifying ? '1px solid rgba(var(--fg),0.18)' : '1px solid rgba(var(--fg),0.08)', background: 'transparent' }}>
             <Scan size={12} />Re-identify
           </button>
         </div>
@@ -2260,10 +2260,10 @@ function PriceGraph({ price, accentRGB }) {
     <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(var(--fg),0.02)', border: '1px solid rgba(var(--fg),0.07)' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(var(--fg),0.05)' }}>
-        <div className="text-[10px] tracking-[0.28em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.28)' }}>
+        <div className="text-[13px] tracking-[0.28em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.28)' }}>
           Marketplace · by condition
         </div>
-        <div className="text-[10px] font-mono" style={{ color: 'rgba(var(--fg),0.20)' }}>
+        <div className="text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.20)' }}>
           {price.totalListings} listing{price.totalListings !== 1 ? 's' : ''}
           {price.currency ? ` · ${price.currency}` : ''}
         </div>
@@ -2273,8 +2273,8 @@ function PriceGraph({ price, accentRGB }) {
       <div className="px-4 py-3 space-y-2">
         {rows.length === 0 ? (
           <div style={{ color: 'rgba(var(--fg),0.22)' }}>
-            <div className="text-[11px] font-mono py-2">No condition data available.</div>
-            {price._debug && <div className="text-[9px] font-mono pb-2 opacity-60">debug: {JSON.stringify(price._debug)}</div>}
+            <div className="text-[14px] font-mono py-2">No condition data available.</div>
+            {price._debug && <div className="text-[11px] font-mono pb-2 opacity-60">debug: {JSON.stringify(price._debug)}</div>}
           </div>
         ) : rows.map((row, i) => {
           const pct = row.avg / maxAvg;
@@ -2286,7 +2286,7 @@ function PriceGraph({ price, accentRGB }) {
               {/* Condition label */}
               <div style={{
                 width: 26, textAlign: 'right', flexShrink: 0,
-                fontSize: 9, letterSpacing: '0.08em', fontFamily: 'monospace',
+                fontSize: 14, letterSpacing: '0.08em', fontFamily: 'monospace',
                 color: `rgba(${accentRGB},${intensity * 0.7})`,
               }}>
                 {row.short}
@@ -2314,7 +2314,7 @@ function PriceGraph({ price, accentRGB }) {
                 {row.count > 1 && (
                   <div style={{
                     position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
-                    fontSize: 8, fontFamily: 'monospace',
+                    fontSize: 13, fontFamily: 'monospace',
                     color: `rgba(${accentRGB},${intensity * 0.45})`,
                     pointerEvents: 'none',
                   }}>
@@ -2326,7 +2326,7 @@ function PriceGraph({ price, accentRGB }) {
               {/* Price */}
               <div style={{
                 width: 52, textAlign: 'right', flexShrink: 0,
-                fontSize: 11, fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
+                fontSize: 18, fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
                 color: `rgba(var(--fg),${intensity * 0.75})`,
               }}>
                 {row.avg.toFixed(2)}
@@ -2341,14 +2341,14 @@ function PriceGraph({ price, accentRGB }) {
         <div className="px-4 pb-3 pt-1 flex gap-4 flex-wrap" style={{ borderTop: '1px solid rgba(var(--fg),0.04)' }}>
           {price.median != null && (
             <div>
-              <span className="text-[9px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Median</span>
-              <span className="text-[12px] font-mono" style={{ color: `rgba(${accentRGB},0.80)` }}>{price.median.toFixed(2)}</span>
+              <span className="text-[11px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Median</span>
+              <span className="text-[15px] font-mono" style={{ color: `rgba(${accentRGB},0.80)` }}>{price.median.toFixed(2)}</span>
             </div>
           )}
           {price.low != null && price.high != null && price.low !== price.high && (
             <div>
-              <span className="text-[9px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Range</span>
-              <span className="text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>{price.low.toFixed(2)} — {price.high.toFixed(2)}</span>
+              <span className="text-[11px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Range</span>
+              <span className="text-[14px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>{price.low.toFixed(2)} — {price.high.toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -2366,7 +2366,7 @@ function AccountSection({ label, open, onToggle, children }) {
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3.5 text-left transition-colors"
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
-        <span style={{ fontSize: 12, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
+        <span style={{ fontSize: 19, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
         <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.25)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && <div className="pb-4">{children}</div>}
@@ -2483,7 +2483,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
         onClick={e => e.stopPropagation()}>
 
         <div className="flex items-center justify-between mb-5">
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Account</h2>
+          <h2 style={{ fontSize: 24, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Account</h2>
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors"><X size={16} /></button>
         </div>
 
@@ -2501,7 +2501,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             }}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 22, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
+              : <span style={{ fontSize: 35, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
             }
             {avatarSavedOk && (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
@@ -2512,14 +2512,14 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </button>
           <div className="flex items-center gap-3">
             <button onClick={() => avatarInputRef.current?.click()}
-              style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {avatarPreview ? 'Change photo' : 'Upload photo'}
             </button>
             {avatarPreview && (
               <>
-                <span style={{ color: 'rgba(var(--fg),0.15)', fontSize: 11 }}>|</span>
+                <span style={{ color: 'rgba(var(--fg),0.15)', fontSize: 18 }}>|</span>
                 <button onClick={removeAvatar}
-                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Remove
                 </button>
               </>
@@ -2527,9 +2527,9 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </div>
         </div>
 
-        <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
+        <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
 
-        {errorMsg && <p style={{ fontSize: 11, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
+        {errorMsg && <p style={{ fontSize: 18, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
 
         {/* Accordion sections */}
         <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)' }}>
@@ -2542,13 +2542,13 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                 onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
                 onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
                 placeholder="Your name"
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
                 onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
               <button onClick={saveDisplayName} disabled={saving || savedOk}
                 style={{
-                  padding: '8px 13px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+                  padding: '8px 13px', borderRadius: 9, fontSize: 19, fontWeight: 600,
                   color: 'var(--bg-hex)',
                   background: saving ? 'rgba(var(--fg),0.3)' : savedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)',
                   border: 'none',
@@ -2562,41 +2562,41 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Public profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
-            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
               Claim a username and make your collection public so others can browse it, follow you, and react.
             </p>
 
-            <label style={{ display: 'block', fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
+            <label style={{ display: 'block', fontSize: 16, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <span style={{ fontSize: 14, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>@</span>
+              <span style={{ fontSize: 23, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>@</span>
               <input
                 type="text"
                 value={username}
                 onChange={e => { setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setProfileSavedOk(false); setProfileErr(''); }}
                 placeholder="username"
                 maxLength={20}
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
                 onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
             </div>
 
-            <label style={{ display: 'block', fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Bio</label>
+            <label style={{ display: 'block', fontSize: 16, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Bio</label>
             <textarea
               value={bio}
               onChange={e => { setBio(e.target.value.slice(0, 160)); setProfileSavedOk(false); setProfileErr(''); }}
               placeholder="A line about your taste, your rig, your scene…"
               rows={2}
-              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 13, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', resize: 'none', marginBottom: 4 }}
+              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', resize: 'none', marginBottom: 4 }}
               onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
               onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
             />
-            <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', textAlign: 'right', marginBottom: 12 }}>{bio.length}/160</div>
+            <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', textAlign: 'right', marginBottom: 12 }}>{bio.length}/160</div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 12, color: isPublic ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.7)', transition: 'color 0.2s' }}>{isPublic ? 'Public collection' : 'Private collection'}</div>
-                <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
+                <div style={{ fontSize: 19, color: isPublic ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.7)', transition: 'color 0.2s' }}>{isPublic ? 'Public collection' : 'Private collection'}</div>
+                <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
               </div>
               <button
                 onClick={() => { setIsPublic(v => !v); setProfileSavedOk(false); setProfileErr(''); }}
@@ -2606,16 +2606,16 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
               </button>
             </div>
 
-            {profileErr && <p style={{ fontSize: 11, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{profileErr}</p>}
+            {profileErr && <p style={{ fontSize: 18, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{profileErr}</p>}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button onClick={saveProfile} disabled={profileSaving || profileSavedOk}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 9, fontSize: 19, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
                 {profileSaving ? 'Saving...' : profileSavedOk ? (<><Check size={13} weight="bold" />Saved!</>) : 'Save profile'}
               </button>
               {!profileSaving && !profileSavedOk && profile?.username && profile?.is_public && (
                 <button onClick={() => onViewProfile?.(profile.username)}
-                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   View my profile →
                 </button>
               )}
@@ -2624,10 +2624,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
           <AccountSection label="Password" open={openSection === 'password'} onToggle={() => toggleSection('password')}>
             {resetSent ? (
-              <p style={{ fontSize: 12, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
+              <p style={{ fontSize: 19, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
             ) : (
               <button onClick={sendPasswordReset}
-                style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'rgba(var(--fg),0.75)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(var(--fg),0.45)'}>
                 Send password reset email
@@ -2636,7 +2636,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Print labels" open={openSection === 'labels'} onToggle={() => toggleSection('labels')}>
-            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
+            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
             <button onClick={onPrintLabels}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
               style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
@@ -2647,7 +2647,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Download CSV" open={openSection === 'csv'} onToggle={() => toggleSection('csv')}>
-            <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
+            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
             <button onClick={onDownloadCSV}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
               style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
@@ -2658,10 +2658,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="About" open={openSection === 'about'} onToggle={() => toggleSection('about')}>
-            <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
+            <div style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
               Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve and within seconds you have the pressing confirmed, tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
             </div>
-            <div style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
+            <div style={{ fontSize: 16, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {[
                 { Icon: Camera,      title: 'Photograph', desc: 'Point your camera at the sleeve or label.' },
@@ -2672,20 +2672,20 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                 <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <Icon size={13} style={{ color: `rgba(${accentRGB},0.65)`, marginTop: 1, flexShrink: 0 }} />
                   <div>
-                    <span style={{ fontSize: 11, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
-                    <span style={{ fontSize: 11, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
+                    <span style={{ fontSize: 18, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
+                    <span style={{ fontSize: 18, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
+            <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
           </AccountSection>
 
           {/* Appearance */}
           <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
+            <span style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
+              <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
               <button
                 onClick={onToggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -2758,7 +2758,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-3xl p-6" style={{ background: "rgba(var(--bg),0.99)", border: "1px solid rgba(var(--fg),0.08)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-[11px] tracking-[0.3em] uppercase font-mono text-white/60">Crate manager</h3>
+          <h3 className="text-[14px] tracking-[0.3em] uppercase font-mono text-white/60">Crate manager</h3>
           <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.40)" }}><X size={13} /></button>
         </div>
         {crates.length === 0 && <p className="text-white/30 text-sm font-mono text-center py-4">No crates yet.</p>}
@@ -2784,7 +2784,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                 {/* Colour picker — only shown when editing this crate */}
                 {editingName === crate && (
                   <div className="flex items-center gap-2 px-3 pb-3 pt-0">
-                    <span className="text-[9px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
+                    <span className="text-[11px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
                     {CRATE_PALETTE.map(({ id, hex }) => {
                       const isActive = activeColor === hex;
                       return (
@@ -2803,7 +2803,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                     })}
                     {activeColor && (
                       <button onClick={() => onSetColor(crate, null)}
-                        className="text-[9px] font-mono tracking-wide ml-1 transition-all"
+                        className="text-[11px] font-mono tracking-wide ml-1 transition-all"
                         style={{ color: 'rgba(var(--fg),0.22)', borderBottom: '1px solid rgba(var(--fg),0.10)', lineHeight: '1.1' }}>
                         clear
                       </button>
@@ -2853,13 +2853,13 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
     <div className="pt-6 md:pt-10">
       <div className="flex items-center gap-3 mb-6">
         <h2 className="text-2xl font-display"><span className="italic">Batch</span> progress</h2>
-        <span className="text-[11px] font-mono text-white/35">{done}/{queue.length} saved</span>
+        <span className="text-[14px] font-mono text-white/35">{done}/{queue.length} saved</span>
         {processing && <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: `rgba(${accentRGB},0.25)`, borderTopColor: `rgb(${accentRGB})` }} />}
       </div>
 
       {needsReview.length > 0 && (
         <div className="mb-5 p-4 rounded-2xl" style={{ background: "rgba(240,190,80,0.05)", border: "1px solid rgba(240,190,80,0.18)" }}>
-          <div className="text-[10px] tracking-[0.2em] uppercase text-yellow-400/60 mb-1 font-mono">{needsReview.length} needing disambiguation</div>
+          <div className="text-[13px] tracking-[0.2em] uppercase text-yellow-400/60 mb-1 font-mono">{needsReview.length} needing disambiguation</div>
           <p className="text-sm text-white/40">Scroll down to pick the correct pressing for flagged records.</p>
         </div>
       )}
@@ -2875,7 +2875,7 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
                 {item.release ? (
                   <>
                     <div className="text-sm font-display truncate text-white/80">{item.release.artist} — {item.release.title}</div>
-                    <div className="text-[10px] text-white/35 font-mono">{item.release.catalogNumber || item.release.label || ""}</div>
+                    <div className="text-[13px] text-white/35 font-mono">{item.release.catalogNumber || item.release.label || ""}</div>
                   </>
                 ) : item.status === "disambiguation" ? (
                   <div className="text-sm text-yellow-400/70 font-mono">Multiple pressings found</div>
@@ -2887,13 +2887,13 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
             </div>
             {item.status === "disambiguation" && item.candidates && (
               <div className="px-4 pb-4">
-                <div className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-2 font-mono">Pick pressing</div>
+                <div className="text-[13px] tracking-[0.2em] uppercase text-white/25 mb-2 font-mono">Pick pressing</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {item.candidates.map((c) => (
-                    <button key={c.id} onClick={() => onResolve(idx, c)} className="text-left p-2.5 rounded-xl text-[11px] transition-all hover:bg-white/5" style={{ border: "1px solid rgba(var(--fg),0.07)" }}>
+                    <button key={c.id} onClick={() => onResolve(idx, c)} className="text-left p-2.5 rounded-xl text-[14px] transition-all hover:bg-white/5" style={{ border: "1px solid rgba(var(--fg),0.07)" }}>
                       <div className="font-mono text-white/65 truncate">{c.artist}</div>
                       <div className="text-white/40 truncate">{c.recordTitle}</div>
-                      <div className="text-white/22 font-mono text-[10px]">{c.catalogNumber} {c.year}</div>
+                      <div className="text-white/22 font-mono text-[13px]">{c.catalogNumber} {c.year}</div>
                     </button>
                   ))}
                 </div>
@@ -2926,8 +2926,8 @@ function StatCard({ label, target, suffix = '', ready }) {
 
   return (
     <div style={{ padding: '14px 18px', borderRadius: 16, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.09)' }}>
-      <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 28, fontFamily: 'monospace', color: 'rgba(var(--fg),0.88)', lineHeight: 1 }}>{val}{suffix}</div>
+      <div style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 44, fontFamily: 'monospace', color: 'rgba(var(--fg),0.88)', lineHeight: 1 }}>{val}{suffix}</div>
     </div>
   );
 }
@@ -2985,20 +2985,22 @@ function StatsView({ collection, accentRGB }) {
 
   const barColors = [accentRGB, '130, 175, 255', '255, 145, 175'];
 
-  const barTrack = { flex: 1, position: 'relative', height: 18, borderRadius: 4, background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.08)' };
+  const barTrack = { flex: 1, position: 'relative', height: 18, borderRadius: 4, background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.08)', overflow: 'hidden' };
   const barFill = (pct, colorIdx = 0, delay = 0) => {
     const c = barColors[colorIdx % barColors.length];
     return {
       position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 4,
       width: ready ? `${pct * 100}%` : '0%',
       transition: `width 0.6s cubic-bezier(0.4,0,0.2,1) ${delay}s`,
-      background: `rgba(${c},0.60)`,
+      background: `linear-gradient(to bottom, rgba(${c},0.85) 0%, rgba(${c},0.55) 55%, rgba(${c},0.45) 100%)`,
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.12), 0 1px 4px rgba(${c},0.35)`,
+      border: `1px solid rgba(${c},0.30)`,
     };
   };
 
   return (
     <div className="pt-8 md:pt-12 space-y-5 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
-      <div className="text-[10px] tracking-[0.35em] uppercase mb-2 text-white/25 font-mono">Collection Stats</div>
+      <div className="text-[13px] tracking-[0.35em] uppercase mb-2 text-white/25 font-mono">Collection Stats</div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Records"    target={total}         suffix=""  ready={ready} />
@@ -3012,11 +3014,11 @@ function StatsView({ collection, accentRGB }) {
           <div className="space-y-2.5">
             {topGenres.map(([genre, count], i) => (
               <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
+                <div style={{ width: 76, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / maxGenre, i, i * 0.04)} />
                 </div>
-                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+                <div style={{ width: 24, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
             ))}
           </div>
@@ -3030,11 +3032,11 @@ function StatsView({ collection, accentRGB }) {
               const c = barColors[i % barColors.length];
               return (
                 <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
+                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
                   <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `rgba(${c},0.60)` }} />
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `linear-gradient(to top, rgba(${c},0.80) 0%, rgba(${c},0.60) 50%, rgba(${c},0.85) 100%)`, boxShadow: `inset 1px 0 0 rgba(255,255,255,0.22), inset -1px 0 0 rgba(0,0,0,0.08), inset 0 2px 0 rgba(255,255,255,0.18), 0 0 8px rgba(${c},0.25)`, border: `1px solid rgba(${c},0.28)`, borderBottom: 'none' }} />
                   </div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
+                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
                 </div>
               );
             })}
@@ -3047,11 +3049,11 @@ function StatsView({ collection, accentRGB }) {
           <div className="space-y-2.5">
             {topLabels.map(([label, count], i) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 76, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
+                <div style={{ width: 76, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / (topLabels[0]?.[1] || 1), i, i * 0.04)} />
                 </div>
-                <div style={{ width: 24, fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
+                <div style={{ width: 24, fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
               </div>
             ))}
           </div>
@@ -3063,8 +3065,8 @@ function StatsView({ collection, accentRGB }) {
           <div className="flex flex-wrap gap-2">
             {crateSizes.map(({ name, count }) => (
               <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)' }}>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.62)' }}>{name}</span>
-                <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.32)' }}>{count}</span>
+                <span style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.62)' }}>{name}</span>
+                <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.32)' }}>{count}</span>
               </div>
             ))}
           </div>
@@ -3079,14 +3081,14 @@ function StatsView({ collection, accentRGB }) {
 function AboutView({ accentRGB }) {
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
-      <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/25 font-mono">About</div>
+      <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/25 font-mono">About</div>
       <h2 className="text-4xl md:text-5xl leading-[0.95] mb-8 font-display tracking-tight">
         Built for the crate,<br />
         <span className="text-white/35 italic">not the cloud.</span>
       </h2>
 
       <div className="space-y-8">
-        <div className="space-y-4 text-white/55 leading-relaxed text-[15px]">
+        <div className="space-y-4 text-white/55 leading-relaxed text-[19px]">
           <p>
             Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve, and within seconds you have the pressing confirmed, the tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
           </p>
@@ -3099,7 +3101,7 @@ function AboutView({ accentRGB }) {
         </div>
 
         <div>
-          <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
+          <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
           <div className="space-y-3">
             {[
               { Icon: Camera,          title: "Photograph", desc: "Point your camera at the sleeve or label. A single photo is all it takes." },
@@ -3113,14 +3115,14 @@ function AboutView({ accentRGB }) {
                 </div>
                 <div>
                   <div className="text-sm font-display mb-0.5 text-white/85">{title}</div>
-                  <div className="text-[13px] text-white/40 leading-relaxed">{desc}</div>
+                  <div className="text-[16px] text-white/40 leading-relaxed">{desc}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="pt-2 border-t border-white/[0.06] text-[11px] text-white/20 font-mono leading-relaxed">
+        <div className="pt-2 border-t border-white/[0.06] text-[14px] text-white/20 font-mono leading-relaxed">
           Your collection is stored locally and synced to your account across devices.
         </div>
       </div>
@@ -3134,7 +3136,7 @@ function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick })
   return (
     <div className="pt-8 md:pt-12" style={{ animation: "fadeUp 0.5s ease-out" }}>
       <div className="mb-10">
-        <div className="text-[10px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Multiple pressings found</div>
+        <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Multiple pressings found</div>
         <h2 className="text-4xl md:text-5xl leading-[1.02] mb-3 font-display tracking-tight"><span className="italic">Pick a pressing</span></h2>
         {vision && (
           <p className="text-white/35 text-sm font-mono">
@@ -3156,15 +3158,15 @@ function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick })
               <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)" }} />
             </div>
             <div className="relative p-4">
-              <div className="text-[10px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
+              <div className="text-[13px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
               <div className="text-sm leading-snug mb-2 font-display">
                 {candidate.artist && <span className="italic text-white/80">{candidate.artist}</span>}
                 {candidate.artist && candidate.recordTitle && <span className="text-white/25"> / </span>}
                 <span className="text-white/60">{candidate.recordTitle || candidate.artist}</span>
               </div>
               <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-                {candidate.label && <span className="text-[10px] text-white/40 font-mono">{candidate.label}</span>}
-                {candidate.catalogNumber && <span className="text-[10px] text-white/25 font-mono">{candidate.catalogNumber}</span>}
+                {candidate.label && <span className="text-[13px] text-white/40 font-mono">{candidate.label}</span>}
+                {candidate.catalogNumber && <span className="text-[13px] text-white/25 font-mono">{candidate.catalogNumber}</span>}
               </div>
             </div>
           </button>
@@ -3234,7 +3236,7 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={handleKey}
         placeholder="Search artist, title, label, cat #..."
-        className="w-full rounded-full pl-8 pr-4 py-2 text-[12px] font-mono text-white/65 placeholder-white/30 outline-none transition-all"
+        className="w-full rounded-full pl-8 pr-4 py-2 text-[15px] font-mono text-white/65 placeholder-white/30 outline-none transition-all"
         style={{ background: "rgba(var(--fg),0.04)", border: open && suggestions.length > 0 ? `1px solid rgba(${accentRGB},0.3)` : "1px solid rgba(var(--fg),0.08)" }}
       />
       {value && (
@@ -3248,8 +3250,8 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
             <button key={i} onMouseDown={() => pick(s.text)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all"
               style={{ background: i === highlighted ? `rgba(${accentRGB},0.10)` : "transparent" }}
               onMouseEnter={() => setHighlighted(i)}>
-              <span className="text-[9px] tracking-[0.18em] uppercase font-mono shrink-0" style={{ color: `rgba(${accentRGB},0.55)`, minWidth: 36 }}>{s.label}</span>
-              <span className="text-[12px] font-mono text-white/70 truncate">{s.text}</span>
+              <span className="text-[11px] tracking-[0.18em] uppercase font-mono shrink-0" style={{ color: `rgba(${accentRGB},0.55)`, minWidth: 36 }}>{s.label}</span>
+              <span className="text-[15px] font-mono text-white/70 truncate">{s.text}</span>
             </button>
           ))}
         </div>
@@ -3277,23 +3279,23 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
 
   return (
     <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
-      <div className="text-[10px] tracking-[0.12em] text-white/50 font-mono">{track.position}</div>
+      <div className="text-[13px] tracking-[0.12em] text-white/50 font-mono">{track.position}</div>
       <div className="min-w-0 flex items-start gap-1.5">
         {/* Hot toggle: clickable when onHotToggle provided, display-only when track.hot */}
         {(onHotToggle || track.hot) && (
           <button
             onClick={onHotToggle ? () => onHotToggle(index) : undefined}
             className="shrink-0 leading-none transition-opacity"
-            style={{ fontSize: 13, opacity: track.hot ? 1 : 0.22, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
+            style={{ fontSize: 20, opacity: track.hot ? 1 : 0.22, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
             title={onHotToggle ? (track.hot ? "Unmark as hot" : "Mark as hot") : undefined}
           >
             🔥
           </button>
         )}
         <div className="min-w-0">
-          <div className="text-[14px] md:text-[15px] truncate font-display text-white/85">{track.title}</div>
+          <div className="text-[18px] md:text-[19px] truncate font-display text-white/85">{track.title}</div>
           {/* Mobile: duration + BPM + key inline */}
-          <div className="md:hidden text-[10px] text-white/42 mt-0.5 flex items-center gap-1.5 font-mono">
+          <div className="md:hidden text-[13px] text-white/42 mt-0.5 flex items-center gap-1.5 font-mono">
             {track.duration && <><span>{track.duration}</span><span>·</span></>}
             {bpmLoading
               ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
@@ -3309,9 +3311,9 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
         <PlayBtn size={10} />
       </div>
       {/* Desktop columns */}
-      <div className="hidden md:flex items-center gap-1 text-[11px] text-white/50 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
-      <div className="hidden md:flex items-center gap-1 text-[11px] tabular-nums min-w-[72px] justify-end font-mono">
-        <span className="text-white/35 text-[9px]">BPM</span>
+      <div className="hidden md:flex items-center gap-1 text-[14px] text-white/50 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
+      <div className="hidden md:flex items-center gap-1 text-[14px] tabular-nums min-w-[72px] justify-end font-mono">
+        <span className="text-white/35 text-[11px]">BPM</span>
         {bpmLoading
           ? <span className="text-white/40" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
           : <span style={{ color: track.bpm != null ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.40)" }}>{track.bpm != null ? track.bpm : "—"}</span>
@@ -3320,8 +3322,8 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
       {/* Key badge — hidden on mobile (already shown inline above) */}
       <div className="hidden md:flex items-center justify-center md:w-12 h-7">
         {keyColor ? (
-          <div className="w-full h-full rounded-full flex items-center justify-center text-[11px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
-        ) : <span className="text-white/35 text-[10px] font-mono">—</span>}
+          <div className="w-full h-full rounded-full flex items-center justify-center text-[14px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
+        ) : <span className="text-white/35 text-[13px] font-mono">—</span>}
       </div>
       <div className="hidden md:flex items-center justify-center">
         <PlayBtn size={9} />
@@ -3339,8 +3341,8 @@ function ConditionSelect({ label, value, onChange }) {
   const displayColor = isLight ? darkColor : color;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: `rgba(var(--fg),${isLight ? 0.52 : 0.30})` }}>{label}</span>
-      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: displayColor ? `rgba(${displayColor},${isLight ? 0.10 : 0.09})` : 'rgba(var(--fg),0.04)', border: `1px solid ${displayColor ? `rgba(${displayColor},${isLight ? 0.35 : 0.28})` : 'rgba(var(--fg),0.10)'}`, color: displayColor ? `rgb(${displayColor})` : `rgba(var(--fg),${isLight ? 0.52 : 0.45})`, borderRadius: 20, padding: '3px 8px', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
+      <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: `rgba(var(--fg),${isLight ? 0.52 : 0.30})` }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ background: displayColor ? `rgba(${displayColor},${isLight ? 0.10 : 0.09})` : 'rgba(var(--fg),0.04)', border: `1px solid ${displayColor ? `rgba(${displayColor},${isLight ? 0.35 : 0.28})` : 'rgba(var(--fg),0.10)'}`, color: displayColor ? `rgb(${displayColor})` : `rgba(var(--fg),${isLight ? 0.52 : 0.45})`, borderRadius: 20, padding: '3px 8px', fontSize: 16, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
         {CONDITION_GRADES.map(g => (
           <option key={g} value={g}>{g || '--'}</option>
         ))}
@@ -3355,9 +3357,9 @@ function GlassSection({ title, subtitle, icon, accentRGB, children }) {
       <div className="flex items-baseline justify-between mb-5">
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="text-[10px] tracking-[0.3em] uppercase font-medium font-mono text-white/60">{title}</h3>
+          <h3 className="text-[13px] tracking-[0.3em] uppercase font-medium font-mono text-white/60">{title}</h3>
         </div>
-        {subtitle && <div className="text-[10px] tracking-[0.12em] uppercase text-white/40 font-mono">{subtitle}</div>}
+        {subtitle && <div className="text-[13px] tracking-[0.12em] uppercase text-white/40 font-mono">{subtitle}</div>}
       </div>
       {children}
     </section>
@@ -3367,8 +3369,8 @@ function GlassSection({ title, subtitle, icon, accentRGB, children }) {
 function Pill({ label, value, mono }) {
   return (
     <div className="inline-flex items-baseline gap-1.5 px-2.5 py-1 rounded-full" style={{ background: "rgba(var(--fg),0.035)", border: "1px solid rgba(var(--fg),0.07)" }}>
-      <span className="text-[9px] tracking-[0.2em] uppercase text-white/45 font-mono">{label}</span>
-      <span className={`text-[13px] text-white/85 ${mono ? "font-mono" : ""}`}>{value}</span>
+      <span className="text-[11px] tracking-[0.2em] uppercase text-white/45 font-mono">{label}</span>
+      <span className={`text-[16px] text-white/85 ${mono ? "font-mono" : ""}`}>{value}</span>
     </div>
   );
 }
@@ -3376,7 +3378,7 @@ function Pill({ label, value, mono }) {
 function ConfidenceBadge({ confidence, identified, accentRGB }) {
   const isOk = identified;
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] tracking-[0.2em] uppercase font-mono"
+    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] tracking-[0.2em] uppercase font-mono"
       style={{ border: `1px solid ${isOk ? `rgba(${accentRGB},0.28)` : "rgba(240,190,80,0.28)"}`, color: isOk ? `rgb(${accentRGB})` : "rgb(240,190,80)", background: "rgba(var(--fg),0.015)" }}>
       <span className="w-1.5 h-1.5 rounded-full" style={{ background: isOk ? `rgb(${accentRGB})` : "rgb(240,190,80)" }} />
       {isOk ? "Identified" : "Unverified"}
@@ -3409,7 +3411,7 @@ function TagCloud({ tags, genres, accentRGB }) {
         return (
           <span
             key={tag}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono"
             style={isGenre
               ? { background: `rgba(${accentRGB},0.10)`, border: `1px solid rgba(${accentRGB},0.25)`, color: `rgba(${accentRGB},0.85)` }
               : { background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.09)", color: "rgba(var(--fg),0.52)" }
@@ -3450,12 +3452,12 @@ function ExploreView({ collection, accentRGB, onSelectRecord }) {
     const records = tagMap.get(selectedTag) || [];
     return (
       <div style={{ animation: "fadeUp 0.22s ease-out" }}>
-        <button onClick={() => setSelectedTag(null)} className="inline-flex items-center gap-2 mb-6 text-[11px] font-mono text-white/35 hover:text-white/65 transition-colors">
+        <button onClick={() => setSelectedTag(null)} className="inline-flex items-center gap-2 mb-6 text-[14px] font-mono text-white/35 hover:text-white/65 transition-colors">
           <CaretLeft size={12} />All tags
         </button>
         <div className="mb-5">
           <h3 className="text-2xl font-display mb-0.5">{selectedTag}</h3>
-          <div className="text-[11px] font-mono text-white/30">{records.length} record{records.length !== 1 ? "s" : ""}</div>
+          <div className="text-[14px] font-mono text-white/30">{records.length} record{records.length !== 1 ? "s" : ""}</div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {records.map((record) => (
@@ -3472,11 +3474,11 @@ function ExploreView({ collection, accentRGB, onSelectRecord }) {
         <button
           key={tag}
           onClick={() => setSelectedTag(tag)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-mono transition-all hover:scale-[1.03] active:scale-[0.97]"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[15px] font-mono transition-all hover:scale-[1.03] active:scale-[0.97]"
           style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.65)" }}
         >
           {tag}
-          <span className="text-[10px] font-mono" style={{ color: "rgba(var(--fg),0.28)" }}>{records.length}</span>
+          <span className="text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.28)" }}>{records.length}</span>
         </button>
       ))}
     </div>
@@ -3580,7 +3582,7 @@ function CameraModal({ onCapture, onClose }) {
             </div>
 
             {/* How to fix — browser-specific hint */}
-            <div className="w-full rounded-xl px-4 py-3 text-left text-[12px] font-mono text-white/35 leading-relaxed"
+            <div className="w-full rounded-xl px-4 py-3 text-left text-[15px] font-mono text-white/35 leading-relaxed"
               style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
               <p className="text-white/50 mb-1.5">To allow camera access:</p>
               <p>1. Tap the lock / info icon in your browser address bar</p>
@@ -3620,7 +3622,7 @@ function CameraModal({ onCapture, onClose }) {
       {/* Capture button */}
       {ready && (
         <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 z-10">
-          <p className="text-[10px] tracking-[0.2em] uppercase font-mono text-white/40">
+          <p className="text-[13px] tracking-[0.2em] uppercase font-mono text-white/40">
             Align sleeve within the guide
           </p>
           <button onClick={capture}
@@ -3776,17 +3778,17 @@ function BatchLabelModal({ records, accentRGB, onClose }) {
 
         <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
           <div>
-            <div className="text-[10px] tracking-[0.3em] uppercase font-mono text-white/35">Batch Labels</div>
+            <div className="text-[13px] tracking-[0.3em] uppercase font-mono text-white/35">Batch Labels</div>
             <div className="text-white/60 text-sm font-mono mt-0.5">{records.length} record{records.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={downloadAll}
-              className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all"
               style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.3)`, color: `rgb(${accentRGB})` }}>
               <DownloadSimple size={13} />Download All
             </button>
             <button onClick={printAll}
-              className="flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-mono transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all"
               style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.5)', background: 'transparent' }}>
               <Printer size={13} />Print
             </button>
@@ -3800,7 +3802,7 @@ function BatchLabelModal({ records, accentRGB, onClose }) {
         <div className="overflow-y-auto px-6 pb-6 flex flex-col gap-4">
           {records.map((record, i) => (
             <div key={record.id}>
-              <div className="text-[10px] font-mono text-white/30 mb-1.5">{record.artist} - {record.title}</div>
+              <div className="text-[13px] font-mono text-white/30 mb-1.5">{record.artist} - {record.title}</div>
               <div className="w-full rounded-xl overflow-hidden" style={{ border: '1px solid rgba(var(--fg),0.07)', aspectRatio: '1000 / 640' }}>
                 <canvas ref={el => canvasRefs.current[i] = el} style={{ width: '100%', height: '100%', display: 'block' }} />
               </div>
@@ -3865,43 +3867,43 @@ function LabelModal({ record, accentRGB, onClose }) {
         </button>
 
         <div className="p-6 md:p-8">
-          <div className="text-[10px] tracking-[0.3em] uppercase font-mono text-white/35 mb-4">Sleeve Label</div>
+          <div className="text-[13px] tracking-[0.3em] uppercase font-mono text-white/35 mb-4">Sleeve Label</div>
 
           <div className="w-full rounded-xl overflow-hidden mb-3" style={{ border: '1px solid rgba(var(--fg),0.07)', aspectRatio: '1000 / 640' }}>
             <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
           </div>
 
-          <div className="text-[10px] font-mono text-white/22 mb-5">
+          <div className="text-[13px] font-mono text-white/22 mb-5">
             1000 x 640 px (approx 85 x 54 mm at 300 dpi) · sleeve label format
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             <button onClick={download}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[12px] font-mono transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[15px] font-mono transition-all"
               style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.30)`, color: `rgb(${accentRGB})` }}>
               <DownloadSimple size={14} />Download PNG
             </button>
 
             {gelatoStatus === null && (
               <button onClick={orderGelato}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[12px] font-mono transition-all"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[15px] font-mono transition-all"
                 style={{ border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.45)', background: 'transparent' }}>
                 <Printer size={14} />Order via Gelato
               </button>
             )}
             {gelatoStatus === 'ordering' && (
-              <div className="flex items-center gap-2 text-[11px] font-mono text-white/35">
+              <div className="flex items-center gap-2 text-[14px] font-mono text-white/35">
                 <div className="w-3 h-3 rounded-full border animate-spin" style={{ borderColor: 'rgba(var(--fg),0.2)', borderTopColor: 'rgba(var(--fg),0.6)' }} />
                 Placing order...
               </div>
             )}
             {gelatoStatus === 'success' && (
-              <div className="flex items-center gap-2 text-[11px] font-mono" style={{ color: 'rgb(120,220,140)' }}>
+              <div className="flex items-center gap-2 text-[14px] font-mono" style={{ color: 'rgb(120,220,140)' }}>
                 <Check size={13} weight="bold" />Order placed
               </div>
             )}
             {gelatoStatus === 'unavailable' && (
-              <div className="text-[11px] font-mono text-white/28">Gelato ordering coming soon.</div>
+              <div className="text-[14px] font-mono text-white/28">Gelato ordering coming soon.</div>
             )}
           </div>
         </div>
@@ -4017,13 +4019,13 @@ function RoadmapFooter({ accentRGB }) {
   ];
   return (
     <footer className="relative z-10 px-5 md:px-10 pb-16 max-w-7xl mx-auto mt-24 md:mt-36">
-      <div className="text-[10px] tracking-[0.3em] uppercase text-white/20 mb-5 font-mono">Roadmap</div>
+      <div className="text-[13px] tracking-[0.3em] uppercase text-white/20 mb-5 font-mono">Roadmap</div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {items.map((item, i) => (
           <div key={i} className="p-4 rounded-2xl" style={{ background: item.done ? "rgba(var(--fg),0.035)" : "transparent", border: item.done ? "1px solid rgba(var(--fg),0.09)" : "1px solid rgba(var(--fg),0.04)", opacity: item.done ? 1 : 0.45 }}>
-            <div className="text-[9px] tracking-[0.25em] uppercase mb-2 font-mono" style={{ color: item.done ? `rgba(${accentRGB},0.6)` : "rgba(var(--fg),0.25)" }}>{item.label}</div>
+            <div className="text-[11px] tracking-[0.25em] uppercase mb-2 font-mono" style={{ color: item.done ? `rgba(${accentRGB},0.6)` : "rgba(var(--fg),0.25)" }}>{item.label}</div>
             <div className="text-sm md:text-base leading-tight mb-1 font-display text-white/80">{item.title}</div>
-            <div className="text-[11px] text-white/30 leading-snug">{item.desc}</div>
+            <div className="text-[14px] text-white/30 leading-snug">{item.desc}</div>
           </div>
         ))}
       </div>
