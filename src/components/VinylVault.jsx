@@ -1396,7 +1396,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.08)" }}>
           {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore tags" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
-            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
+            <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
                 : { background: "transparent", color: "rgba(var(--fg),0.52)" }}>
@@ -1475,11 +1475,13 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                   <button key={c} onClick={() => setFilterCrate(active ? null : c)}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
                     style={col ? {
-                      background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
-                      border: `1px solid ${col}70`,
-                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
-                      color: 'rgba(var(--fg),0.92)',
-                      opacity: active ? 1 : 0.78,
+                      background: `linear-gradient(155deg, ${col}e0 0%, ${col}88 50%, ${col}44 100%)`,
+                      border: `1px solid ${col}a0`,
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
+                      boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(0,0,0,0.10), 0 4px 16px ${col}60`,
+                      color: 'rgba(var(--fg),0.95)',
+                      opacity: active ? 1 : 0.72,
                     } : {
                       background: active ? 'rgba(var(--fg),0.10)' : 'rgba(var(--fg),0.025)',
                       border: `1px solid ${active ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
@@ -1653,10 +1655,12 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
             return (
               <span key={c} className="inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
                 style={col ? {
-                  background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
-                  border: `1px solid ${col}70`,
-                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
-                  color: 'rgba(var(--fg),0.92)',
+                  background: `linear-gradient(155deg, ${col}e0 0%, ${col}88 50%, ${col}44 100%)`,
+                  border: `1px solid ${col}a0`,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(0,0,0,0.10), 0 4px 16px ${col}60`,
+                  color: 'rgba(var(--fg),0.95)',
                 } : {
                   background: `rgba(${accentRGB},0.10)`,
                   border: `1px solid rgba(${accentRGB},0.22)`,
