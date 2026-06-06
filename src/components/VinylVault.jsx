@@ -1579,12 +1579,12 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
     else if (delta > 40 || velocity > 0.22) onPrev();
   };
 
+  // Close picker when navigating to a different record (must be before early return)
+  useEffect(() => { setShowCratePicker(false); }, [index]);
+
   const current = records[index];
   if (!current) return null;
   const isDragging = visualDelta !== 0;
-
-  // Close picker when navigating to a different record
-  useEffect(() => { setShowCratePicker(false); }, [index]);
 
   return (
     <div className="select-none">
