@@ -11,6 +11,7 @@ import { useTheme } from "../hooks/useTheme.js";
 import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
+import { getNotificationCount, getLastSeenTs, markNotifsSeen } from '../lib/social.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -344,6 +345,7 @@ export default function VinylVault() {
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
+  const [notifCount, setNotifCount] = useState(0);
 
   const openProfile = useCallback((username) => {
     if (!username) return;
@@ -377,6 +379,19 @@ export default function VinylVault() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  // Notification badge: fetch count on login, reset when community tab is opened.
+  useEffect(() => {
+    if (!user?.id || !isSupabaseEnabled) { setNotifCount(0); return; }
+    getNotificationCount(user.id, getLastSeenTs()).then(setNotifCount).catch(() => {});
+  }, [user?.id, isSupabaseEnabled]);
+
+  useEffect(() => {
+    if (appView === 'community' && user?.id) {
+      setNotifCount(0);
+      markNotifsSeen();
+    }
+  }, [appView, user?.id]);
 
   const [labelSelectMode, setLabelSelectMode] = useState(false);
   const [selectedForLabels, setSelectedForLabels] = useState(new Set());
@@ -616,7 +631,7 @@ export default function VinylVault() {
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
     { id: "stats", label: "Stats", icon: ChartBar },
-    ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users }] : []),
+    ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
     { id: "about", label: "About", icon: Info },
   ];
 
@@ -636,7 +651,7 @@ export default function VinylVault() {
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
-          {navItems.map(({ id, label, icon: Icon }) => (
+          {navItems.map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
               onClick={() => {
@@ -650,7 +665,14 @@ export default function VinylVault() {
                 : { background: "transparent", border: "1px solid rgba(var(--fg),0.07)", color: "rgba(var(--fg),0.4)" }
               }
             >
-              <Icon size={16} weight={appView === id ? "bold" : "regular"} />
+              <span className="relative inline-flex items-center">
+                <Icon size={16} weight={appView === id ? "bold" : "regular"} />
+                {badge > 0 && (
+                  <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 14, height: 14, borderRadius: 7, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#000', lineHeight: 1, padding: '0 3px' }}>
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+              </span>
               <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
@@ -712,6 +734,7 @@ export default function VinylVault() {
             onOpenProfile={openProfile}
             onOpenHome={openCommunityHome}
             onOpenAccount={() => setShowAccount(true)}
+            collection={collection}
           />
         )}
         {appView === "about" && <AboutView accentRGB={accentRGB} />}

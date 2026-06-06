@@ -1,5 +1,74 @@
 import { supabase } from './supabase';
 
+// ─── Notification helpers ─────────────────────────────────────────────────────
+
+const NOTIF_LAST_SEEN_KEY = 'vv_notifs_last_seen';
+
+export function getLastSeenTs() {
+  return localStorage.getItem(NOTIF_LAST_SEEN_KEY) || new Date(0).toISOString();
+}
+
+export function markNotifsSeen() {
+  localStorage.setItem(NOTIF_LAST_SEEN_KEY, new Date().toISOString());
+}
+
+export async function getNotificationCount(userId, since) {
+  if (!supabase || !userId) return 0;
+  const [{ count: rc }, { count: cc }] = await Promise.all([
+    supabase.from('record_reactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_user_id', userId)
+      .neq('reactor_user_id', userId)
+      .gt('created_at', since),
+    supabase.from('record_comments')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_user_id', userId)
+      .neq('user_id', userId)
+      .gt('created_at', since),
+  ]);
+  return (rc || 0) + (cc || 0);
+}
+
+export async function getNotifications(userId, since) {
+  if (!supabase || !userId) return [];
+  const [{ data: reactions }, { data: comments }] = await Promise.all([
+    supabase.from('record_reactions')
+      .select('id, record_local_id, emoji, created_at, profiles:reactor_user_id(id, username, display_name, avatar_url)')
+      .eq('owner_user_id', userId)
+      .neq('reactor_user_id', userId)
+      .gt('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(30),
+    supabase.from('record_comments')
+      .select('id, record_local_id, body, created_at, profiles:user_id(id, username, display_name, avatar_url)')
+      .eq('owner_user_id', userId)
+      .neq('user_id', userId)
+      .gt('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(30),
+  ]);
+  const notifs = [
+    ...(reactions || []).map(r => ({
+      id: `r-${r.id}`,
+      type: 'reaction',
+      recordLocalId: r.record_local_id,
+      emoji: r.emoji,
+      createdAt: r.created_at,
+      actor: r.profiles || null,
+    })),
+    ...(comments || []).map(c => ({
+      id: `c-${c.id}`,
+      type: 'comment',
+      recordLocalId: c.record_local_id,
+      body: c.body,
+      createdAt: c.created_at,
+      actor: c.profiles || null,
+    })),
+  ];
+  notifs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return notifs.slice(0, 40);
+}
+
 // ─── Profiles ─────────────────────────────────────────────────────────────────
 
 const PROFILE_FIELDS = 'id, username, display_name, avatar_url, bio, is_public';
@@ -96,6 +165,17 @@ export async function unfollowUser(targetId, currentUserId) {
   if (!supabase) throw new Error('Not configured');
   const { error } = await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', targetId);
   if (error) throw error;
+}
+
+export async function getFollowing(userId, limit = 50) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from('follows')
+    .select(`profiles:following_id(${PROFILE_FIELDS})`)
+    .eq('follower_id', userId)
+    .limit(limit);
+  if (error) throw error;
+  return (data || []).map(row => row.profiles).filter(Boolean);
 }
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────

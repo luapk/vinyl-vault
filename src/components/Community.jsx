@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, CaretLeft, MagnifyingGlass, Users, ShareNetwork, PaperPlaneRight,
-  Trash, VinylRecord, ChatCircle, Check, Clock,
+  Trash, VinylRecord, ChatCircle, Check, Clock, Bell,
 } from "@phosphor-icons/react";
 import {
   getProfileByUsername, getPublicCollection, getCollectionCount,
-  getFollowState, followUser, unfollowUser, getFeed, searchUsers,
+  getFollowState, followUser, unfollowUser, getFollowing, getFeed, searchUsers,
   REACTION_EMOJI, getReactionsForRecords, getReactions, toggleReaction,
   getComments, addComment, deleteComment,
+  getNotifications, getLastSeenTs,
 } from "../lib/social.js";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -454,17 +455,28 @@ function ProfileMessage({ title, body, onBack, profile }) {
 
 // ─── Community home (feed + search + your profile) ────────────────────────────
 
-function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount }) {
+function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
+  const [following, setFollowing] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [selectedNotifRecord, setSelectedNotifRecord] = useState(null);
+  // Capture the "last seen" timestamp at render time, before VinylVault resets it.
+  const notifSinceRef = useRef(getLastSeenTs());
   const searchTimer = useRef(null);
 
   useEffect(() => {
     getFeed(40).then(setFeed).catch(() => {}).finally(() => setFeedLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    getFollowing(currentUser.id).then(setFollowing).catch(() => {});
+    getNotifications(currentUser.id, notifSinceRef.current).then(setNotifications).catch(() => {});
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -487,7 +499,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
       </h1>
 
       {/* Your profile card */}
-      <div className="rounded-2xl p-4 mb-6 flex items-center gap-3" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
+      <div className="rounded-2xl p-4 mb-4 flex items-center gap-3" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
         <Avatar profile={currentProfile} size={44} />
         <div className="flex-1 min-w-0">
           <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(currentProfile)}</div>
@@ -504,6 +516,27 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
           <button onClick={onOpenAccount} className="px-4 py-2 rounded-full text-[11px] font-mono uppercase tracking-[0.1em]" style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>Set up</button>
         )}
       </div>
+
+      {/* People you follow */}
+      {following.length > 0 && (
+        <div className="mb-6">
+          <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/30 mb-2.5 flex items-center gap-1.5">
+            <Users size={11} /> Following ({following.length})
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {following.map(p => (
+              <button key={p.id} onClick={() => p.username && onOpenProfile(p.username)}
+                className="flex flex-col items-center gap-1.5 shrink-0 px-2.5 py-2 rounded-xl transition-all"
+                style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 60 }}>
+                <Avatar profile={p} size={32} />
+                <span className="text-[9px] font-mono text-white/50 max-w-[52px] truncate leading-tight">
+                  {p.display_name || p.username || 'User'}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-3">
@@ -534,6 +567,40 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Notifications */}
+      {notifications.length > 0 && (
+        <div className="mb-6">
+          <div className="text-[10px] tracking-[0.25em] uppercase font-mono mb-3 flex items-center gap-1.5" style={{ color: 'rgba(34,197,94,0.7)' }}>
+            <Bell size={12} weight="fill" /> New activity on your records
+          </div>
+          <div className="space-y-1.5">
+            {notifications.map(notif => {
+              const record = (collection || []).find(r => r.id === notif.recordLocalId);
+              return (
+                <button key={notif.id} onClick={() => record && setSelectedNotifRecord(record)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                  style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', cursor: record ? 'pointer' : 'default' }}>
+                  <Avatar profile={notif.actor} size={30} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] leading-snug" style={{ color: 'rgba(var(--fg),0.8)' }}>
+                      <span className="font-medium">{nameFor(notif.actor)}</span>
+                      {notif.type === 'reaction'
+                        ? <span className="text-white/45"> reacted {notif.emoji} to your record</span>
+                        : <span className="text-white/45"> commented on your record</span>}
+                      {record && <span className="font-medium" style={{ color: 'rgba(var(--fg),0.65)' }}> {record.artist} {record.title ? `— ${record.title}` : ''}</span>}
+                    </div>
+                    {notif.type === 'comment' && notif.body && (
+                      <div className="text-[11px] font-mono text-white/35 truncate mt-0.5">"{notif.body}"</div>
+                    )}
+                  </div>
+                  <div className="text-[10px] font-mono text-white/25 shrink-0">{relativeTime(notif.createdAt)}</div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -624,13 +691,25 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
           </div>
         );
       })()}
+
+      {/* Notification record modal */}
+      {selectedNotifRecord && (
+        <RecordSocialModal
+          record={selectedNotifRecord}
+          ownerUserId={currentUser?.id}
+          currentUserId={currentUser?.id}
+          accentRGB={accentRGB}
+          onClose={() => setSelectedNotifRecord(null)}
+          onOpenProfile={onOpenProfile}
+        />
+      )}
     </div>
   );
 }
 
 // ─── Top-level Community view ─────────────────────────────────────────────────
 
-export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount }) {
+export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection }) {
   const [toast, setToast] = useState('');
 
   const share = useCallback((username) => {
@@ -664,6 +743,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onOpenProfile={onOpenProfile}
           onShare={share}
           onOpenAccount={onOpenAccount}
+          collection={collection}
         />
       )}
 
