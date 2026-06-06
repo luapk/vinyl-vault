@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle, Disc, BookOpen, EnvelopeSimple, ImageSquare, Mountains,
+  ChatCircle, ImageSquare, Mountains,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -1254,22 +1254,12 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[14px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          {/* Grade before saving -- icon audition: three option sets */}
+          {/* Grade before saving */}
           {!saved && (
-            <div className="space-y-2 py-1">
-              <div style={{ fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.22)' }}>Grade</div>
-              {[
-                { key: 'A', vinylIcon: <Mountains size={16} />, sleeveIcon: <BookOpen size={16} />, hint: 'open jacket' },
-                { key: 'B', vinylIcon: <Mountains size={16} />, sleeveIcon: <EnvelopeSimple size={16} />, hint: 'sleeve envelope' },
-                { key: 'C', vinylIcon: <Mountains size={16} />, sleeveIcon: <ImageSquare size={16} />, hint: 'cover art square' },
-              ].map(opt => (
-                <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', width: 14 }}>{opt.key}</span>
-                  <ConditionSelect icon={opt.vinylIcon} value={pendingMedia} onChange={setPendingMedia} />
-                  <ConditionSelect icon={opt.sleeveIcon} value={pendingSleeve} onChange={setPendingSleeve} />
-                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.22)', fontStyle: 'italic' }}>{opt.hint}</span>
-                </div>
-              ))}
+            <div className="flex items-center gap-4 py-1">
+              <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.25)' }}>Grade</span>
+              <ConditionSelect icon={<Mountains size={16} />} value={pendingMedia} onChange={setPendingMedia} />
+              <ConditionSelect icon={<ImageSquare size={16} />} value={pendingSleeve} onChange={setPendingSleeve} />
             </div>
           )}
 
@@ -2065,8 +2055,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               {record.catalogNumber && <Pill label="Cat #" value={record.catalogNumber} mono />}
             </div>
             <div className="flex items-center gap-4 mb-3">
-              <ConditionSelect label="Vinyl" value={record.mediaCondition || ''} onChange={v => onUpdate?.(record.id, { mediaCondition: v })} />
-              <ConditionSelect label="Sleeve" value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
+              <ConditionSelect icon={<Mountains size={16} />} value={record.mediaCondition || ''} onChange={v => onUpdate?.(record.id, { mediaCondition: v })} />
+              <ConditionSelect icon={<ImageSquare size={16} />} value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
             </div>
             <div>
               <div className="text-[11px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>
