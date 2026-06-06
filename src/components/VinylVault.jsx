@@ -918,8 +918,8 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
           backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="relative z-10 flex flex-col items-center gap-5 text-center">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isLight ? 'linear-gradient(145deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02))' : 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: isLight ? 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.10)' : 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
-              <GridNine size={22} weight="light" className="text-white/45" />
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isLight ? 'linear-gradient(145deg, rgba(160,130,255,0.18), rgba(160,130,255,0.06))' : 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: isLight ? 'inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 10px rgba(160,130,255,0.22)' : 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
+              <GridNine size={22} weight="light" style={{ color: isLight ? 'rgba(120,90,220,0.80)' : undefined }} className={isLight ? '' : 'text-white/45'} />
             </div>
             <div>
               <div className="text-[10px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
@@ -944,12 +944,12 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
       {/* Recommendations */}
       {recs.length > 0 && (
-        <div className="mt-16 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
-          <div className="flex items-baseline justify-between mb-4">
-            <div className="text-[10px] tracking-[0.35em] uppercase font-mono" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
+        <div className="mt-8 w-full max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.5s ease-out 0.15s both' }}>
+          <div className="mb-4">
+            <div className="text-[10px] tracking-[0.35em] uppercase font-mono whitespace-nowrap" style={{ color: `rgba(var(--fg),${isLight ? 0.55 : 0.3})` }}>Picked for you</div>
             {recsSource.length > 0 && (
-              <div className="text-[9px] font-mono" style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.2})`, letterSpacing: '0.12em' }}>
-                {recsSource.join(' / ')}
+              <div className="text-[9px] font-mono mt-1 truncate" style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.2})`, letterSpacing: '0.10em' }}>
+                {recsSource.slice(0, 2).join(' / ')}{recsSource.length > 2 ? ` +${recsSource.length - 2}` : ''}
               </div>
             )}
           </div>
@@ -963,7 +963,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   }
                 </div>
                 <div style={{ padding: '10px 10px 10px' }}>
-                  <div style={{ fontSize: 9, color: `rgba(var(--fg),${isLight ? 0.55 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 9, color: `rgba(var(--fg),${isLight ? 0.65 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
                   <div style={{ fontSize: 9, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.52 : 0.28})`, marginBottom: 5 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
@@ -973,9 +973,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   )}
                   <div style={{ fontSize: 8, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgba(${accentRGB},0.14)`, border: `1px solid rgba(${accentRGB},0.28)`, color: `rgb(${accentRGB})`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = `rgba(${accentRGB},0.25)`; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = `rgba(${accentRGB},0.14)`; }}>
+                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
+                    onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
                     Buy now
                   </a>
                 </div>
