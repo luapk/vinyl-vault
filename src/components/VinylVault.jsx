@@ -812,6 +812,7 @@ function SaveConfirmation({ release, accentRGB }) {
 // ----- IdleView --------------------------------------------------------------
 
 function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const [showCamera, setShowCamera] = useState(false);
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
@@ -883,9 +884,13 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       {/* Cards grid - centred */}
       <div className="grid sm:grid-cols-2 gap-4 max-w-lg mx-auto w-full">
         {/* Camera / scan card */}
-        <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={{ background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
+        <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.52) 100%)',
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.04), 0 12px 40px -10px rgba(0,0,0,0.14), 0 4px 12px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07), 0 0 40px -12px rgba(${accentRGB},0.22)`,
+          backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderRadius: '20px', padding: '2rem',
+        } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="flex flex-col items-center gap-5 text-center">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(145deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.08))`, boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.2), 0 4px 12px rgba(0,0,0,0.3)' }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(145deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.08))`, boxShadow: isLight ? `inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 12px rgba(${accentRGB},0.18)` : 'inset 0 1px 0 rgba(var(--fg),0.2), 0 4px 12px rgba(0,0,0,0.3)' }}>
               <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
             </div>
             <div>
@@ -898,9 +903,13 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
         </div>
 
         {/* Batch queue card */}
-        <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={{ background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
+        <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.52) 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.04), 0 12px 40px -10px rgba(0,0,0,0.14), 0 4px 12px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)',
+          backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderRadius: '20px', padding: '2rem',
+        } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="relative z-10 flex flex-col items-center gap-5 text-center">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isLight ? 'linear-gradient(145deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02))' : 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: isLight ? 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.10)' : 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
               <GridNine size={22} weight="light" className="text-white/45" />
             </div>
             <div>
