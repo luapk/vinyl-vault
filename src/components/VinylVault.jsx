@@ -837,8 +837,8 @@ function SaveConfirmation({ release, accentRGB }) {
           <Check size={14} weight="bold" />
         </div>
         <div style={{ overflow: 'hidden', minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 1.5 }}>Added to collection</div>
-          <div style={{ fontSize: 19, color: 'rgba(var(--fg),0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
+          <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 1.5 }}>Added to collection</div>
+          <div style={{ fontSize: 14, color: 'rgba(var(--fg),0.85)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis' }}>{release.artist} — {release.title}</div>
         </div>
         <VinylRecord size={15} weight="fill" style={{ color: `rgba(${accentRGB},0.65)`, flexShrink: 0, marginLeft: 2 }} />
       </div>
@@ -1010,7 +1010,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   )}
                   <div style={{ fontSize: 13, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 16, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
+                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
                     onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
                     onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
                     Buy now
