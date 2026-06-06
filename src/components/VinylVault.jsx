@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle, ImageSquare, Mountains,
+  ChatCircle, ImageSquare, Mountains, CloudArrowDown,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -420,7 +420,7 @@ export default function VinylVault() {
   }, []);
 
   const userId = user?.id ?? null;
-  const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate } = useCollection(userId);
+  const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, addRecordsBulk } = useCollection(userId);
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
     setRelease(prev => {
@@ -800,6 +800,7 @@ export default function VinylVault() {
           onViewProfile={(username) => { setShowAccount(false); openProfile(username); }}
           onPrintLabels={() => { setShowAccount(false); setAppView('collection'); enterLabelMode(); }}
           onDownloadCSV={() => downloadCSV(collection)}
+          onAddRecordsBulk={addRecordsBulk}
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
         />
@@ -1856,6 +1857,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const [reidentifyResults, setReidentifyResults] = useState(null);
   const [reidentifyPicking, setReidentifyPicking] = useState(false);
   const [reidentifyError, setReidentifyError] = useState(null);
+  const [enriching, setEnriching] = useState(false);
   const recordCrates = record.crates || [];
   const genreChips = GENRE_CRATES.filter(g => !recordCrates.includes(g));
   const otherCrates = allCrates.filter(c => !recordCrates.includes(c) && !GENRE_CRATES.includes(c));
@@ -1887,6 +1889,23 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     if (!src) return;
     extractDominantColor(src).then(({ r, g, b }) => setLocalAccent(`${r},${g},${b}`)).catch(() => {});
   }, [record.coverUrl]);
+
+  useEffect(() => {
+    if (record.source !== 'discogs_import' || !record.discogsId || (record.tracklist || []).length > 0) return;
+    setEnriching(true);
+    fetch(`/api/discogs-release?id=${record.discogsId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        onUpdate?.(record.id, {
+          tracklist: data.tracklist || [],
+          country: data.country || record.country || null,
+          source: 'discogs',
+        });
+      })
+      .catch(console.error)
+      .finally(() => setEnriching(false));
+  }, [record.id]);
 
   useEffect(() => {
     if (!record?.tracklist?.length) return;
@@ -2141,6 +2160,13 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
           </div>
         </div>
 
+        {enriching && (
+          <div className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: 'rgba(var(--fg),0.3)', borderTopColor: 'transparent' }} />
+            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', letterSpacing: '0.15em', textTransform: 'uppercase' }}>Loading tracklist...</span>
+          </div>
+        )}
+
         {record.tracklist && record.tracklist.length > 0 && (
           <div className="mb-5">
             <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
@@ -2377,7 +2403,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, isAdmin, onOpenAdmin }) {
+function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2403,6 +2429,44 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
   const [profileErr, setProfileErr] = useState('');
 
   const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
+
+  // Discogs import state
+  const [discogsUser, setDiscogsUser] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
+  const cancelImport = useRef(false);
+
+  async function startImport() {
+    const uname = discogsUser.trim();
+    if (!uname || importing) return;
+    cancelImport.current = false;
+    setImporting(true);
+    setImportError('');
+    setImportResult(null);
+    setImportProgress({ done: 0, total: 0 });
+    let totalAdded = 0, totalSkipped = 0;
+    try {
+      for (let page = 1; ; page++) {
+        if (cancelImport.current) break;
+        const res = await fetch(`/api/discogs-import?username=${encodeURIComponent(uname)}&page=${page}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Import failed');
+        if (page === 1) setImportProgress({ done: 0, total: data.total });
+        const { added, skipped } = await onAddRecordsBulk(data.records);
+        totalAdded += added;
+        totalSkipped += skipped;
+        setImportProgress({ done: Math.min(page * 100, data.total), total: data.total });
+        if (page >= data.pages) break;
+      }
+      if (!cancelImport.current) setImportResult({ added: totalAdded, skipped: totalSkipped });
+    } catch (err) {
+      setImportError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
@@ -2647,6 +2711,84 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
               <Printer size={13} />Go to collection
             </button>
+          </AccountSection>
+
+          <AccountSection label="Import from Discogs" open={openSection === 'discogs-import'} onToggle={() => toggleSection('discogs-import')}>
+            {!importing && !importResult && (
+              <>
+                <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+                  Import your Discogs collection directly into Vinyl Vault. Your collection must be set to Public in Discogs Settings.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={discogsUser}
+                    onChange={e => { setDiscogsUser(e.target.value); setImportError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && startImport()}
+                    placeholder="Discogs username"
+                    style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
+                    onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
+                    onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
+                  />
+                  <button onClick={startImport} disabled={!discogsUser.trim()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '8px 13px', borderRadius: 9, fontSize: 19, fontWeight: 600,
+                      color: 'var(--bg-hex)',
+                      background: discogsUser.trim() ? 'rgba(var(--fg),0.9)' : 'rgba(var(--fg),0.3)',
+                      border: 'none',
+                      cursor: discogsUser.trim() ? 'pointer' : 'default',
+                      transition: 'background 0.2s',
+                    }}>
+                    <CloudArrowDown size={15} />Import
+                  </button>
+                </div>
+                {importError && (
+                  <p style={{ fontSize: 17, color: '#fca5a5', fontFamily: 'monospace', marginTop: 10 }}>{importError}</p>
+                )}
+              </>
+            )}
+            {importing && (
+              <div>
+                <div style={{ height: 6, borderRadius: 3, background: 'rgba(var(--fg),0.06)', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{
+                    height: '100%',
+                    borderRadius: 3,
+                    background: 'rgba(var(--fg),0.35)',
+                    width: importProgress.total > 0 ? `${Math.min((importProgress.done / importProgress.total) * 100, 100)}%` : '0%',
+                    transition: 'width 0.3s',
+                  }} />
+                </div>
+                <p style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 10 }}>
+                  {importProgress.total > 0 ? `${importProgress.done} / ${importProgress.total} records` : 'Starting...'}
+                </p>
+                <button
+                  onClick={() => { cancelImport.current = true; }}
+                  style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Cancel
+                </button>
+              </div>
+            )}
+            {!importing && importResult && (
+              <div>
+                <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Check size={14} weight="bold" />Added {importResult.added} records
+                </p>
+                {importResult.skipped > 0 && (
+                  <p style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>
+                    {importResult.skipped} duplicates skipped
+                  </p>
+                )}
+                {importError && (
+                  <p style={{ fontSize: 17, color: '#fca5a5', fontFamily: 'monospace', marginBottom: 10 }}>{importError}</p>
+                )}
+                <button
+                  onClick={() => { setImportResult(null); setImportError(''); }}
+                  style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Import again
+                </button>
+              </div>
+            )}
           </AccountSection>
 
           <AccountSection label="Download CSV" open={openSection === 'csv'} onToggle={() => toggleSection('csv')}>

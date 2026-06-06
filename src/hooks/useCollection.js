@@ -77,9 +77,15 @@ function reducer(state, action) {
         ...r,
         crates: (r.crates || []).filter(c => c !== action.name),
       }));
+    case 'BULK_ADD':
+      return [...action.records, ...state];
     default:
       return state;
   }
+}
+
+function localNormalizeKey(artist, title) {
+  return `${artist}${title}`.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 // ─── Supabase persistence helpers ─────────────────────────────────────────────
@@ -237,6 +243,44 @@ export function useCollection(userId = null) {
       });
   }, [useDb]);
 
+  const addRecordsBulk = useCallback(async (releases) => {
+    const existing = collectionRef.current;
+    const newRecords = [];
+    for (const release of releases) {
+      const r = recordFromRelease(release, []);
+      const isDupe = existing.some(
+        e =>
+          (r.discogsId && e.discogsId === r.discogsId) ||
+          localNormalizeKey(r.artist, r.title) === localNormalizeKey(e.artist, e.title)
+      );
+      if (!isDupe) newRecords.push(r);
+    }
+    if (newRecords.length > 0) {
+      dispatch({ type: 'BULK_ADD', records: newRecords });
+      if (useDb) {
+        try {
+          const { data, error } = await supabase
+            .from('records')
+            .insert(newRecords.map(r => ({ user_id: userId, data: r })))
+            .select('id');
+          if (!error && data) {
+            data.forEach((row, i) => {
+              if (newRecords[i]) dbIds.current[newRecords[i].id] = row.id;
+            });
+            setSyncedIds(s => {
+              const next = new Set(s || []);
+              newRecords.forEach(r => next.add(r.id));
+              return next;
+            });
+          }
+        } catch (e) {
+          console.error('Bulk insert error', e);
+        }
+      }
+    }
+    return { added: newRecords.length, skipped: releases.length - newRecords.length };
+  }, [useDb, userId]);
+
   return {
     collection,
     syncedIds,
@@ -245,6 +289,7 @@ export function useCollection(userId = null) {
     updateRecord,
     renameCrate,
     deleteCrate,
+    addRecordsBulk,
   };
 }
 
