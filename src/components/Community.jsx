@@ -549,27 +549,81 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
           <p className="text-white/40 text-sm mb-1">Your feed is quiet.</p>
           <p className="text-white/25 text-xs font-mono">Search for collectors above and follow them to see what they add.</p>
         </div>
-      ) : (
-        <div className="space-y-2.5">
-          {feed.map((item, i) => (
-            <button key={`${item.record._dbId}-${i}`} onClick={() => item.owner.username && onOpenProfile(item.owner.username)}
-              className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left" style={{ background: 'rgba(var(--fg),0.03)', border: '1px solid rgba(var(--fg),0.06)' }}>
-              <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0" style={{ boxShadow: '0 4px 12px -4px rgba(0,0,0,0.5)' }}>
-                {item.record.coverUrl
-                  ? <img src={item.record.coverUrl} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.08)` }}><VinylRecord size={18} weight="thin" className="opacity-20" /></div>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-display truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{item.record.artist} — {item.record.title}</div>
-                <div className="text-[11px] font-mono text-white/35 truncate flex items-center gap-1.5">
-                  <span style={{ color: 'rgba(var(--fg),0.5)' }}>{nameFor(item.owner)}</span>
-                  <Clock size={10} /> {relativeTime(item.addedAt)}
+      ) : (() => {
+        // Group all feed items by owner, preserving first-appearance order
+        const grouped = [];
+        const ownerMap = new Map();
+        for (const item of feed) {
+          const uid = item.owner?.id;
+          if (!uid) continue;
+          if (!ownerMap.has(uid)) {
+            const group = { owner: item.owner, records: [], latestAt: item.addedAt };
+            ownerMap.set(uid, group);
+            grouped.push(group);
+          }
+          const group = ownerMap.get(uid);
+          group.records.push(item.record);
+          if (item.addedAt > group.latestAt) group.latestAt = item.addedAt;
+        }
+        grouped.sort((a, b) => new Date(b.latestAt) - new Date(a.latestAt));
+
+        return (
+          <div className="space-y-3">
+            {grouped.map(group => (
+              <div key={group.owner.id} className="rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)' }}>
+
+                {/* Owner header */}
+                <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+                  <button onClick={() => group.owner.username && onOpenProfile(group.owner.username)}
+                    className="shrink-0 transition-opacity hover:opacity-80">
+                    <Avatar profile={group.owner} size={38} />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.88)' }}>
+                      {nameFor(group.owner)}
+                    </div>
+                    <div className="text-[10px] font-mono text-white/30">
+                      {group.records.length} record{group.records.length !== 1 ? 's' : ''}&nbsp;·&nbsp;{relativeTime(group.latestAt)}
+                    </div>
+                  </div>
+                  {group.owner.username && (
+                    <button onClick={() => onOpenProfile(group.owner.username)}
+                      className="shrink-0 flex items-center gap-1 text-[11px] font-mono px-3 py-1.5 rounded-full transition-all"
+                      style={{ border: `1px solid rgba(${accentRGB},0.3)`, color: `rgba(${accentRGB},0.85)`, background: `rgba(${accentRGB},0.08)` }}>
+                      View vault
+                    </button>
+                  )}
+                </div>
+
+                {/* Records list */}
+                <div className="px-3 pb-3 space-y-1">
+                  {group.records.slice(0, 5).map((record, ri) => (
+                    <div key={record._dbId || record.id || ri} className="flex items-center gap-3 px-2 py-2 rounded-xl"
+                      style={{ background: 'rgba(var(--fg),0.03)' }}>
+                      <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ boxShadow: '0 3px 8px -3px rgba(0,0,0,0.5)' }}>
+                        {record.coverUrl
+                          ? <img src={record.coverUrl} alt="" className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.08)` }}><VinylRecord size={14} weight="thin" className="opacity-20" /></div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-display truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{record.artist}</div>
+                        <div className="text-[10px] font-mono text-white/35 truncate">{record.title}{record.year ? ` · ${record.year}` : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {group.records.length > 5 && (
+                    <button onClick={() => group.owner.username && onOpenProfile(group.owner.username)}
+                      className="w-full text-left text-[10px] font-mono text-white/30 hover:text-white/50 transition-colors px-2 py-1.5">
+                      +{group.records.length - 5} more in their vault
+                    </button>
+                  )}
                 </div>
               </div>
-            </button>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
