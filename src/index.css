@@ -15,10 +15,42 @@
 [data-theme="light"] {
   color-scheme: light;
   --fg: 10,10,13;
-  --bg: 240,240,243;
-  --bg-hex: #f0f0f3;
+  --bg: 248,246,240;
+  --bg-hex: #F8F6F0;
   --fg-hex: #0a0a0d;
   --color-white: 10 10 13;
+}
+
+/* Remap Tailwind text-white/* opacity classes to dark equivalents in light mode.
+   These classes hard-code white and become invisible on a light background. */
+[data-theme="light"] .text-white\/20  { color: rgba(10,10,13,0.38) !important; }
+[data-theme="light"] .text-white\/22  { color: rgba(10,10,13,0.40) !important; }
+[data-theme="light"] .text-white\/25  { color: rgba(10,10,13,0.42) !important; }
+[data-theme="light"] .text-white\/28  { color: rgba(10,10,13,0.44) !important; }
+[data-theme="light"] .text-white\/30  { color: rgba(10,10,13,0.48) !important; }
+[data-theme="light"] .text-white\/35  { color: rgba(10,10,13,0.52) !important; }
+[data-theme="light"] .text-white\/40  { color: rgba(10,10,13,0.58) !important; }
+[data-theme="light"] .text-white\/45  { color: rgba(10,10,13,0.62) !important; }
+[data-theme="light"] .text-white\/50  { color: rgba(10,10,13,0.68) !important; }
+[data-theme="light"] .text-white\/55  { color: rgba(10,10,13,0.72) !important; }
+[data-theme="light"] .text-white\/60  { color: rgba(10,10,13,0.76) !important; }
+[data-theme="light"] .text-white\/65  { color: rgba(10,10,13,0.80) !important; }
+[data-theme="light"] .text-white\/70  { color: rgba(10,10,13,0.83) !important; }
+[data-theme="light"] .text-white\/80  { color: rgba(10,10,13,0.88) !important; }
+[data-theme="light"] .text-white\/85  { color: rgba(10,10,13,0.92) !important; }
+[data-theme="light"] .text-white\/90  { color: rgba(10,10,13,0.96) !important; }
+
+/* bg-white/* and border-white/* similarly become invisible on light backgrounds */
+[data-theme="light"] .bg-white\/5    { background-color: rgba(10,10,13,0.05) !important; }
+[data-theme="light"] .border-white\/20 { border-color: rgba(10,10,13,0.20) !important; }
+
+/* Placeholder text */
+[data-theme="light"] .placeholder-white\/20::placeholder { color: rgba(10,10,13,0.38) !important; }
+
+/* Stronger header border so it reads as a real separator */
+[data-theme="light"] header {
+  border-bottom-color: rgba(10,10,13,0.10) !important;
+  box-shadow: 0 1px 0 rgba(10,10,13,0.06);
 }
 
 html,

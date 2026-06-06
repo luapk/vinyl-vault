@@ -662,7 +662,7 @@ export default function VinylVault() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 12px -4px rgba(${accentRGB},0.3)` }
-                : { background: "transparent", border: "1px solid rgba(var(--fg),0.07)", color: "rgba(var(--fg),0.4)" }
+                : { background: "transparent", border: `1px solid rgba(var(--fg),${isDark ? 0.07 : 0.15})`, color: `rgba(var(--fg),${isDark ? 0.4 : 0.6})` }
               }
             >
               <span className="relative inline-flex items-center">
@@ -1455,6 +1455,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 // ----- VinylCarousel ---------------------------------------------------------
 
 function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [] }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const startXRef = useRef(null);
   const startTimeRef = useRef(null);
   const didDragRef = useRef(false);
@@ -1523,14 +1524,22 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
               {/* Glass panel frame */}
               <div style={{
                 position: 'relative', width: '100%', height: '100%', borderRadius: 20, padding: 10,
-                background: isActive
-                  ? `linear-gradient(145deg, rgba(${accentRGB},0.18) 0%, rgba(${accentRGB},0.07) 55%, rgba(var(--fg),0.03) 100%)`
-                  : `linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.03) 100%)`,
+                background: isLight
+                  ? (isActive
+                    ? `linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(${accentRGB},0.06) 100%)`
+                    : `linear-gradient(145deg, rgba(255,255,255,0.88) 0%, rgba(248,246,240,0.82) 100%)`)
+                  : (isActive
+                    ? `linear-gradient(145deg, rgba(${accentRGB},0.18) 0%, rgba(${accentRGB},0.07) 55%, rgba(var(--fg),0.03) 100%)`
+                    : `linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.03) 100%)`),
                 backdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
                 WebkitBackdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
-                boxShadow: isActive
-                  ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.28), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
-                  : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`,
+                boxShadow: isLight
+                  ? (isActive
+                    ? `0 20px 60px -12px rgba(0,0,0,0.20), 0 0 30px -5px rgba(${accentRGB},0.15), 0 2px 0 0px rgba(0,0,0,0.10), 0 4px 0 0px rgba(0,0,0,0.06), 0 7px 0 0px rgba(0,0,0,0.03), 0 0 0 1px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,1), inset 0 0 30px rgba(${accentRGB},0.03)`
+                    : `0 ${10 + abs * 6}px 35px -8px rgba(0,0,0,0.13), 0 2px 0 0px rgba(0,0,0,0.07), 0 4px 0 0px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,${Math.max(0.05, 0.09 - abs * 0.01)}), inset 0 1px 0 rgba(255,255,255,0.9)`)
+                  : (isActive
+                    ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.28), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
+                    : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`),
               }}>
                 {/* Album cover inset */}
                 <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
@@ -1540,7 +1549,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                         <VinylRecord size={56} weight="thin" className="opacity-20" />
                       </div>
                   }
-                  {isActive && <div style={{ position: 'absolute', inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)", pointerEvents: 'none' }} />}
+                  {isActive && <div style={{ position: 'absolute', inset: 0, background: isLight ? "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 45%)" : "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)", pointerEvents: 'none' }} />}
                 </div>
               </div>
             </div>
