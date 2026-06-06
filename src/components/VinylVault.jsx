@@ -2181,7 +2181,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               <div className="text-[14px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
             )}
             {price && typeof price === "object" && (
-              <PriceGraph price={price} accentRGB={localAccent} />
+              <PriceSummary price={price} accentRGB={localAccent} />
             )}
           </div>
         )}
@@ -2240,134 +2240,34 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
 // ----- PriceGraph ------------------------------------------------------------
 
-const CONDITION_ORDER = [
-  'Mint (M)',
-  'Near Mint (NM or M-)',
-  'Very Good Plus (VG+)',
-  'Very Good (VG)',
-  'Good Plus (G+)',
-  'Good (G)',
-  'Fair (F)',
-  'Poor (P)',
-];
+function PriceSummary({ price, accentRGB }) {
+  const cur = price.currency || '';
+  const fmt = v => v != null ? `${cur} ${v.toFixed(2)}`.trim() : null;
 
-const CONDITION_SHORT = {
-  'Mint (M)': 'M',
-  'Near Mint (NM or M-)': 'NM',
-  'Very Good Plus (VG+)': 'VG+',
-  'Very Good (VG)': 'VG',
-  'Good Plus (G+)': 'G+',
-  'Good (G)': 'G',
-  'Fair (F)': 'F',
-  'Poor (P)': 'P',
-};
-
-function PriceGraph({ price, accentRGB }) {
-  const [ready, setReady] = useState(false);
-  useEffect(() => { const id = requestAnimationFrame(() => setReady(true)); return () => cancelAnimationFrame(id); }, []);
-
-  const byCondition = price.byCondition || {};
-  const rows = CONDITION_ORDER
-    .map(cond => ({ cond, short: CONDITION_SHORT[cond] || cond, ...(byCondition[cond] || { avg: null, count: 0 }) }))
-    .filter(r => r.avg != null);
-
-  const maxAvg = rows.length ? Math.max(...rows.map(r => r.avg)) : 1;
+  const stats = [
+    { label: 'Low',    value: fmt(price.low) },
+    { label: 'Median', value: fmt(price.median), accent: true },
+    { label: 'High',   value: fmt(price.high) },
+  ].filter(s => s.value);
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(var(--fg),0.02)', border: '1px solid rgba(var(--fg),0.07)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(var(--fg),0.05)' }}>
-        <div className="text-[13px] tracking-[0.28em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.28)' }}>
-          Marketplace · by condition
-        </div>
-        <div className="text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.20)' }}>
-          {price.totalListings} listing{price.totalListings !== 1 ? 's' : ''}
-          {price.currency ? ` · ${price.currency}` : ''}
-        </div>
+    <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(var(--fg),0.02)', border: '1px solid rgba(var(--fg),0.07)' }}>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] tracking-[0.25em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.25)' }}>Marketplace</span>
+        {price.totalListings > 0 && (
+          <span className="text-[12px] font-mono" style={{ color: 'rgba(var(--fg),0.22)' }}>{price.totalListings} listing{price.totalListings !== 1 ? 's' : ''}</span>
+        )}
       </div>
-
-      {/* Bars */}
-      <div className="px-4 py-3 space-y-2">
-        {rows.length === 0 ? (
-          <div style={{ color: 'rgba(var(--fg),0.22)' }}>
-            <div className="text-[14px] font-mono py-2">No condition data available.</div>
-            {price._debug && <div className="text-[11px] font-mono pb-2 opacity-60">debug: {JSON.stringify(price._debug)}</div>}
-          </div>
-        ) : rows.map((row, i) => {
-          const pct = row.avg / maxAvg;
-          // Brightness fades gently from M down to P
-          const intensity = 0.55 + 0.45 * ((rows.length - i) / rows.length);
-
-          return (
-            <div key={row.cond} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {/* Condition label */}
-              <div style={{
-                width: 26, textAlign: 'right', flexShrink: 0,
-                fontSize: 14, letterSpacing: '0.08em', fontFamily: 'monospace',
-                color: `rgba(${accentRGB},${intensity * 0.7})`,
-              }}>
-                {row.short}
-              </div>
-
-              {/* Bar track */}
-              <div style={{ flex: 1, position: 'relative', height: 18, borderRadius: 3 }}>
-                {/* Track background */}
-                <div style={{
-                  position: 'absolute', inset: 0, borderRadius: 3,
-                  background: `rgba(${accentRGB},0.04)`,
-                  border: `1px solid rgba(${accentRGB},0.08)`,
-                }} />
-                {/* Filled portion */}
-                <div style={{
-                  position: 'absolute', top: 0, left: 0, bottom: 0,
-                  width: ready ? `${pct * 100}%` : '0%',
-                  minWidth: ready && pct > 0 ? 4 : 0,
-                  borderRadius: 3,
-                  transition: `width 0.55s cubic-bezier(0.4,0,0.2,1) ${i * 0.055}s`,
-                  background: `linear-gradient(90deg, rgba(${accentRGB},${intensity * 0.28}), rgba(${accentRGB},${intensity * 0.55}))`,
-                  boxShadow: `0 0 14px -3px rgba(${accentRGB},${intensity * 0.5}), inset 0 1px 0 rgba(var(--fg),0.06)`,
-                }} />
-                {/* Count inside bar (right-aligned) */}
-                {row.count > 1 && (
-                  <div style={{
-                    position: 'absolute', right: 5, top: '50%', transform: 'translateY(-50%)',
-                    fontSize: 13, fontFamily: 'monospace',
-                    color: `rgba(${accentRGB},${intensity * 0.45})`,
-                    pointerEvents: 'none',
-                  }}>
-                    {row.count}
-                  </div>
-                )}
-              </div>
-
-              {/* Price */}
-              <div style={{
-                width: 52, textAlign: 'right', flexShrink: 0,
-                fontSize: 18, fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
-                color: `rgba(var(--fg),${intensity * 0.75})`,
-              }}>
-                {row.avg.toFixed(2)}
-              </div>
+      {stats.length === 0 ? (
+        <div className="text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.25)' }}>No price data available.</div>
+      ) : (
+        <div className="flex gap-5">
+          {stats.map(({ label, value, accent }) => (
+            <div key={label}>
+              <div className="text-[11px] tracking-[0.18em] uppercase font-mono mb-0.5" style={{ color: 'rgba(var(--fg),0.22)' }}>{label}</div>
+              <div className="text-[16px] font-mono" style={{ color: accent ? `rgba(${accentRGB},0.85)` : 'rgba(var(--fg),0.55)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Footer summary */}
-      {(price.median != null || price.low != null) && (
-        <div className="px-4 pb-3 pt-1 flex gap-4 flex-wrap" style={{ borderTop: '1px solid rgba(var(--fg),0.04)' }}>
-          {price.median != null && (
-            <div>
-              <span className="text-[11px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Median</span>
-              <span className="text-[15px] font-mono" style={{ color: `rgba(${accentRGB},0.80)` }}>{price.median.toFixed(2)}</span>
-            </div>
-          )}
-          {price.low != null && price.high != null && price.low !== price.high && (
-            <div>
-              <span className="text-[11px] tracking-[0.18em] uppercase font-mono mr-1.5" style={{ color: 'rgba(var(--fg),0.20)' }}>Range</span>
-              <span className="text-[14px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>{price.low.toFixed(2)} — {price.high.toFixed(2)}</span>
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>
