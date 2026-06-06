@@ -1791,11 +1791,6 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 
 function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect, localOnly = false }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const condColor = conditionColor(record.mediaCondition);
-  const condColorDark = record.mediaCondition === 'M' || record.mediaCondition === 'NM' ? '40,140,55'
-    : record.mediaCondition === 'VG+' || record.mediaCondition === 'VG' ? '140,100,10'
-    : condColor ? '180,45,45' : null;
-  const displayCondColor = isLight ? condColorDark : condColor;
   return (
     <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect}>
       <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
@@ -1824,11 +1819,6 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
             className="absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center group-hover:opacity-0 transition-opacity"
             style={{ background: 'rgba(251,146,60,0.92)', fontSize: 14, fontWeight: 800, color: '#fff', fontFamily: 'monospace', lineHeight: 1 }}>
             !
-          </div>
-        )}
-        {record.mediaCondition && !selectMode && displayCondColor && (
-          <div style={{ position: 'absolute', bottom: 6, left: 6, fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.08em', padding: '2px 6px', borderRadius: 10, background: `rgba(${displayCondColor},${isLight ? 0.14 : 0.18})`, border: `1px solid rgba(${displayCondColor},${isLight ? 0.40 : 0.35})`, color: `rgb(${displayCondColor})`, pointerEvents: 'none' }}>
-            {record.mediaCondition}
           </div>
         )}
       </div>
