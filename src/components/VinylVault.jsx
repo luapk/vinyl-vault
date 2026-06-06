@@ -448,7 +448,7 @@ export default function VinylVault() {
     }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg-hex)" }}>
-        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 192, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
+        <video src="/intro.mp4" autoPlay muted playsInline style={{ height: 192, mixBlendMode: 'screen', marginBottom: 8 }} />
         <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(var(--fg),0.1)", borderTopColor: "rgba(var(--fg),0.5)" }} />
         <span style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)' }}>Connecting...</span>
       </div>
