@@ -2395,7 +2395,7 @@ function AccountSection({ label, open, onToggle, children }) {
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3.5 text-left transition-colors"
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
-        <span style={{ fontSize: 19, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
+        <span style={{ fontSize: 16, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
         <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.25)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && <div className="pb-4">{children}</div>}
@@ -2550,7 +2550,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
         onClick={e => e.stopPropagation()}>
 
         <div className="flex items-center justify-between mb-5">
-          <h2 style={{ fontSize: 24, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Account</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Account</h2>
           <button onClick={onClose} className="text-white/30 hover:text-white/70 transition-colors"><X size={16} /></button>
         </div>
 
@@ -2568,7 +2568,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             }}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 35, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
+              : <span style={{ fontSize: 30, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
             }
             {avatarSavedOk && (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
@@ -2579,14 +2579,14 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </button>
           <div className="flex items-center gap-3">
             <button onClick={() => avatarInputRef.current?.click()}
-              style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               {avatarPreview ? 'Change photo' : 'Upload photo'}
             </button>
             {avatarPreview && (
               <>
-                <span style={{ color: 'rgba(var(--fg),0.15)', fontSize: 18 }}>|</span>
+                <span style={{ color: 'rgba(var(--fg),0.15)', fontSize: 15 }}>|</span>
                 <button onClick={removeAvatar}
-                  style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Remove
                 </button>
               </>
@@ -2594,9 +2594,9 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </div>
         </div>
 
-        <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
+        <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
 
-        {errorMsg && <p style={{ fontSize: 18, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
+        {errorMsg && <p style={{ fontSize: 15, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
 
         {/* Accordion sections */}
         <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)' }}>
@@ -2609,13 +2609,13 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                 onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
                 onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
                 placeholder="Your name"
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
                 onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
               <button onClick={saveDisplayName} disabled={saving || savedOk}
                 style={{
-                  padding: '8px 13px', borderRadius: 9, fontSize: 19, fontWeight: 600,
+                  padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
                   color: 'var(--bg-hex)',
                   background: saving ? 'rgba(var(--fg),0.3)' : savedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)',
                   border: 'none',
@@ -2629,41 +2629,41 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Public profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
-            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
               Claim a username and make your collection public so others can browse it, follow you, and react.
             </p>
 
-            <label style={{ display: 'block', fontSize: 16, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
+            <label style={{ display: 'block', fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <span style={{ fontSize: 23, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>@</span>
+              <span style={{ fontSize: 20, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>@</span>
               <input
                 type="text"
                 value={username}
                 onChange={e => { setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')); setProfileSavedOk(false); setProfileErr(''); }}
                 placeholder="username"
                 maxLength={20}
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
+                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
                 onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                 onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
               />
             </div>
 
-            <label style={{ display: 'block', fontSize: 16, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Bio</label>
+            <label style={{ display: 'block', fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Bio</label>
             <textarea
               value={bio}
               onChange={e => { setBio(e.target.value.slice(0, 160)); setProfileSavedOk(false); setProfileErr(''); }}
               placeholder="A line about your taste, your rig, your scene…"
               rows={2}
-              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', resize: 'none', marginBottom: 4 }}
+              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', resize: 'none', marginBottom: 4 }}
               onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
               onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
             />
-            <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', textAlign: 'right', marginBottom: 12 }}>{bio.length}/160</div>
+            <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', textAlign: 'right', marginBottom: 12 }}>{bio.length}/160</div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 19, color: isPublic ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.7)', transition: 'color 0.2s' }}>{isPublic ? 'Public collection' : 'Private collection'}</div>
-                <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
+                <div style={{ fontSize: 16, color: isPublic ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.7)', transition: 'color 0.2s' }}>{isPublic ? 'Public collection' : 'Private collection'}</div>
+                <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>{isPublic ? 'Anyone can view your records' : 'Only you can see your records'}</div>
               </div>
               <button
                 onClick={() => { setIsPublic(v => !v); setProfileSavedOk(false); setProfileErr(''); }}
@@ -2673,16 +2673,16 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
               </button>
             </div>
 
-            {profileErr && <p style={{ fontSize: 18, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{profileErr}</p>}
+            {profileErr && <p style={{ fontSize: 15, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{profileErr}</p>}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button onClick={saveProfile} disabled={profileSaving || profileSavedOk}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 9, fontSize: 19, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 16px', borderRadius: 9, fontSize: 16, fontWeight: 600, color: 'var(--bg-hex)', background: profileSaving ? 'rgba(var(--fg),0.3)' : profileSavedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)', border: 'none', cursor: (profileSaving || profileSavedOk) ? 'default' : 'pointer', transition: 'background 0.2s' }}>
                 {profileSaving ? 'Saving...' : profileSavedOk ? (<><Check size={13} weight="bold" />Saved!</>) : 'Save profile'}
               </button>
               {!profileSaving && !profileSavedOk && profile?.username && profile?.is_public && (
                 <button onClick={() => onViewProfile?.(profile.username)}
-                  style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   View my profile →
                 </button>
               )}
@@ -2691,10 +2691,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
           <AccountSection label="Password" open={openSection === 'password'} onToggle={() => toggleSection('password')}>
             {resetSent ? (
-              <p style={{ fontSize: 19, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
+              <p style={{ fontSize: 16, color: '#86efac', fontFamily: 'monospace' }}>Reset link sent to {user.email}</p>
             ) : (
               <button onClick={sendPasswordReset}
-                style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                 onMouseEnter={e => e.currentTarget.style.color = 'rgba(var(--fg),0.75)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(var(--fg),0.45)'}>
                 Send password reset email
@@ -2703,7 +2703,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Print labels" open={openSection === 'labels'} onToggle={() => toggleSection('labels')}>
-            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
+            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Select records from your collection to print labels for.</p>
             <button onClick={onPrintLabels}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
               style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
@@ -2716,7 +2716,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           <AccountSection label="Import from Discogs" open={openSection === 'discogs-import'} onToggle={() => toggleSection('discogs-import')}>
             {!importing && !importResult && (
               <>
-                <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
                   Import your Discogs collection directly into Vinyl Vault. Your collection must be set to Public in Discogs Settings.
                 </p>
                 <div className="flex gap-2">
@@ -2726,14 +2726,14 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                     onChange={e => { setDiscogsUser(e.target.value); setImportError(''); }}
                     onKeyDown={e => e.key === 'Enter' && startImport()}
                     placeholder="Discogs username"
-                    style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 20, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
+                    style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', fontFamily: 'monospace' }}
                     onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
                     onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
                   />
                   <button onClick={startImport} disabled={!discogsUser.trim()}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '8px 13px', borderRadius: 9, fontSize: 19, fontWeight: 600,
+                      padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
                       color: 'var(--bg-hex)',
                       background: discogsUser.trim() ? 'rgba(var(--fg),0.9)' : 'rgba(var(--fg),0.3)',
                       border: 'none',
@@ -2744,7 +2744,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                   </button>
                 </div>
                 {importError && (
-                  <p style={{ fontSize: 17, color: '#fca5a5', fontFamily: 'monospace', marginTop: 10 }}>{importError}</p>
+                  <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginTop: 10 }}>{importError}</p>
                 )}
               </>
             )}
@@ -2759,32 +2759,32 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                     transition: 'width 0.3s',
                   }} />
                 </div>
-                <p style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 10 }}>
+                <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 10 }}>
                   {importProgress.total > 0 ? `${importProgress.done} / ${importProgress.total} records` : 'Starting...'}
                 </p>
                 <button
                   onClick={() => { cancelImport.current = true; }}
-                  style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Cancel
                 </button>
               </div>
             )}
             {!importing && importResult && (
               <div>
-                <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Check size={14} weight="bold" />Added {importResult.added} records
                 </p>
                 {importResult.skipped > 0 && (
-                  <p style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>
                     {importResult.skipped} duplicates skipped
                   </p>
                 )}
                 {importError && (
-                  <p style={{ fontSize: 17, color: '#fca5a5', fontFamily: 'monospace', marginBottom: 10 }}>{importError}</p>
+                  <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginBottom: 10 }}>{importError}</p>
                 )}
                 <button
                   onClick={() => { setImportResult(null); setImportError(''); }}
-                  style={{ fontSize: 17, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Import again
                 </button>
               </div>
@@ -2792,7 +2792,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Download CSV" open={openSection === 'csv'} onToggle={() => toggleSection('csv')}>
-            <p style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
+            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>Export your full collection as a spreadsheet.</p>
             <button onClick={onDownloadCSV}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono transition-all"
               style={{ background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}
@@ -2803,10 +2803,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="About" open={openSection === 'about'} onToggle={() => toggleSection('about')}>
-            <div style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
               Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve and within seconds you have the pressing confirmed, tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
             </div>
-            <div style={{ fontSize: 16, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
+            <div style={{ fontSize: 14, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
               {[
                 { Icon: Camera,      title: 'Photograph', desc: 'Point your camera at the sleeve or label.' },
@@ -2817,20 +2817,20 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                 <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                   <Icon size={13} style={{ color: `rgba(${accentRGB},0.65)`, marginTop: 1, flexShrink: 0 }} />
                   <div>
-                    <span style={{ fontSize: 18, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
-                    <span style={{ fontSize: 18, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
+                    <span style={{ fontSize: 15, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
+                    <span style={{ fontSize: 15, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
+            <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
           </AccountSection>
 
           {/* Appearance */}
           <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 19, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
+            <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
+              <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
               <button
                 onClick={onToggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
