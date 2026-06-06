@@ -483,7 +483,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
     <div className="pt-6 md:pt-10 max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.4s ease-out' }}>
       <div className="text-[10px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">Community</div>
       <h1 className="text-4xl md:text-5xl leading-[0.95] mb-8 font-display tracking-tight">
-        Connect with your crew,<br /><span className="text-white/35 italic">browse trax.</span>
+        Find your people,<br /><span className="text-white/35 italic">browse tracks.</span>
       </h1>
 
       {/* Your profile card */}
