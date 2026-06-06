@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle, ImageSquare, Mountains, CloudArrowDown,
+  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -1408,13 +1408,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
         {collectionMode === "stacks" && (
           <div className="flex items-center gap-2">
-            {!labelSelectMode ? (
-              <>
-                <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.52)", background: "transparent" }}>
-                  <PencilSimple size={12} />Crates
-                </button>
-              </>
-            ) : (
+            {!labelSelectMode ? null : (
               <>
                 <span className="text-[14px] font-mono text-white/40">{selectedForLabels.size} selected</span>
                 <button
@@ -1489,7 +1483,12 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           )}
 
-          <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-5 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
+            <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.35)", background: "transparent" }}>
+              <Wrench size={10} />Crates
+            </button>
+          </div>
 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
