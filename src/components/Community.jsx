@@ -529,24 +529,16 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
           <div className="text-[10px] tracking-[0.25em] uppercase font-mono text-white/30 mb-2.5 flex items-center gap-1.5">
             <Users size={11} /> Following ({following.length})
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {following.map(p => (
-              <div key={p.id} className="flex flex-col items-center gap-1.5 shrink-0 px-2.5 py-2 rounded-xl"
-                style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 60 }}>
-                <button onClick={() => p.username && onOpenProfile(p.username)} className="flex flex-col items-center gap-1">
-                  <Avatar profile={p} size={32} />
-                  <span className="text-[9px] font-mono text-white/50 max-w-[52px] truncate leading-tight">
-                    {p.display_name || p.username || 'User'}
-                  </span>
-                </button>
-                {onOpenChat && (
-                  <button onClick={() => onOpenChat(p)} title="Message"
-                    className="flex items-center justify-center transition-opacity hover:opacity-70"
-                    style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid rgba(var(--fg),0.12)', background: 'rgba(var(--fg),0.05)', color: 'rgba(var(--fg),0.45)' }}>
-                    <PaperPlaneTilt size={10} />
-                  </button>
-                )}
-              </div>
+              <button key={p.id} onClick={() => p.username && onOpenProfile(p.username)}
+                className="flex flex-col items-center gap-2 shrink-0 px-3 py-3 rounded-xl transition-all hover:opacity-80"
+                style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 72 }}>
+                <Avatar profile={p} size={44} />
+                <span className="text-[10px] font-mono text-white/55 max-w-[64px] truncate leading-tight">
+                  {p.display_name || p.username || 'User'}
+                </span>
+              </button>
             ))}
           </div>
         </div>
