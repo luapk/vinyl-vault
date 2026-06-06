@@ -644,7 +644,6 @@ export default function VinylVault() {
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
     ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
-    { id: "about", label: "About", icon: Info },
   ];
 
   return (
@@ -763,7 +762,7 @@ export default function VinylVault() {
             onOpenChat={(recipient) => { setChatRecipient(recipient); setChatOpen(true); }}
           />
         )}
-        {appView === "about" && <AboutView accentRGB={accentRGB} />}
+
       </main>
 
       {/* Chat panel overlay */}
@@ -790,6 +789,7 @@ export default function VinylVault() {
         <AccountModal
           user={user}
           profile={profile}
+          accentRGB={accentRGB}
           isDark={isDark}
           onToggleTheme={toggleTheme}
           onClose={() => setShowAccount(false)}
@@ -2374,7 +2374,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, isAdmin, onOpenAdmin }) {
+function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, isAdmin, onOpenAdmin }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2655,6 +2655,30 @@ function AccountModal({ user, profile, isDark, onToggleTheme, onClose, onSignOut
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.07)'; e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
               <DownloadSimple size={13} />Download
             </button>
+          </AccountSection>
+
+          <AccountSection label="About" open={openSection === 'about'} onToggle={() => toggleSection('about')}>
+            <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
+              Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve and within seconds you have the pressing confirmed, tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
+            </div>
+            <div style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+              {[
+                { Icon: Camera,      title: 'Photograph', desc: 'Point your camera at the sleeve or label.' },
+                { Icon: Scan,        title: 'Identify',   desc: 'Matched against the global Discogs database.' },
+                { Icon: Sparkle,     title: 'Enrich',     desc: 'Tracklist, BPM, and Camelot key pulled automatically.' },
+                { Icon: VinylRecord, title: 'File',       desc: 'Assign to crates or save unassigned and sort later.' },
+              ].map(({ Icon, title, desc }) => (
+                <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <Icon size={13} style={{ color: `rgba(${accentRGB},0.65)`, marginTop: 1, flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontSize: 11, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
+                    <span style={{ fontSize: 11, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
           </AccountSection>
 
           {/* Appearance */}
