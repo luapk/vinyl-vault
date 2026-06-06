@@ -89,11 +89,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Logo: white-on-dark in dark mode, inverted for light mode */
+/* Logo: white-on-dark in dark mode.
+   In light mode: full invert → black illustration on white, then multiply
+   blends the white away against the background, leaving just the artwork. */
 [data-theme="light"] img[src="/logo.png"] {
-  mix-blend-mode: normal !important;
-  filter: invert(0.85) !important;
-  opacity: 0.8 !important;
+  mix-blend-mode: multiply !important;
+  filter: invert(1) !important;
+  opacity: 0.88 !important;
 }
 
 @keyframes scanLine {
