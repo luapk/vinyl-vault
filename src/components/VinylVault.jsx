@@ -637,10 +637,10 @@ export default function VinylVault() {
 
   return (
     <div className="min-h-screen w-full relative overflow-x-hidden" style={{ background: "var(--bg-hex)", color: "var(--fg-hex)" }}>
-      {/* Atmospheric accent glows */}
+      {/* Atmospheric accent glows — more prominent in light mode to show through glass */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 70% 50% at 75% -5%, rgba(${accentRGB}, 0.13), transparent 55%)` }} />
-        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 55% 45% at 15% 105%, rgba(${accentRGB}, 0.08), transparent 55%)` }} />
+        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 70% 50% at 75% -5%, rgba(${accentRGB}, ${isDark ? 0.13 : 0.30}), transparent 55%)` }} />
+        <div className="absolute transition-all duration-[2500ms]" style={{ inset: 0, background: `radial-gradient(ellipse 55% 45% at 15% 105%, rgba(${accentRGB}, ${isDark ? 0.08 : 0.22}), transparent 55%)` }} />
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 100% 60% at 50% 0%, rgba(var(--fg),0.015), transparent 50%)" }} />
       </div>
 
@@ -882,12 +882,21 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       </div>
 
       {/* Cards grid - centred */}
-      <div className="grid sm:grid-cols-2 gap-4 max-w-lg mx-auto w-full">
+      <div className="relative max-w-lg mx-auto w-full" style={{ overflow: 'visible' }}>
+        {/* Colour blobs behind the glass panels — only rendered in light mode */}
+        {isLight && (
+          <div style={{ position: 'absolute', inset: '-35% -20%', pointerEvents: 'none' }}>
+            <div style={{ position: 'absolute', top: '5%', left: '8%', width: '55%', height: '60%', background: `radial-gradient(ellipse, rgba(${accentRGB},0.42), transparent 60%)`, filter: 'blur(56px)' }} />
+            <div style={{ position: 'absolute', bottom: '5%', right: '6%', width: '48%', height: '52%', background: 'radial-gradient(ellipse, rgba(180,140,255,0.32), transparent 60%)', filter: 'blur(48px)' }} />
+            <div style={{ position: 'absolute', top: '42%', left: '38%', width: '36%', height: '38%', background: 'radial-gradient(ellipse, rgba(100,200,255,0.22), transparent 60%)', filter: 'blur(40px)' }} />
+          </div>
+        )}
+        <div className="grid sm:grid-cols-2 gap-4">
         {/* Camera / scan card */}
         <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.52) 100%)',
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.04), 0 12px 40px -10px rgba(0,0,0,0.14), 0 4px 12px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07), 0 0 40px -12px rgba(${accentRGB},0.22)`,
-          backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderRadius: '20px', padding: '2rem',
+          background: `linear-gradient(145deg, rgba(255,255,255,0.48) 0%, rgba(${accentRGB},0.05) 60%, rgba(255,255,255,0.34) 100%)`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7), 0 0 48px -10px rgba(${accentRGB},0.28)`,
+          backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="flex flex-col items-center gap-5 text-center">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(145deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.08))`, boxShadow: isLight ? `inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 12px rgba(${accentRGB},0.18)` : 'inset 0 1px 0 rgba(var(--fg),0.2), 0 4px 12px rgba(0,0,0,0.3)' }}>
@@ -904,9 +913,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
         {/* Batch queue card */}
         <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.52) 100%)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.04), 0 12px 40px -10px rgba(0,0,0,0.14), 0 4px 12px -4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)',
-          backdropFilter: 'blur(28px) saturate(180%)', WebkitBackdropFilter: 'blur(28px) saturate(180%)', borderRadius: '20px', padding: '2rem',
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.48) 0%, rgba(200,180,255,0.08) 60%, rgba(255,255,255,0.34) 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)',
+          backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="relative z-10 flex flex-col items-center gap-5 text-center">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isLight ? 'linear-gradient(145deg, rgba(0,0,0,0.06), rgba(0,0,0,0.02))' : 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: isLight ? 'inset 0 1px 0 rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.10)' : 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
@@ -919,7 +928,8 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
           </div>
           <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
         </label>
-      </div>
+        </div>{/* end grid */}
+      </div>{/* end relative wrapper */}
 
       {/* "or choose from library" centred below the grid */}
       <div className="mt-4 flex justify-center">
