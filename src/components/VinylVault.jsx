@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle,
+  ChatCircle, Disc, BookOpen, EnvelopeSimple, ImageSquare,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -1254,12 +1254,22 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <button onClick={addCustomCrate} className="px-4 py-2 rounded-full text-[14px] font-mono transition-all hover:text-white/70" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "transparent" }}>Add</button>
           </div>
 
-          {/* Grade before saving */}
+          {/* Grade before saving -- icon audition: three option sets */}
           {!saved && (
-            <div className="flex items-center gap-4 py-1">
-              <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.25)' }}>Grade</span>
-              <ConditionSelect label="Vinyl" value={pendingMedia} onChange={setPendingMedia} />
-              <ConditionSelect label="Sleeve" value={pendingSleeve} onChange={setPendingSleeve} />
+            <div className="space-y-2 py-1">
+              <div style={{ fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.22)' }}>Grade</div>
+              {[
+                { key: 'A', vinylIcon: <VinylRecord size={16} />, sleeveIcon: <BookOpen size={16} />, hint: 'disc + open jacket' },
+                { key: 'B', vinylIcon: <VinylRecord size={16} />, sleeveIcon: <EnvelopeSimple size={16} />, hint: 'disc + sleeve envelope' },
+                { key: 'C', vinylIcon: <Disc size={16} />, sleeveIcon: <ImageSquare size={16} />, hint: 'disc alt + cover art' },
+              ].map(opt => (
+                <div key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', width: 14 }}>{opt.key}</span>
+                  <ConditionSelect icon={opt.vinylIcon} value={pendingMedia} onChange={setPendingMedia} />
+                  <ConditionSelect icon={opt.sleeveIcon} value={pendingSleeve} onChange={setPendingSleeve} />
+                  <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.22)', fontStyle: 'italic' }}>{opt.hint}</span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -3332,7 +3342,7 @@ function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading,
   );
 }
 
-function ConditionSelect({ label, value, onChange }) {
+function ConditionSelect({ label, icon, value, onChange }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const color = conditionColor(value);
   const darkColor = value === 'M' || value === 'NM' ? '40,140,55'
@@ -3341,7 +3351,10 @@ function ConditionSelect({ label, value, onChange }) {
   const displayColor = isLight ? darkColor : color;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: `rgba(var(--fg),${isLight ? 0.52 : 0.30})` }}>{label}</span>
+      {icon
+        ? <span style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.38})`, display: 'flex' }}>{icon}</span>
+        : <span style={{ fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.18em', textTransform: 'uppercase', color: `rgba(var(--fg),${isLight ? 0.52 : 0.30})` }}>{label}</span>
+      }
       <select value={value} onChange={e => onChange(e.target.value)} style={{ background: displayColor ? `rgba(${displayColor},${isLight ? 0.10 : 0.09})` : 'rgba(var(--fg),0.04)', border: `1px solid ${displayColor ? `rgba(${displayColor},${isLight ? 0.35 : 0.28})` : 'rgba(var(--fg),0.10)'}`, color: displayColor ? `rgb(${displayColor})` : `rgba(var(--fg),${isLight ? 0.52 : 0.45})`, borderRadius: 20, padding: '3px 8px', fontSize: 16, fontFamily: 'monospace', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}>
         {CONDITION_GRADES.map(g => (
           <option key={g} value={g}>{g || '--'}</option>
