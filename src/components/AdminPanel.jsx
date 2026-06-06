@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserCircle, EnvelopeSimple, ArrowLeft, Crown } from '@phosphor-icons/react';
+import { UserCircle, EnvelopeSimple, ArrowLeft, Crown, ArrowClockwise } from '@phosphor-icons/react';
 
 export default function AdminPanel({ onBack }) {
   const [users, setUsers]       = useState([]);
@@ -83,13 +83,19 @@ export default function AdminPanel({ onBack }) {
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <ArrowLeft size={18} />
         </button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <Crown size={20} className="text-amber-400" weight="duotone" />
             Admin Panel
           </h1>
           <p className="text-xs text-white/40">Manage users and invites</p>
         </div>
+        <button onClick={loadUsers} disabled={loading}
+          className="p-2 rounded-xl transition-colors"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: loading ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.5)' }}
+          title="Refresh">
+          <ArrowClockwise size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+        </button>
       </div>
 
       {/* Invite form */}
