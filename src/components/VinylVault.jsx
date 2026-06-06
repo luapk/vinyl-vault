@@ -1396,7 +1396,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       {/* Mode toggle: Stacks vs Explore */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center rounded-full p-0.5" style={{ background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.08)" }}>
-          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore by tag" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
+          {[{ id: "stacks", label: "Collection" }, { id: "explore", label: "Explore tags" }, { id: "stats", label: "Stats" }].map(({ id, label }) => (
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
