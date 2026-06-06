@@ -990,29 +990,28 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', alignItems: 'stretch' }}>
             {recs.slice(0, 6).map(rec => (
-              <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden' }}>
-                <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden' }}>
+              <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden', flexShrink: 0 }}>
                   {rec.thumb
                     ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center"><VinylRecord size={24} weight="thin" className="opacity-20" /></div>
                   }
                 </div>
-                <div style={{ padding: '10px 10px 10px' }}>
-                  <div style={{ fontSize: 14, color: `rgba(var(--fg),${isLight ? 0.65 : 0.4})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 14, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.52 : 0.28})`, marginBottom: 5 }}>
+                <div style={{ padding: '8px 8px 8px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <div style={{ fontSize: 10, color: `rgba(var(--fg),${isLight ? 0.55 : 0.35})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
+                  <div style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.45 : 0.25})`, marginBottom: 4 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
                   {rec.reason && (
-                    <div style={{ fontSize: 14, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 1 : 0.7})`, lineHeight: 1.4, marginBottom: 6 }}>{rec.reason}</div>
+                    <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.6})`, lineHeight: 1.4, marginBottom: 4 }}>{rec.reason}</div>
                   )}
-                  <div style={{ fontSize: 13, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.5 : 0.2})`, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Discogs Marketplace</div>
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '6px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: 'monospace', background: `rgb(${accentRGB})`, border: 'none', color: '#fff', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', boxShadow: `0 2px 8px rgba(${accentRGB},0.35)` }}
-                    onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.1)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}>
+                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: 'rgba(var(--fg),0.06)', border: `1px solid rgba(var(--fg),0.14)`, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: `rgba(var(--fg),0.60)`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.06)'; e.currentTarget.style.color = 'rgba(var(--fg),0.60)'; }}>
                     Buy now
                   </a>
                 </div>
