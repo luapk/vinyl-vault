@@ -199,7 +199,7 @@ export async function getFeed(limit = 40) {
 
 // ─── Reactions ────────────────────────────────────────────────────────────────
 
-export const REACTION_EMOJI = ['🔥', '❤️', '👀', '🎧', '💎'];
+export const REACTION_EMOJI = ['🔥', '❤️', '🚀', '⛳', '💎'];
 
 // Fetch all reactions for a single record (owner + local id).
 export async function getReactions(ownerUserId, recordLocalId) {

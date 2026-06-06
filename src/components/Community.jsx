@@ -658,7 +658,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                     <button onClick={() => onOpenProfile(group.owner.username)}
                       className="shrink-0 flex items-center gap-1 text-[11px] font-mono px-3 py-1.5 rounded-full transition-all"
                       style={{ border: `1px solid rgba(${accentRGB},0.3)`, color: `rgba(${accentRGB},0.85)`, background: `rgba(${accentRGB},0.08)` }}>
-                      View vault
+                      View
                     </button>
                   )}
                 </div>
