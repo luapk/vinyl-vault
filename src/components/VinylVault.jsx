@@ -1336,6 +1336,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [filterCrate, setFilterCrate] = useState(null);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [showCrateManager, setShowCrateManager] = useState(false);
+  const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [detailRecordId, setDetailRecordId] = useState(null);
   const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
@@ -1488,6 +1489,11 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             <button onClick={() => setShowCrateManager(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.35)", background: "transparent" }}>
               <Wrench size={10} />Crates
             </button>
+            {collection.length >= 2 && (
+              <button onClick={() => setShowSmartCrates(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.35)", background: "transparent" }}>
+                <Sparkle size={10} />Smart Crates
+              </button>
+            )}
           </div>
 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
@@ -1517,6 +1523,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
       {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
       {showCrateManager && <CrateManagerModal crates={allCrates} onClose={() => setShowCrateManager(false)} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />}
+      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -2950,6 +2957,103 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ----- SmartCratesModal ------------------------------------------------------
+
+function SmartCratesModal({ collection, onUpdate, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [crates, setCrates] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const compact = collection.map(r => ({
+      id: r.id,
+      artist: r.artist,
+      title: r.title,
+      year: r.year,
+      label: r.label,
+      genres: r.genres,
+    }));
+
+    fetch('/api/smart-crates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ records: compact }),
+    })
+      .then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.error || `HTTP ${res.status}`))))
+      .then(data => { setCrates(data.crates || []); setLoading(false); })
+      .catch(err => { setError(err.message); setLoading(false); });
+  }, []);
+
+  const apply = () => {
+    const updates = {};
+    for (const crate of (crates || [])) {
+      for (const id of (crate.ids || [])) {
+        if (!updates[id]) updates[id] = [];
+        updates[id].push(crate.name);
+      }
+    }
+    for (const [id, newCrateNames] of Object.entries(updates)) {
+      const record = collection.find(r => r.id === id);
+      if (!record) continue;
+      const merged = [...new Set([...(record.crates || []), ...newCrateNames])];
+      onUpdate(id, { ...record, crates: merged });
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-3xl p-6 flex flex-col" style={{ background: "rgba(var(--bg),0.99)", border: "1px solid rgba(var(--fg),0.08)", maxHeight: "85vh" }} onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Sparkle size={14} style={{ color: "rgba(var(--fg),0.45)" }} />
+            <h3 className="text-[14px] tracking-[0.3em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.6)" }}>Smart Crates</h3>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.40)" }}><X size={13} /></button>
+        </div>
+
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-14 gap-5">
+            <div className="w-10 h-10 rounded-full animate-spin" style={{ border: "2.5px solid rgba(var(--fg),0.07)", borderTopColor: "rgba(var(--fg),0.55)" }} />
+            <div className="text-[13px] font-mono tracking-wide" style={{ color: "rgba(var(--fg),0.35)" }}>Sorting your collection...</div>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="py-8 text-center">
+            <p className="text-sm font-mono" style={{ color: "rgba(220,100,100,0.7)" }}>{error}</p>
+          </div>
+        )}
+
+        {!loading && crates && (
+          <>
+            <div className="overflow-y-auto flex-1 space-y-2 pr-0.5" style={{ minHeight: 0 }}>
+              {crates.map((crate, i) => (
+                <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(var(--fg),0.03)", border: "1px solid rgba(var(--fg),0.07)" }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.75)" }}>{crate.name}</span>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full" style={{ background: "rgba(var(--fg),0.07)", color: "rgba(var(--fg),0.4)" }}>{(crate.ids || []).length}</span>
+                  </div>
+                  {crate.description && <p className="text-[12px] leading-snug" style={{ color: "rgba(var(--fg),0.35)" }}>{crate.description}</p>}
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={apply} className="flex-1 py-2.5 rounded-2xl text-[13px] font-mono transition-all" style={{ background: "rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.75)", border: "1px solid rgba(var(--fg),0.12)" }}>
+                Apply {crates.length} crate{crates.length !== 1 ? "s" : ""}
+              </button>
+              <button onClick={onClose} className="px-5 py-2.5 rounded-2xl text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.35)", border: "1px solid rgba(var(--fg),0.08)" }}>
+                Discard
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
