@@ -190,83 +190,65 @@ export async function fetchDiscogsRelease(id) {
 export async function fetchDiscogsPrice(releaseId) {
   const headers = authHeaders();
 
-  // Fetch up to 100 active marketplace listings sorted cheapest-first.
-  // The IQR method then trims outliers so we get a bell-curve centre.
-  const listingsRes = await fetchWithRetry(
-    `${BASE}/marketplace/search?release_id=${releaseId}&sort=price&sort_order=asc&per_page=100`,
-    { headers }
-  );
+  // Discogs has no public endpoint that lists individual marketplace listings
+  // with their conditions, so the old marketplace/search call never returned
+  // condition data (it 404s and we fell back to stats, which only has a floor
+  // price + listing count). Instead we use two real endpoints:
+  //   price_suggestions/{id} -- a suggested price per condition grade
+  //   stats/{id}             -- live listing count + lowest active price
+  const [suggestRes, statsRes] = await Promise.all([
+    fetchWithRetry(`${BASE}/marketplace/price_suggestions/${releaseId}`, { headers }),
+    fetchWithRetry(`${BASE}/marketplace/stats/${releaseId}`, { headers }),
+  ]);
 
-  if (listingsRes.ok) {
-    const data = await listingsRes.json();
-    // Discogs marketplace search uses 'listings'; database search uses 'results'
-    const listings = data.listings || data.results || [];
-    const _firstKeys = listings[0] ? Object.keys(listings[0]).join(',') : 'no listings';
-    const _httpStatus = listingsRes.status;
-
-    const prices = listings
-      .map(l => l.price?.value)
-      .filter(p => typeof p === 'number' && p > 0)
-      .sort((a, b) => a - b);
-
-    // Group by condition: { "Near Mint (NM or M-)": { total, count } }
-    const condMap = {};
-    for (const l of listings) {
-      const cond = l.condition || l.grade || l.media_condition;
-      const val = l.price?.value;
-      if (!cond || typeof val !== 'number' || val <= 0) continue;
-      if (!condMap[cond]) condMap[cond] = { total: 0, count: 0 };
-      condMap[cond].total += val;
-      condMap[cond].count++;
+  // price_suggestions returns { "Near Mint (NM or M-)": { currency, value }, ... }
+  // keyed by the same condition names the PriceGraph expects.
+  const byCondition = {};
+  let currency = null;
+  if (suggestRes && suggestRes.ok) {
+    const suggestions = await suggestRes.json();
+    for (const [cond, info] of Object.entries(suggestions || {})) {
+      const val = info && info.value;
+      if (typeof val !== 'number' || val <= 0) continue;
+      byCondition[cond] = { avg: Math.round(val * 100) / 100, count: 0 };
+      if (!currency && info.currency) currency = info.currency;
     }
-    const byCondition = {};
-    for (const [cond, { total, count }] of Object.entries(condMap)) {
-      byCondition[cond] = { avg: Math.round((total / count) * 100) / 100, count };
-    }
-
-    if (prices.length >= 3) {
-      const q1 = prices[Math.floor(prices.length * 0.25)];
-      const q3 = prices[Math.floor(prices.length * 0.75)];
-      const iqr = q3 - q1;
-      const trimmed = prices.filter(p => p >= q1 - 1.5 * iqr && p <= q3 + 1.5 * iqr);
-      const median = trimmed[Math.floor(trimmed.length / 2)];
-      const mean = Math.round((trimmed.reduce((s, p) => s + p, 0) / trimmed.length) * 100) / 100;
-      const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
-      return {
-        currency, median: Math.round(median * 100) / 100, mean,
-        low: Math.round(trimmed[0] * 100) / 100,
-        high: Math.round(trimmed[trimmed.length - 1] * 100) / 100,
-        sampleSize: trimmed.length, totalListings: listings.length, byCondition,
-        _debug: { source: 'marketplace/search', count: listings.length, firstKeys: _firstKeys },
-      };
-    }
-
-    if (listings.length > 0) {
-      const currency = listings.find(l => l.price?.currency)?.price?.currency || 'USD';
-      return { currency, median: null, mean: null, low: null, high: null, sampleSize: null, totalListings: listings.length, byCondition,
-        _debug: { source: 'marketplace/search', count: listings.length, firstKeys: _firstKeys },
-      };
-    }
-
-    // marketplace/search returned 200 but no usable listings
-    console.log('marketplace/search empty. HTTP', _httpStatus, 'keys in data:', Object.keys(data).join(','));
-  } else {
-    console.log('marketplace/search failed:', listingsRes.status);
+  } else if (suggestRes) {
+    console.log('price_suggestions failed:', suggestRes.status);
   }
 
-  // Fallback: marketplace stats gives at least the floor price
-  const statsRes = await fetchWithRetry(`${BASE}/marketplace/stats/${releaseId}`, { headers });
-  if (!statsRes.ok) return null;
-  const stats = await statsRes.json();
-  if (!stats.lowest_price) return null;
+  // stats gives the headline listing count and floor price.
+  let totalListings = 0;
+  let low = null;
+  if (statsRes && statsRes.ok) {
+    const stats = await statsRes.json();
+    totalListings = stats.num_for_sale || 0;
+    if (stats.lowest_price) {
+      low = stats.lowest_price.value;
+      if (!currency) currency = stats.lowest_price.currency;
+    }
+  }
+
+  const condVals = Object.values(byCondition).map(c => c.avg).sort((a, b) => a - b);
+
+  // Nothing usable from either endpoint.
+  if (condVals.length === 0 && totalListings === 0 && low == null) return null;
+
+  const median = condVals.length ? condVals[Math.floor(condVals.length / 2)] : null;
+  const mean = condVals.length
+    ? Math.round((condVals.reduce((s, p) => s + p, 0) / condVals.length) * 100) / 100
+    : null;
+  const high = condVals.length ? condVals[condVals.length - 1] : null;
+  if (low == null && condVals.length) low = condVals[0];
+
   return {
-    currency: stats.lowest_price.currency,
-    median: null,
-    mean: null,
-    low: stats.lowest_price.value,
-    high: null,
-    sampleSize: null,
-    totalListings: stats.num_for_sale || 0,
-    byCondition: {},
+    currency: currency || 'USD',
+    median,
+    mean,
+    low: low != null ? Math.round(low * 100) / 100 : null,
+    high,
+    sampleSize: condVals.length || null,
+    totalListings,
+    byCondition,
   };
 }
