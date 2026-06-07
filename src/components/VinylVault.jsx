@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
-  Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
+  Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench,
@@ -1385,6 +1385,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
+  const [crateMenuOpen, setCrateMenuOpen] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [detailRecordId, setDetailRecordId] = useState(null);
   const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
@@ -1512,29 +1513,57 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           </div>
 
-          {/* Crate filters — user crates only */}
+          {/* Crate filter — dropdown picker (scales to any number of crates) */}
           {allCrates.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {allCrates.map((c) => {
-                const col = crateColors[c] || null;
-                const active = filterCrate === c;
-                return (
-                  <button key={c} onClick={() => setFilterCrate(active ? null : c)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
-                    style={col ? pillGlassStyle(col, { opacity: active ? 1 : 0.72 }) : {
-                      background: active ? 'rgba(var(--fg),0.10)' : 'rgba(var(--fg),0.025)',
-                      border: `1px solid ${active ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
-                      color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.52)',
-                    }}>
-                    {c}
-                    {(crateCounts[c] || 0) > 0 && (
-                      <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: active ? 'rgba(var(--fg),0.22)' : 'rgba(var(--fg),0.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontFamily: 'monospace', lineHeight: 1 }}>
-                        {crateCounts[c]}
-                      </span>
+            <div className="relative mb-4" style={{ maxWidth: 320 }}>
+              <button onClick={() => setCrateMenuOpen(o => !o)}
+                className="w-full inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+                style={{
+                  background: filterCrate ? 'rgba(var(--fg),0.07)' : 'rgba(var(--fg),0.025)',
+                  border: `1px solid ${filterCrate ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
+                  color: filterCrate ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.50)',
+                }}>
+                {filterCrate ? (
+                  <>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: crateColors[filterCrate] || 'rgba(var(--fg),0.4)' }} />
+                    <span className="truncate">{filterCrate}</span>
+                    {(crateCounts[filterCrate] || 0) > 0 && (
+                      <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--fg),0.18)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1 }}>{crateCounts[filterCrate]}</span>
                     )}
-                  </button>
-                );
-              })}
+                    <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setFilterCrate(null); setCrateMenuOpen(false); }} className="ml-auto flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.45)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.85)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.45)'}><X size={11} /></span>
+                  </>
+                ) : (
+                  <>
+                    <Stack size={13} className="opacity-60" />
+                    <span>Filter by crate</span>
+                    <CaretDown size={11} className="ml-auto opacity-50" style={{ transform: crateMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+                  </>
+                )}
+              </button>
+
+              {crateMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setCrateMenuOpen(false)} />
+                  <div className="absolute left-0 right-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto"
+                    style={{ background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                    {allCrates.map((c) => {
+                      const active = filterCrate === c;
+                      return (
+                        <button key={c} onClick={() => { setFilterCrate(active ? null : c); setCrateMenuOpen(false); }}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left transition-all"
+                          style={{ background: active ? 'rgba(var(--fg),0.07)' : 'transparent' }}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(var(--fg),0.04)'; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+                          <span style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: crateColors[c] || 'rgba(var(--fg),0.28)' }} />
+                          <span className="flex-1 truncate text-[12px] tracking-[0.1em] uppercase font-mono" style={{ color: active ? 'rgba(var(--fg),0.92)' : 'rgba(var(--fg),0.62)' }}>{c}</span>
+                          {active && <Check size={11} weight="bold" style={{ color: 'rgba(var(--fg),0.7)' }} />}
+                          <span className="text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.30)' }}>{crateCounts[c] || 0}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1665,7 +1694,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                     ? `0 20px 60px -12px rgba(0,0,0,0.20), 0 0 30px -5px rgba(${accentRGB},0.15), 0 2px 0 0px rgba(0,0,0,0.10), 0 4px 0 0px rgba(0,0,0,0.06), 0 7px 0 0px rgba(0,0,0,0.03), 0 0 0 1px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,1), inset 0 0 30px rgba(${accentRGB},0.03)`
                     : `0 ${10 + abs * 6}px 35px -8px rgba(0,0,0,0.13), 0 2px 0 0px rgba(0,0,0,0.07), 0 4px 0 0px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,${Math.max(0.05, 0.09 - abs * 0.01)}), inset 0 1px 0 rgba(255,255,255,0.9)`)
                   : (isActive
-                    ? `0 50px 100px -18px rgba(0,0,0,0.95), 0 0 65px -8px rgba(${accentRGB},0.28), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
+                    ? `0 36px 64px -22px rgba(0,0,0,0.82), 0 0 60px -10px rgba(${accentRGB},0.24), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
                     : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`),
               }}>
                 {/* Album cover inset */}
@@ -1685,7 +1714,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
       </div>
 
       {/* Info */}
-      <div className="mt-7 text-center">
+      <div className="mt-11 text-center">
         <div key={current.id} style={{ animation: "fadeOnly 0.12s ease-out" }}>
         <div className="text-[13px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
           {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
@@ -1817,30 +1846,38 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
         <button onClick={onPrev} disabled={index === 0} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretLeft size={14} />
         </button>
-        {/* Progress dots — click to seek */}
-        <div className="relative flex-1 max-w-[180px] flex items-center justify-between cursor-pointer"
-          style={{ height: 16 }}
-          onClick={e => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            onIndexChange(Math.round(ratio * (records.length - 1)));
-          }}>
-          {Array.from({ length: records.length }, (_, i) => (
-            <div key={i} style={{
-              width: i === index ? 4 : 2,
-              height: i === index ? 4 : 2,
-              borderRadius: '50%',
-              flexShrink: 0,
-              transition: 'all 0.2s',
-              background: i === index
-                ? `rgb(${accentRGB})`
-                : i < index
-                  ? 'rgba(var(--fg),0.32)'
-                  : 'rgba(var(--fg),0.12)',
-              boxShadow: i === index ? `0 0 0 2px rgba(${accentRGB},0.22)` : 'none',
-            }} />
-          ))}
-        </div>
+        {/* Progress dots — click to seek. Capped so the track never overruns the arrows. */}
+        {(() => {
+          const MAX_DOTS = 30;
+          const dotCount = Math.min(records.length, MAX_DOTS);
+          // Map the real index onto the (possibly condensed) dot array.
+          const activeDot = records.length <= 1 ? 0 : Math.round((index / (records.length - 1)) * (dotCount - 1));
+          return (
+            <div className="relative flex-1 max-w-[180px] flex items-center justify-between cursor-pointer"
+              style={{ height: 16 }}
+              onClick={e => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                onIndexChange(Math.round(ratio * (records.length - 1)));
+              }}>
+              {Array.from({ length: dotCount }, (_, i) => (
+                <div key={i} style={{
+                  width: i === activeDot ? 4 : 2,
+                  height: i === activeDot ? 4 : 2,
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  transition: 'all 0.2s',
+                  background: i === activeDot
+                    ? `rgb(${accentRGB})`
+                    : i < activeDot
+                      ? 'rgba(var(--fg),0.32)'
+                      : 'rgba(var(--fg),0.12)',
+                  boxShadow: i === activeDot ? `0 0 0 2px rgba(${accentRGB},0.22)` : 'none',
+                }} />
+              ))}
+            </div>
+          );
+        })()}
         <button onClick={onNext} disabled={index === records.length - 1} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretRight size={14} />
         </button>
