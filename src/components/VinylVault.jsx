@@ -1465,25 +1465,26 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           ))}
         </div>
 
-        {collectionMode === "stacks" && (
-          <div className="flex items-center gap-2">
-            {!labelSelectMode ? null : (
-              <>
-                <span className="text-[14px] font-mono text-white/40">{selectedForLabels.size} selected</span>
-                <button
-                  onClick={() => onShowBatchLabelModal(true)}
-                  disabled={selectedForLabels.size === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all"
-                  style={{ border: `1px solid rgba(${accentRGB},${selectedForLabels.size > 0 ? '0.4' : '0.12'})`, color: selectedForLabels.size > 0 ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.2)', background: selectedForLabels.size > 0 ? `rgba(${accentRGB},0.12)` : 'transparent', cursor: selectedForLabels.size === 0 ? 'not-allowed' : 'pointer' }}>
-                  <Printer size={12} />Preview Labels
-                </button>
-                <button onClick={onExitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] tracking-[0.15em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.28)' }}>
+            {collectionMode === 'stacks' ? filtered.length : collection.length}{(collectionMode === 'stacks' ? filtered.length : collection.length) !== 1 ? ' recs' : ' rec'}
+          </span>
+          {collectionMode === 'stacks' && labelSelectMode && (
+            <>
+              <span className="text-[14px] font-mono text-white/40">{selectedForLabels.size} selected</span>
+              <button
+                onClick={() => onShowBatchLabelModal(true)}
+                disabled={selectedForLabels.size === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all"
+                style={{ border: `1px solid rgba(${accentRGB},${selectedForLabels.size > 0 ? '0.4' : '0.12'})`, color: selectedForLabels.size > 0 ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.2)', background: selectedForLabels.size > 0 ? `rgba(${accentRGB},0.12)` : 'transparent', cursor: selectedForLabels.size === 0 ? 'not-allowed' : 'pointer' }}>
+                <Printer size={12} />Preview Labels
+              </button>
+              <button onClick={onExitLabelMode} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.38)", background: "transparent" }}>
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* CRATES MODE */}
@@ -1567,10 +1568,6 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
               )}
             </div>
           )}
-
-          <div className="mb-5">
-            <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 font-mono">{filtered.length} record{filtered.length !== 1 ? "s" : ""}</div>
-          </div>
 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
