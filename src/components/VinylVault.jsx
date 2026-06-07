@@ -1545,6 +1545,11 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                       color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.52)',
                     }}>
                     {c}
+                    {(crateCounts[c] || 0) > 0 && (
+                      <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: active ? 'rgba(var(--fg),0.22)' : 'rgba(var(--fg),0.14)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontFamily: 'monospace', lineHeight: 1 }}>
+                        {crateCounts[c]}
+                      </span>
+                    )}
                   </button>
                 );
               })}
