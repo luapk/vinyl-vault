@@ -706,32 +706,30 @@ export default function VinylVault() {
           ))}
         </nav>
 
-        {/* Chat button */}
+        {/* Chat + Account pair */}
         {isSupabaseEnabled && user && (
-          <button onClick={() => { setChatRecipient(null); setChatOpen(p => !p); }} title="Messages"
-            className="relative w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-opacity hover:opacity-70"
-            style={{ border: chatOpen ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.18)', background: chatOpen ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.06)', color: chatOpen ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>
-            <ChatCircle size={14} weight={chatOpen ? 'fill' : 'regular'} />
-            {msgUnread > 0 && (
-              <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
-                {msgUnread > 9 ? '9+' : msgUnread}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* Account button */}
-        {isSupabaseEnabled && user && (
-          <button onClick={() => setShowAccount(true)} title="Account settings"
-            className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center shrink-0 transition-opacity hover:opacity-70"
-            style={{ border: "1px solid rgba(var(--fg),0.18)", background: "rgba(var(--fg),0.06)" }}>
-            {profile?.avatar_url
-              ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 18, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)', lineHeight: 1 }}>
-                  {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={() => { setChatRecipient(null); setChatOpen(p => !p); }} title="Messages"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
+              style={{ border: chatOpen ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.18)', background: chatOpen ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.06)', color: chatOpen ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>
+              <ChatCircle size={16} weight={chatOpen ? 'fill' : 'regular'} />
+              {msgUnread > 0 && (
+                <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                  {msgUnread > 9 ? '9+' : msgUnread}
                 </span>
-            }
-          </button>
+              )}
+            </button>
+            <button onClick={() => setShowAccount(true)} title="Account settings"
+              className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-opacity hover:opacity-70"
+              style={{ border: "1px solid rgba(var(--fg),0.18)", background: "rgba(var(--fg),0.06)" }}>
+              {profile?.avatar_url
+                ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                : <span style={{ fontSize: 21, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)', lineHeight: 1 }}>
+                    {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
+                  </span>
+              }
+            </button>
+          </div>
         )}
       </header>
 
