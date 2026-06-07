@@ -178,6 +178,17 @@ export async function getFollowing(userId, limit = 50) {
   return (data || []).map(row => row.profiles).filter(Boolean);
 }
 
+export async function getFollowers(userId, limit = 50) {
+  if (!supabase || !userId) return [];
+  const { data, error } = await supabase
+    .from('follows')
+    .select(`profiles:follower_id(${PROFILE_FIELDS})`)
+    .eq('following_id', userId)
+    .limit(limit);
+  if (error) throw error;
+  return (data || []).map(row => row.profiles).filter(Boolean);
+}
+
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
 // Recent records added by people the current user follows.

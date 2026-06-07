@@ -5,9 +5,9 @@ import {
 } from "@phosphor-icons/react";
 import {
   getProfileByUsername, getPublicCollection, getCollectionCount,
-  getFollowState, followUser, unfollowUser, getFollowing, getFeed, searchUsers,
+  getFollowState, followUser, unfollowUser, getFollowing, getFollowers, getFeed, searchUsers,
   REACTION_EMOJI, getReactionsForRecords, getReactions, toggleReaction,
-  getComments, addComment, deleteComment,
+  getComments, addComment, deleteComment, sendMessage,
   getNotifications, getLastSeenTs,
 } from "../lib/social.js";
 
@@ -134,7 +134,7 @@ function ReactionBar({ ownerUserId, recordLocalId, currentUserId, accentRGB }) {
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
-function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, onOpenProfile }) {
+function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, onOpenProfile, onAfterPost }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
@@ -155,6 +155,7 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
     setPostError(null);
     try {
       await addComment(ownerUserId, recordLocalId, body, currentUserId);
+      onAfterPost?.(body);
       setDraft('');
       reload();
     } catch (e) {
@@ -283,8 +284,74 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
           </div>
 
           <div className="pt-4" style={{ borderTop: '1px solid rgba(var(--fg),0.07)' }}>
-            <CommentSection ownerUserId={ownerUserId} recordLocalId={recordLocalId} currentUserId={currentUserId} accentRGB={accentRGB} onOpenProfile={onOpenProfile} />
+            <CommentSection
+              ownerUserId={ownerUserId}
+              recordLocalId={recordLocalId}
+              currentUserId={currentUserId}
+              accentRGB={accentRGB}
+              onOpenProfile={onOpenProfile}
+              onAfterPost={ownerUserId !== currentUserId && currentUserId
+                ? (body) => sendMessage(currentUserId, ownerUserId, body).catch(() => {})
+                : undefined}
+            />
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Follow list modal ────────────────────────────────────────────────────────
+
+function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB }) {
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fn = mode === 'followers' ? getFollowers : getFollowing;
+    fn(userId).then(setList).catch(() => {}).finally(() => setLoading(false));
+  }, [userId, mode]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(10px)' }} onClick={onClose}>
+      <div className="w-full sm:max-w-sm max-h-[70vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl"
+        style={{ background: 'rgba(var(--bg),0.99)', border: '1px solid rgba(var(--fg),0.08)', boxShadow: '0 40px 100px -20px rgba(0,0,0,0.95)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3.5"
+          style={{ background: 'rgba(var(--bg),0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(var(--fg),0.06)' }}>
+          <span className="text-[11px] tracking-[0.25em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>
+            {mode === 'followers' ? 'Followers' : 'Following'}
+          </span>
+          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ border: '1px solid rgba(var(--fg),0.1)', color: 'rgba(var(--fg),0.45)' }}>
+            <X size={13} />
+          </button>
+        </div>
+        <div className="p-3">
+          {loading ? (
+            <div className="py-10 flex justify-center">
+              <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(var(--fg),0.1)', borderTopColor: `rgb(${accentRGB})` }} />
+            </div>
+          ) : list.length === 0 ? (
+            <div className="py-10 text-center text-[12px] font-mono" style={{ color: 'rgba(var(--fg),0.3)' }}>No one here yet.</div>
+          ) : (
+            <div>
+              {list.map(p => (
+                <button key={p.id} onClick={() => { onClose(); onOpenProfile(p.username); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+                  style={{ background: 'transparent' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--fg),0.04)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <Avatar profile={p} size={36} />
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(p)}</div>
+                    {p.username && <div className="text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>@{p.username}</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -305,6 +372,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
   const [followBusy, setFollowBusy] = useState(false);
   const [reactionCounts, setReactionCounts] = useState({});
   const [selected, setSelected] = useState(null);
+  const [showFollowModal, setShowFollowModal] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -400,8 +468,12 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
           {profile.bio && <p className="text-[15px] mt-2 max-w-md leading-relaxed" style={{ color: 'rgba(var(--fg),0.6)' }}>{profile.bio}</p>}
           <div className="flex items-center gap-4 mt-3 text-[13px] font-mono text-white/45">
             <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{total}</span> records</span>
-            <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.followers}</span> followers</span>
-            <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.following}</span> following</span>
+            <button onClick={() => setShowFollowModal('followers')} className="transition-colors hover:text-white/70">
+              <span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.followers}</span> followers
+            </button>
+            <button onClick={() => setShowFollowModal('following')} className="transition-colors hover:text-white/70">
+              <span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.following}</span> following
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -449,6 +521,10 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
 
       {selected && (
         <RecordSocialModal record={selected} ownerUserId={profile.id} currentUserId={currentUserId} accentRGB={accentRGB} onClose={() => setSelected(null)} onOpenProfile={onOpenProfile} />
+      )}
+
+      {showFollowModal && (
+        <FollowListModal userId={profile.id} mode={showFollowModal} onOpenProfile={onOpenProfile} onClose={() => setShowFollowModal(null)} accentRGB={accentRGB} />
       )}
     </div>
   );

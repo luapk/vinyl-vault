@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots } from '@phosphor-icons/react';
+import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
-import { getConversations, getMessages, sendMessage, markMessagesRead } from '../lib/social';
+import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing } from '../lib/social';
 
 function ChatAvatar({ profile, size = 32 }) {
   const letter = (profile?.display_name || profile?.username || '?')[0].toUpperCase();
@@ -34,10 +34,23 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [followingList, setFollowingList] = useState([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const recipientRef = useRef(recipient);
   useEffect(() => { recipientRef.current = recipient; }, [recipient]);
+
+  const openCompose = useCallback(async () => {
+    setView('compose');
+    if (followingList.length > 0) return;
+    setLoadingFollowing(true);
+    try {
+      const list = await getFollowing(currentUser.id);
+      setFollowingList(list);
+    } catch { /* silent */ }
+    setLoadingFollowing(false);
+  }, [currentUser.id, followingList.length]);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -126,12 +139,49 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
 
   return (
     <div style={panelStyle}>
-      {view === 'list' ? (
+      {view === 'compose' ? (
+        <>
+          {/* Compose header */}
+          <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <button onClick={() => setView('list')} style={btnStyle}><ArrowLeft size={13} weight="bold" /></button>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.65)' }}>New Message</span>
+            <button onClick={onClose} style={btnStyle}><X size={13} weight="bold" /></button>
+          </div>
+
+          {/* Following list */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {loadingFollowing ? (
+              <div style={{ padding: '48px 0', display: 'flex', justifyContent: 'center' }}>
+                <div className="animate-spin" style={{ width: 20, height: 20, borderRadius: '50%', border: `2px solid rgba(var(--fg),0.1)`, borderTopColor: `rgb(${accentRGB})` }} />
+              </div>
+            ) : followingList.length === 0 ? (
+              <div style={{ padding: '52px 24px', textAlign: 'center', color: 'rgba(var(--fg),0.35)', fontSize: 14, fontFamily: 'monospace' }}>
+                <div style={{ marginBottom: 4 }}>No one to message yet</div>
+                <div style={{ fontSize: 12, color: 'rgba(var(--fg),0.25)' }}>Follow someone to start a conversation.</div>
+              </div>
+            ) : followingList.map(p => (
+              <button key={p.id} onClick={() => openThread(p)}
+                style={{ width: '100%', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(var(--fg),0.05)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                <ChatAvatar profile={p} size={40} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.display_name || p.username || 'User'}
+                  </div>
+                  {p.username && <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)' }}>@{p.username}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : view === 'list' ? (
         <>
           {/* List header */}
           <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.65)' }}>Messages</span>
-            <button onClick={onClose} style={btnStyle}><X size={13} weight="bold" /></button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={openCompose} style={btnStyle} title="New message"><PencilSimpleLine size={13} weight="bold" /></button>
+              <button onClick={onClose} style={btnStyle}><X size={13} weight="bold" /></button>
+            </div>
           </div>
 
           {/* Conversation list */}
