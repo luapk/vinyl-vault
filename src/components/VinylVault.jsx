@@ -1293,12 +1293,28 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 // ----- Crate colour system ---------------------------------------------------
 
 const CRATE_PALETTE = [
+  { id: 'white',   hex: '#f5f5f3' },
   { id: 'cyan',    hex: '#7dd9e8' },
   { id: 'amber',   hex: '#f5c97a' },
   { id: 'rose',    hex: '#f5a0b0' },
   { id: 'violet',  hex: '#bba8f5' },
   { id: 'emerald', hex: '#7dd4b5' },
 ];
+
+// Shared animated glassmorphism style for colored crate pills.
+// background-size + pillSwirl keyframe (in index.css) animates the gradient.
+function pillGlassStyle(col, extraStyle = {}) {
+  return {
+    background: `linear-gradient(135deg, ${col}f0 0%, rgba(255,255,255,0.80) 28%, ${col}c0 52%, rgba(255,255,255,0.52) 76%, ${col}f0 100%)`,
+    backgroundSize: '280% 280%',
+    border: `1px solid ${col}a8`,
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(0,0,0,0.08), 0 4px 16px ${col}50`,
+    color: 'rgba(var(--fg),0.95)',
+    ...extraStyle,
+  };
+}
 
 function loadCrateColors() {
   try { return JSON.parse(localStorage.getItem('vinylvault_crate_colors') || '{}'); }
@@ -1461,16 +1477,8 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 const active = filterCrate === c;
                 return (
                   <button key={c} onClick={() => setFilterCrate(active ? null : c)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
-                    style={col ? {
-                      background: `linear-gradient(155deg, ${col}e0 0%, ${col}88 50%, ${col}44 100%)`,
-                      border: `1px solid ${col}a0`,
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
-                      boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(0,0,0,0.10), 0 4px 16px ${col}60`,
-                      color: 'rgba(var(--fg),0.95)',
-                      opacity: active ? 1 : 0.72,
-                    } : {
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all${col ? ' crate-pill-color' : ''}`}
+                    style={col ? pillGlassStyle(col, { opacity: active ? 1 : 0.72 }) : {
                       background: active ? 'rgba(var(--fg),0.10)' : 'rgba(var(--fg),0.025)',
                       border: `1px solid ${active ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
                       color: active ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.52)',
@@ -1642,15 +1650,8 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           {(current.crates || []).map((c) => {
             const col = crateColors[c] || null;
             return (
-              <span key={c} className="inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
-                style={col ? {
-                  background: `linear-gradient(155deg, ${col}e0 0%, ${col}88 50%, ${col}44 100%)`,
-                  border: `1px solid ${col}a0`,
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.60), inset 0 -1px 0 rgba(0,0,0,0.10), 0 4px 16px ${col}60`,
-                  color: 'rgba(var(--fg),0.95)',
-                } : {
+              <span key={c} className={`inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono${col ? ' crate-pill-color' : ''}`}
+                style={col ? pillGlassStyle(col) : {
                   background: `rgba(${accentRGB},0.10)`,
                   border: `1px solid rgba(${accentRGB},0.22)`,
                   color: 'rgba(var(--fg),0.65)',
@@ -2072,13 +2073,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   const col = crateColors[c] || null;
                   return (
                     <button key={c} onClick={() => toggleRecordCrate(c)}
-                      className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
-                      style={col ? {
-                        background: `linear-gradient(135deg, ${col}60 0%, ${col}3a 100%)`,
-                        border: `1px solid ${col}70`,
-                        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.10), 0 2px 8px ${col}45`,
-                        color: 'rgba(var(--fg),0.92)',
-                      } : {
+                      className={`inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80${col ? ' crate-pill-color' : ''}`}
+                      style={col ? pillGlassStyle(col) : {
                         background: `rgba(${localAccent},0.10)`,
                         border: `1px solid rgba(${localAccent},0.22)`,
                         color: 'rgba(var(--fg),0.65)',
@@ -2852,7 +2848,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
 
 // ----- SmartCratesModal ------------------------------------------------------
 
-function SmartCratesModal({ collection, onUpdate, onClose }) {
+function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onSetColor }) {
   const [loading, setLoading] = useState(true);
   const [crates, setCrates] = useState(null);
   const [error, setError] = useState(null);
@@ -2890,6 +2886,12 @@ function SmartCratesModal({ collection, onUpdate, onClose }) {
       if (!record) continue;
       const merged = [...new Set([...(record.crates || []), ...newCrateNames])];
       onUpdate(id, { ...record, crates: merged });
+    }
+    // Default new crates to white so they get the animated glass pill immediately
+    if (onSetColor) {
+      for (const crate of (crates || [])) {
+        if (!crateColors[crate.name]) onSetColor(crate.name, '#f5f5f3');
+      }
     }
     onClose();
   };
@@ -3022,7 +3024,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         </div>
       )}
 
-      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} />}
+      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} crateColors={crateColors} onSetColor={onSetColor} />}
     </div>
   );
 }
