@@ -448,7 +448,7 @@ export default function VinylVault() {
     }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg-hex)" }}>
-        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 192, mixBlendMode: 'screen', opacity: 0.7, marginBottom: 8 }} />
+        <img src="/logo.png" alt="Vinyl Vault" style={{ height: 192, opacity: 0.7, marginBottom: 8 }} />
         <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(var(--fg),0.1)", borderTopColor: "rgba(var(--fg),0.5)" }} />
         <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)' }}>Connecting...</span>
       </div>
@@ -660,7 +660,7 @@ export default function VinylVault() {
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)" }}>
         <div className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, mixBlendMode: "screen", opacity: 0.92 }} />
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">

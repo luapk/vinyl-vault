@@ -287,7 +287,7 @@ export default function PricingScreen({ onGetStarted, onSignIn }) {
         {/* Logo -- doubled from 90px to 180px */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20, ...anim(0) }}>
           <img src="/logo.png" alt="Vinyl Vault"
-            style={{ height: 180, mixBlendMode: 'screen', opacity: 0.9 }} />
+            style={{ height: 180, opacity: 0.92 }} />
         </div>
 
         {/* Headline */}
