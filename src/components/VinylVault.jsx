@@ -2611,7 +2611,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
         {/* Accordion sections */}
         <div>
 
-          <AccountSection label="Profile name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
+          <AccountSection label="Collector name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -2638,7 +2638,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             </div>
           </AccountSection>
 
-          <AccountSection label="Public profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
+          <AccountSection label="Profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
             <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
               Claim a username and make your collection public so others can browse it, follow you, and react.
             </p>

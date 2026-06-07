@@ -114,20 +114,21 @@ export function useAuth() {
 
     const timeout = (ms, msg) => new Promise((_, reject) => setTimeout(() => reject(new Error(msg)), ms));
 
+    const updates = {};
+    if (username !== undefined && username !== null) updates.username = username;
+    if (bio !== undefined && bio !== null) updates.bio = bio;
+    if (typeof isPublic === 'boolean') updates.is_public = isPublic;
+
     const { error } = await Promise.race([
-      supabase.rpc('update_own_profile', {
-        p_username: username ?? null,
-        p_bio: bio ?? null,
-        p_is_public: typeof isPublic === 'boolean' ? isPublic : null,
-      }),
-      timeout(10000, 'Profile save timed out -- check your connection and try again.'),
+      supabase.from('profiles').update(updates).eq('id', user.id),
+      timeout(20000, 'Profile save timed out -- check your connection and try again.'),
     ]);
     if (error) {
       if (error.code === '23505') throw new Error('That username is already taken.');
       if (error.code === '23514') throw new Error('Username must be 3-20 characters: lowercase letters, numbers, underscores.');
       throw error;
     }
-    const fresh = await Promise.race([fetchProfile(user.id), timeout(8000, 'Could not reload profile.')]);
+    const fresh = await Promise.race([fetchProfile(user.id), timeout(12000, 'Could not reload profile.')]);
     if (fresh) setProfile(fresh);
     return fresh;
   }, [user, fetchProfile]);
