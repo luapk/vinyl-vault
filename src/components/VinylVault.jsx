@@ -1021,46 +1021,45 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
               </div>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
             {recs.slice(0, 6).map(rec => (
-              <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, rgba(var(--fg),${isLight ? 0.06 : 0.07}) 0%, rgba(var(--fg),0.02) 100%)`, border: `1px solid rgba(var(--fg),${isLight ? 0.13 : 0.08})`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ aspectRatio: '1/1', background: 'rgba(var(--fg),0.05)', overflow: 'hidden', flexShrink: 0 }}>
-                  {rec.thumb
-                    ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center"><VinylRecord size={24} weight="thin" className="opacity-20" /></div>
-                  }
-                </div>
-                <div style={{ padding: '8px 8px 8px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                  <div style={{ fontSize: 10, color: `rgba(var(--fg),${isLight ? 0.55 : 0.35})`, fontFamily: 'monospace', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rec.artist || 'Various'}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(var(--fg),0.85)', lineHeight: 1.3, marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 10, fontFamily: 'monospace', color: `rgba(var(--fg),${isLight ? 0.45 : 0.25})`, marginBottom: 4 }}>
+              <div key={rec.id} style={{ flex: '0 0 200px', height: 290, scrollSnapAlign: 'start', borderRadius: 20, overflow: 'hidden', position: 'relative', flexShrink: 0, boxShadow: '0 12px 40px -8px rgba(0,0,0,0.6)' }}>
+                {/* Full-bleed cover art */}
+                {rec.thumb
+                  ? <img src={rec.thumb} alt={rec.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, rgba(${accentRGB},0.15), rgba(var(--fg),0.04))`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <VinylRecord size={44} weight="thin" style={{ opacity: 0.18 }} />
+                    </div>
+                }
+                {/* Gradient scrim rising from bottom */}
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.65) 42%, transparent 70%)', pointerEvents: 'none' }} />
+                {/* Text + buttons */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 10px 10px' }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.artist || 'Various'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.3, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
+                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', marginBottom: rec.reason ? 5 : 7 }}>
                     {[rec.label, rec.year].filter(Boolean).join(' · ')}
                   </div>
                   {rec.reason && (
-                    <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.6})`, lineHeight: 1.4, marginBottom: 4 }}>{rec.reason}</div>
+                    <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},0.88)`, lineHeight: 1.4, marginBottom: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.reason}</div>
                   )}
-                  <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {/* Store buttons -- horizontal pill pair */}
+                  <div style={{ display: 'flex', gap: 5 }}>
                     {(rec.storeLinks || []).map(store => (
                       <a key={store.key} href={store.url} target="_blank" rel="noopener noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, textDecoration: 'none', transition: 'opacity 0.15s',
-                          ...(store.key === 'roughTrade'
-                            ? { background: '#111', border: '1px solid rgba(255,255,255,0.18)' }
-                            : { background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)' }) }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 6px', borderRadius: 20, textDecoration: 'none', background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', transition: 'opacity 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
                         <img src={`https://www.google.com/s2/favicons?domain=${store.key === 'roughTrade' ? 'roughtrade.com' : 'bleep.com'}&sz=32`}
                           style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0 }} alt="" />
-                        <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.06em',
-                          color: store.key === 'roughTrade' ? 'rgba(255,255,255,0.85)' : 'rgba(var(--fg),0.55)' }}>
-                          {store.name}
-                        </span>
+                        <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.82)' }}>{store.name}</span>
                       </a>
                     ))}
                     {(!rec.storeLinks || rec.storeLinks.length === 0) && rec.buyUrl && (
                       <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                        style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', border: '1px solid rgba(201,255,0,0.6)', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
+                        style={{ flex: 1, display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'all 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
                         Buy now
                       </a>
                     )}
