@@ -1448,7 +1448,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             <button key={id} onClick={() => setCollectionMode(id)} className="px-4 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
               style={collectionMode === id
                 ? { background: "rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.85)", boxShadow: "0 1px 0 rgba(var(--fg),0.08)" }
-                : { background: "transparent", color: "rgba(var(--fg),0.52)" }}>
+                : { background: "transparent", color: "rgba(var(--fg),0.50)" }}>
               {label}
             </button>
           ))}
@@ -3050,7 +3050,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
   return (
     <div className="pt-2 max-w-sm">
       {/* Smart Crates */}
-      <div className="mb-8">
+      <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(var(--fg),0.07)' }}>
         <button
           onClick={() => collection.length >= 2 && setShowSmartCrates(true)}
           disabled={collection.length < 2}
@@ -3059,34 +3059,41 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         >
           <Sparkle size={13} />Smart Crates
         </button>
-        <p className="text-[12px] font-mono leading-relaxed" style={{ color: "rgba(var(--fg),0.25)" }}>
-          AI groups your collection into collector-meaningful crates based on sound, era, and scene.
+        <p className="text-[12px] font-mono" style={{ color: "rgba(var(--fg),0.32)" }}>
+          AI sorts your collection by sound, era and scene.
         </p>
       </div>
 
       {/* Crate list */}
-      <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-3" style={{ color: "rgba(var(--fg),0.25)" }}>Your crates</div>
+      {allCrates.length > 0 && (
+        <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-3" style={{ color: "rgba(var(--fg),0.45)" }}>Your crates</div>
+      )}
       {allCrates.length === 0 ? (
         <p className="text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.25)" }}>No crates yet. Open a record and assign it to a crate to get started.</p>
       ) : (
         <div className="space-y-2">
           {allCrates.map((crate) => {
             const activeColor = crateColors[crate] || null;
+            const crateCount = collection.filter(r => (r.crates || []).includes(crate)).length;
             return (
-              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '44' : 'rgba(var(--fg),0.06)'}`, boxShadow: activeColor ? `0 0 16px -6px ${activeColor}55` : 'none' }}>
-                <div className="flex items-center gap-2.5 p-3">
-                  <RotatingCube color={activeColor || 'rgba(var(--fg),0.35)'} size={10} />
+              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '33' : 'rgba(var(--fg),0.07)'}`, boxShadow: activeColor ? `0 0 20px -6px ${activeColor}66` : 'none' }}>
+                <div className="flex items-center gap-3 px-3.5 py-3">
+                  {/* Solid colour circle */}
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: activeColor || 'rgba(var(--fg),0.28)', display: 'inline-block' }} />
                   {editingName === crate ? (
-                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-[11px] font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-[13px] font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
                   ) : (
-                    <span className="flex-1 text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
+                    <div className="flex-1 flex items-baseline gap-2 min-w-0">
+                      <span className="text-[13px] font-mono truncate" style={{ color: 'rgba(var(--fg),0.80)' }}>{crate}</span>
+                      <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'rgba(var(--fg),0.28)' }}>{crateCount}</span>
+                    </div>
                   )}
                   {editingName === crate ? (
-                    <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>
+                    <button onClick={commitRename} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.55)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.9)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.55)'}><Check size={12} weight="bold" /></button>
                   ) : (
-                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/25 hover:text-white/60"><PencilSimple size={12} /></button>
+                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.35)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.75)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.35)'}><PencilSimple size={13} /></button>
                   )}
-                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-7 h-7 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.4)" }}><Trash size={12} /></button>
+                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.35)" }} onMouseEnter={e => e.currentTarget.style.color='rgba(220,100,100,0.75)'} onMouseLeave={e => e.currentTarget.style.color='rgba(220,100,100,0.35)'}><Trash size={13} /></button>
                 </div>
                 {editingName === crate && (
                   <div className="flex items-center gap-2 px-3 pb-3 pt-0">
