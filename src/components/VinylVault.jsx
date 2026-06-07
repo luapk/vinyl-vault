@@ -2347,7 +2347,7 @@ function AccountSection({ label, open, onToggle, children }) {
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3.5 text-left transition-colors"
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
-        <span style={{ fontSize: 16, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
+        <span style={{ fontSize: 13, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
         <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.25)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && <div className="pb-4">{children}</div>}
@@ -2507,12 +2507,13 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
         </div>
 
         {/* Avatar */}
-        <div className="flex flex-col items-center mb-5">
+        <div className="flex flex-col items-center mb-4">
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
           <button
             onClick={() => avatarInputRef.current?.click()}
-            className="relative w-16 h-16 rounded-full overflow-hidden flex items-center justify-center mb-2.5 transition-opacity hover:opacity-80"
+            className="relative rounded-full overflow-hidden flex items-center justify-center mb-2 transition-opacity hover:opacity-80"
             style={{
+              width: 76, height: 76,
               border: avatarSavedOk ? '2px solid rgba(120,220,140,0.8)' : '2px solid rgba(var(--fg),0.15)',
               background: 'rgba(var(--fg),0.06)',
               boxShadow: avatarSavedOk ? '0 0 20px -4px rgba(120,220,140,0.55)' : 'none',
@@ -2520,25 +2521,25 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             }}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 30, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
+              : <span style={{ fontSize: 32, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
             }
             {avatarSavedOk && (
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
                 style={{ background: 'rgba(60,190,90,0.98)', border: '2px solid rgba(20,20,28,1)' }}>
-                <Check size={11} weight="bold" style={{ color: '#fff' }} />
+                <Check size={9} weight="bold" style={{ color: '#fff' }} />
               </div>
             )}
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button onClick={() => avatarInputRef.current?.click()}
-              style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}>
               {avatarPreview ? 'Change photo' : 'Upload photo'}
             </button>
             {avatarPreview && (
               <>
-                <span style={{ color: 'rgba(var(--fg),0.15)', fontSize: 15 }}>|</span>
+                <span style={{ color: 'rgba(var(--fg),0.12)', fontSize: 11 }}>|</span>
                 <button onClick={removeAvatar}
-                  style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(255,100,100,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,100,100,0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}>
                   Remove
                 </button>
               </>
@@ -2546,20 +2547,20 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </div>
         </div>
 
-        <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 16, textAlign: 'center' }}>{user.email}</p>
+        <p style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.22)', marginBottom: 14, textAlign: 'center', letterSpacing: '0.04em' }}>{user.email}</p>
 
-        {errorMsg && <p style={{ fontSize: 15, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
+        {errorMsg && <p style={{ fontSize: 13, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
 
         {/* Plan row */}
-        <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)', borderBottom: '1px solid rgba(var(--fg),0.07)', paddingTop: 14, paddingBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
-          <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', borderRadius: 6, padding: '3px 8px', letterSpacing: '0.06em' }}>Digger -- Free</span>
+        <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)', borderBottom: '1px solid rgba(var(--fg),0.07)', paddingTop: 11, paddingBottom: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', letterSpacing: '0.06em' }}>Digger</span>
             <button onClick={onUpgrade}
-              style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 600, color: '#000', background: '#C9FF00', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', letterSpacing: '0.04em', transition: 'background 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
-              Upgrade
+              style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.55)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.18)'; }}>
+              Upgrade →
             </button>
           </div>
         </div>
@@ -2792,7 +2793,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
           {/* Appearance */}
           <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
+            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
               <button
@@ -2826,27 +2827,25 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
         </div>
 
-        {/* Admin panel shortcut */}
-        {isAdmin && (
-          <button onClick={onOpenAdmin}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-5"
-            style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)', color: 'rgba(251,191,36,0.7)' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(251,191,36,0.14)'; e.currentTarget.style.color = 'rgba(251,191,36,0.95)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(251,191,36,0.07)'; e.currentTarget.style.color = 'rgba(251,191,36,0.7)'; }}>
-            <Crown size={14} />
-            Admin panel
+        <div className="flex items-center justify-center gap-5 mt-5">
+          {isAdmin && (
+            <button onClick={onOpenAdmin}
+              className="inline-flex items-center gap-1.5 transition-all"
+              style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(251,191,36,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(251,191,36,0.9)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(251,191,36,0.55)'; }}>
+              <Crown size={11} />Admin panel
+            </button>
+          )}
+          {isAdmin && <span style={{ color: 'rgba(var(--fg),0.12)', fontSize: 12 }}>|</span>}
+          <button onClick={onSignOut}
+            className="inline-flex items-center gap-1.5 transition-all"
+            style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(239,100,100,0.75)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.3)'; }}>
+            <SignOut size={11} />Sign out
           </button>
-        )}
-
-        {/* Sign out */}
-        <button onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm transition-all mt-2"
-          style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.45)' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)'; e.currentTarget.style.color = '#fca5a5'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.04)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.08)'; e.currentTarget.style.color = 'rgba(var(--fg),0.45)'; }}>
-          <SignOut size={14} />
-          Sign out
-        </button>
+        </div>
       </div>
     </div>
   );
