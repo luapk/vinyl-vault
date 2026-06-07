@@ -2768,27 +2768,25 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="About" open={openSection === 'about'} onToggle={() => toggleSection('about')}>
-            <div style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.38)', lineHeight: 1.65, marginBottom: 14 }}>
-              Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve and within seconds you have the pressing confirmed, tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
+            <div style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', lineHeight: 1.6, marginBottom: 14 }}>
+              Personal archive for record collectors. Photograph a sleeve, confirm the pressing, file it in crates.
             </div>
-            <div style={{ fontSize: 14, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)', marginBottom: 10 }}>How it works</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', marginBottom: 10 }}>How it works</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
               {[
-                { Icon: Camera,      title: 'Photograph', desc: 'Point your camera at the sleeve or label.' },
-                { Icon: Scan,        title: 'Identify',   desc: 'Matched against the global Discogs database.' },
-                { Icon: Sparkle,     title: 'Enrich',     desc: 'Tracklist, BPM, and Camelot key pulled automatically.' },
-                { Icon: VinylRecord, title: 'File',       desc: 'Assign to crates or save unassigned and sort later.' },
+                { Icon: Camera,      title: 'Photograph', desc: 'Camera or photo library' },
+                { Icon: Scan,        title: 'Identify',   desc: 'Matched against Discogs' },
+                { Icon: Sparkle,     title: 'Enrich',     desc: 'Tracklist, BPM, Camelot key' },
+                { Icon: VinylRecord, title: 'File',       desc: 'Assign to crates, sort later' },
               ].map(({ Icon, title, desc }) => (
-                <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <Icon size={13} style={{ color: `rgba(${accentRGB},0.65)`, marginTop: 1, flexShrink: 0 }} />
-                  <div>
-                    <span style={{ fontSize: 15, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace' }}>{title} </span>
-                    <span style={{ fontSize: 15, color: 'rgba(var(--fg),0.35)', fontFamily: 'monospace' }}>{desc}</span>
-                  </div>
+                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Icon size={12} style={{ color: `rgba(${accentRGB},0.55)`, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'rgba(var(--fg),0.7)', fontFamily: 'monospace', fontWeight: 600 }}>{title}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(var(--fg),0.32)', fontFamily: 'monospace' }}>{desc}</span>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.20)' }}>Your collection is stored locally and synced to your account across devices.</div>
+            <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', paddingTop: 10, borderTop: '1px solid rgba(var(--fg),0.07)' }}>Stored locally and synced across devices</div>
           </AccountSection>
 
           {/* Appearance */}
@@ -3055,7 +3053,9 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
           onClick={() => collection.length >= 2 && setShowSmartCrates(true)}
           disabled={collection.length < 2}
           className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[13px] font-mono transition-all mb-2"
-          style={{ border: "1px solid rgba(var(--fg),0.10)", color: collection.length >= 2 ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.25)", background: "rgba(var(--fg),0.03)", cursor: collection.length >= 2 ? "pointer" : "not-allowed" }}
+          style={{ border: "none", color: collection.length >= 2 ? "#000" : "rgba(var(--fg),0.25)", background: collection.length >= 2 ? "#C9FF00" : "rgba(var(--fg),0.06)", cursor: collection.length >= 2 ? "pointer" : "not-allowed" }}
+          onMouseEnter={e => { if (collection.length >= 2) e.currentTarget.style.background = '#d8ff33'; }}
+          onMouseLeave={e => { if (collection.length >= 2) e.currentTarget.style.background = '#C9FF00'; }}
         >
           <Sparkle size={13} />Smart Crates
         </button>
