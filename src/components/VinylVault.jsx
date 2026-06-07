@@ -13,7 +13,6 @@ import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
 import PricingScreen from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen } from '../lib/social.js';
-import { PRICING_SEEN_KEY } from '../lib/pricing.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -343,11 +342,9 @@ export default function VinylVault() {
   }
   const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
-  // Pricing screen: shown once to unauthenticated visitors who haven't seen it yet.
-  // Once a user is (or was) logged in we never show it -- they already have access.
-  const [pricingSeen, setPricingSeen] = useState(() =>
-    !!localStorage.getItem(PRICING_SEEN_KEY) || !!user
-  );
+  // Pricing screen: always shown to unauthenticated visitors before auth.
+  // Dismissed in-session only -- no localStorage needed.
+  const [pricingSeen, setPricingSeen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
   // Community routing: which public profile is open (null = community home).
@@ -438,16 +435,8 @@ export default function VinylVault() {
     if (!pricingSeen) {
       return (
         <PricingScreen
-          onGetStarted={() => {
-            localStorage.setItem(PRICING_SEEN_KEY, '1');
-            setAuthInitialMode('signup');
-            setPricingSeen(true);
-          }}
-          onSignIn={() => {
-            localStorage.setItem(PRICING_SEEN_KEY, '1');
-            setAuthInitialMode('signin');
-            setPricingSeen(true);
-          }}
+          onGetStarted={() => { setAuthInitialMode('signup'); setPricingSeen(true); }}
+          onSignIn={() => { setAuthInitialMode('signin'); setPricingSeen(true); }}
         />
       );
     }
