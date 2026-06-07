@@ -50,7 +50,7 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, i
           <img
             src="/logo.png"
             alt="Vinyl Vault"
-            style={{ height: 86, mixBlendMode: 'screen', opacity: 0.95, filter: 'drop-shadow(0 0 24px rgba(var(--fg),0.15))' }}
+            style={{ height: 180, opacity: 0.92 }}
           />
         </div>
 
