@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, MagnifyingGlass,
@@ -1420,6 +1420,14 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   // Only user-created crates — tags and genres stay out of this list
   const allCrates = [...new Set(collection.flatMap((r) => r.crates || []))].sort();
 
+  const crateCounts = useMemo(() => {
+    const counts = {};
+    for (const r of collection) {
+      for (const c of (r.crates || [])) counts[c] = (counts[c] || 0) + 1;
+    }
+    return counts;
+  }, [collection]);
+
   const filtered = collection.filter((r) => {
     const q = search.toLowerCase();
     const matchSearch = !q
@@ -1550,7 +1558,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1572,7 +1580,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -1586,7 +1594,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [], smartCrateNames = [] }) {
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const startXRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -1710,6 +1718,11 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                   color: 'rgba(var(--fg),0.65)',
                 }}>
                 {c}
+                {(crateCounts[c] || 0) > 0 && (
+                  <span style={{ marginLeft: 4, minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--fg),0.18)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontFamily: 'monospace', lineHeight: 1 }}>
+                    {crateCounts[c]}
+                  </span>
+                )}
               </span>
             );
           })}
@@ -1892,7 +1905,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [], smartCrateNames = [] }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
@@ -2149,6 +2162,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                         color: 'rgba(var(--fg),0.65)',
                       }}>
                       {c}
+                      {(crateCounts[c] || 0) > 0 && (
+                        <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--fg),0.18)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontFamily: 'monospace', lineHeight: 1 }}>
+                          {crateCounts[c]}
+                        </span>
+                      )}
                       <X size={9} className="opacity-50 ml-0.5" />
                     </button>
                   );

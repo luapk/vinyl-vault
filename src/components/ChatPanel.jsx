@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine } from '@phosphor-icons/react';
+import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
-import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing } from '../lib/social';
+import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction } from '../lib/social';
+
+const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
 function ChatAvatar({ profile, size = 32 }) {
   const letter = (profile?.display_name || profile?.username || '?')[0].toUpperCase();
@@ -36,6 +38,8 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
   const [sending, setSending] = useState(false);
   const [followingList, setFollowingList] = useState([]);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [reactions, setReactions] = useState({});
+  const [pickerMsg, setPickerMsg] = useState(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const recipientRef = useRef(recipient);
@@ -67,15 +71,37 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     setRecipient(profile);
     setView('thread');
     setMessages([]);
+    setReactions({});
+    setPickerMsg(null);
     try {
       const msgs = await getMessages(currentUser.id, profile.id);
       setMessages(msgs);
+      if (msgs.length > 0) {
+        getReactionsForMessages(msgs.map(m => m.id)).then(setReactions).catch(() => {});
+      }
       await markMessagesRead(currentUser.id, profile.id);
       setConversations(prev => prev.map(c => c.userId === profile.id ? { ...c, unread: 0 } : c));
       onUnreadChange?.(0);
     } catch { /* silent */ }
     setTimeout(() => inputRef.current?.focus(), 150);
   }, [currentUser.id, onUnreadChange]);
+
+  const handleReact = useCallback(async (msgId, emoji) => {
+    setPickerMsg(null);
+    const prev = reactions[msgId] || [];
+    const hasIt = prev.some(r => r.user_id === currentUser.id && r.emoji === emoji);
+    setReactions(r => ({
+      ...r,
+      [msgId]: hasIt
+        ? (r[msgId] || []).filter(x => !(x.user_id === currentUser.id && x.emoji === emoji))
+        : [...(r[msgId] || []), { emoji, user_id: currentUser.id }],
+    }));
+    try {
+      await toggleMessageReaction(msgId, emoji, currentUser.id);
+    } catch {
+      getReactionsForMessages([msgId]).then(fresh => setReactions(r => ({ ...r, ...fresh }))).catch(() => {});
+    }
+  }, [currentUser.id, reactions]);
 
   // Open initial recipient once on mount
   useEffect(() => {
@@ -109,6 +135,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     const body = input.trim();
     setInput('');
     setSending(true);
+    setPickerMsg(null);
     // Reset textarea height
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
     try {
@@ -242,12 +269,42 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
               const isMe = msg.from_user_id === currentUser.id;
               const prevMsg = messages[i - 1];
               const showTime = !prevMsg || (new Date(msg.created_at) - new Date(prevMsg.created_at)) > 300000;
+              const msgRxs = reactions[msg.id] || [];
+              const rxGroups = {};
+              for (const r of msgRxs) {
+                if (!rxGroups[r.emoji]) rxGroups[r.emoji] = { count: 0, mine: false };
+                rxGroups[r.emoji].count++;
+                if (r.user_id === currentUser.id) rxGroups[r.emoji].mine = true;
+              }
+              const hasRx = Object.keys(rxGroups).length > 0;
+              const pickerOpen = pickerMsg === msg.id;
+              const reactBtn = (
+                <button
+                  onClick={() => setPickerMsg(p => p === msg.id ? null : msg.id)}
+                  className={`transition-opacity ${pickerOpen ? 'opacity-80' : 'opacity-20 hover:opacity-70'}`}
+                  style={{ width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'rgba(var(--fg),0.7)' }}>
+                  <Smiley size={14} />
+                </button>
+              );
               return (
                 <div key={msg.id}>
                   {showTime && (
                     <div style={{ textAlign: 'center', fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', margin: '6px 0 10px' }}>{msgTime(msg.created_at)}</div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
+                  {pickerOpen && (
+                    <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 4 }}>
+                      {REACT_EMOJIS.map(emoji => (
+                        <button key={emoji} onClick={() => handleReact(msg.id, emoji)}
+                          style={{ fontSize: 18, padding: '4px 6px', borderRadius: 10, border: '1px solid rgba(var(--fg),0.1)', background: 'rgba(var(--fg),0.05)', cursor: 'pointer', lineHeight: 1, transition: 'transform 0.1s' }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'center', gap: 4, marginBottom: hasRx ? 2 : 4 }}>
+                    {!isMe && reactBtn}
                     <div style={{
                       maxWidth: '78%', padding: '8px 12px',
                       borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
@@ -259,7 +316,19 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                     }}>
                       {msg.body}
                     </div>
+                    {isMe && reactBtn}
                   </div>
+                  {hasRx && (
+                    <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 6 }}>
+                      {Object.entries(rxGroups).map(([emoji, { count, mine }]) => (
+                        <button key={emoji} onClick={() => handleReact(msg.id, emoji)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 10, border: mine ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.10)', background: mine ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.05)', cursor: 'pointer' }}>
+                          <span style={{ fontSize: 13 }}>{emoji}</span>
+                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: mine ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.50)' }}>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

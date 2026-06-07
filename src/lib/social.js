@@ -384,6 +384,40 @@ export async function markMessagesRead(toUserId, fromUserId) {
     .is('read_at', null);
 }
 
+// ─── Message reactions ────────────────────────────────────────────────────────
+
+export async function getReactionsForMessages(messageIds) {
+  if (!supabase || !messageIds.length) return {};
+  const { data } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id')
+    .in('message_id', messageIds);
+  const map = {};
+  for (const r of data || []) {
+    (map[r.message_id] ||= []).push({ emoji: r.emoji, user_id: r.user_id });
+  }
+  return map;
+}
+
+export async function toggleMessageReaction(messageId, emoji, userId) {
+  if (!supabase) throw new Error('Not configured');
+  const { data: existing } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle();
+  if (existing) {
+    const { error } = await supabase.from('message_reactions').delete().eq('id', existing.id);
+    if (error) throw error;
+    return 'removed';
+  }
+  const { error } = await supabase.from('message_reactions').insert({ message_id: messageId, user_id: userId, emoji });
+  if (error) throw error;
+  return 'added';
+}
+
 export async function getUnreadMessageCount(userId) {
   if (!supabase || !userId) return 0;
   const { count, error } = await supabase
