@@ -1487,7 +1487,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
       {/* CRATES MODE */}
       {collectionMode === "crates" && (
-        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} />
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} />
       )}
 
       {/* STATS MODE */}
@@ -3060,7 +3060,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 
 // ----- CratesTabView ---------------------------------------------------------
 
-function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied }) {
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [] }) {
   const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
@@ -3070,28 +3070,42 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
     setEditingName(null);
   };
 
+  const canScan = collection.length >= 2;
+
   return (
     <div className="pt-2 max-w-sm">
       {/* Smart Crates */}
       <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(var(--fg),0.07)' }}>
-        <button
-          onClick={() => collection.length >= 2 && setShowSmartCrates(true)}
-          disabled={collection.length < 2}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[13px] font-mono transition-all mb-2"
-          style={{ border: "none", color: collection.length >= 2 ? "#000" : "rgba(var(--fg),0.25)", background: collection.length >= 2 ? "#C9FF00" : "rgba(var(--fg),0.06)", cursor: collection.length >= 2 ? "pointer" : "not-allowed" }}
-          onMouseEnter={e => { if (collection.length >= 2) e.currentTarget.style.background = '#d8ff33'; }}
-          onMouseLeave={e => { if (collection.length >= 2) e.currentTarget.style.background = '#C9FF00'; }}
-        >
-          <Sparkle size={13} />Smart Crates
-        </button>
-        <p className="text-[12px] font-mono" style={{ color: "rgba(var(--fg),0.32)" }}>
-          AI sorts your collection by sound, era and scene.
+        <div className="flex items-center gap-1.5 mb-2">
+          <Sparkle size={12} style={{ color: "rgba(var(--fg),0.45)", flexShrink: 0 }} />
+          <span className="text-[11px] tracking-[0.2em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.45)" }}>Smart Crates</span>
+        </div>
+        <p className="text-[12px] font-mono mb-3" style={{ color: "rgba(var(--fg),0.45)" }}>
+          AI sorts your collection into crates by sound, era and scene.
         </p>
+        {smartCrateNames.length > 0 && (
+          <p className="text-[11px] font-mono mb-3 px-3 py-2 rounded-lg" style={{ color: "rgba(220,160,60,0.85)", background: "rgba(220,160,60,0.08)", border: "1px solid rgba(220,160,60,0.18)" }}>
+            You have already scanned your collection. Running again will replace existing smart crates.
+          </p>
+        )}
+        <button
+          onClick={() => canScan && setShowSmartCrates(true)}
+          disabled={!canScan}
+          className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
+          style={{ border: "none", color: canScan ? "#000" : "rgba(var(--fg),0.25)", background: canScan ? "#C9FF00" : "rgba(var(--fg),0.06)", cursor: canScan ? "pointer" : "not-allowed" }}
+          onMouseEnter={e => { if (canScan) e.currentTarget.style.background = '#d8ff33'; }}
+          onMouseLeave={e => { if (canScan) e.currentTarget.style.background = canScan ? '#C9FF00' : "rgba(var(--fg),0.06)"; }}
+        >
+          Scan Collection
+        </button>
       </div>
 
       {/* Crate list */}
       {allCrates.length > 0 && (
-        <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-3" style={{ color: "rgba(var(--fg),0.45)" }}>Your crates</div>
+        <div className="flex items-center gap-1.5 mb-3">
+          <Wrench size={12} style={{ color: "rgba(var(--fg),0.45)", flexShrink: 0 }} />
+          <span className="text-[11px] tracking-[0.2em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.45)" }}>Edit Crates</span>
+        </div>
       )}
       {allCrates.length === 0 ? (
         <p className="text-[13px] font-mono" style={{ color: "rgba(var(--fg),0.25)" }}>No crates yet. Open a record and assign it to a crate to get started.</p>
