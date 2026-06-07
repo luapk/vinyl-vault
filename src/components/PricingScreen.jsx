@@ -73,6 +73,8 @@ function anim(delay = 0) {
 
 const ROUNDEL = 168; // px -- visible roundel diameter
 const OVERLAP = 68;  // px -- how much roundel hangs above the glass card
+// How much of the roundel sits inside the card (= ROUNDEL - OVERLAP)
+const ROUNDEL_INSIDE = ROUNDEL - OVERLAP; // 100px
 
 function TierCard({ tier, onGetStarted }) {
   const { image, name, price, billing, accentRGB, comingSoon, founding, features } = tier;
@@ -96,7 +98,7 @@ function TierCard({ tier, onGetStarted }) {
           : `0 28px 64px -12px rgba(0,0,0,0.9), inset 0 1px 0 rgba(var(--fg),0.18), inset 0 -1px 0 rgba(0,0,0,0.15), 0 0 0 1px rgba(var(--fg),0.06)`,
         opacity: comingSoon ? 0.58 : 1,
         // Top padding makes room for the roundel that overlaps from above
-        paddingTop: OVERLAP + 8,
+        paddingTop: ROUNDEL_INSIDE + 14,
         paddingBottom: 18,
         paddingLeft: 20,
         paddingRight: 20,
