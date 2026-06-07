@@ -1515,37 +1515,38 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
           {/* Crate filter — dropdown picker (scales to any number of crates) */}
           {allCrates.length > 0 && (
-            <div className="relative mb-4" style={{ maxWidth: 320 }}>
-              <button onClick={() => setCrateMenuOpen(o => !o)}
-                className="w-full inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
-                style={{
-                  background: filterCrate ? 'rgba(var(--fg),0.07)' : 'rgba(var(--fg),0.025)',
-                  border: `1px solid ${filterCrate ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
-                  color: filterCrate ? 'rgba(var(--fg),0.88)' : 'rgba(var(--fg),0.50)',
-                }}>
-                {filterCrate ? (
-                  <>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: crateColors[filterCrate] || 'rgba(var(--fg),0.4)' }} />
-                    <span className="truncate">{filterCrate}</span>
+            <div className="relative mb-4">
+              {filterCrate ? (
+                /* Active state: glassmorphic pill that re-opens the menu on tap */
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCrateMenuOpen(o => !o)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={crateColors[filterCrate]
+                      ? pillGlassStyle(crateColors[filterCrate])
+                      : { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.32)`, color: 'rgba(var(--fg),0.90)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: `0 4px 16px rgba(${accentRGB},0.20)` }}>
+                    {filterCrate}
                     {(crateCounts[filterCrate] || 0) > 0 && (
-                      <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(var(--fg),0.18)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1 }}>{crateCounts[filterCrate]}</span>
+                      <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1 }}>{crateCounts[filterCrate]}</span>
                     )}
-                    <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setFilterCrate(null); setCrateMenuOpen(false); }} className="ml-auto flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.45)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.85)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.45)'}><X size={11} /></span>
-                  </>
-                ) : (
-                  <>
-                    <Stack size={13} className="opacity-60" />
-                    <span>Filter by crate</span>
-                    <CaretDown size={11} className="ml-auto opacity-50" style={{ transform: crateMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
-                  </>
-                )}
-              </button>
+                  </button>
+                  <button onClick={() => { setFilterCrate(null); setCrateMenuOpen(false); }} className="flex items-center justify-center w-6 h-6 rounded-full transition-all" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.80)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.40)'}><X size={10} /></button>
+                </div>
+              ) : (
+                /* Idle state: compact trigger */
+                <button onClick={() => setCrateMenuOpen(o => !o)}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+                  style={{ background: 'rgba(var(--fg),0.025)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.50)' }}>
+                  <Stack size={13} className="opacity-60" />
+                  <span>Filter by crate</span>
+                  <CaretDown size={11} className="opacity-50" style={{ transform: crateMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+                </button>
+              )}
 
               {crateMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setCrateMenuOpen(false)} />
-                  <div className="absolute left-0 right-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto"
-                    style={{ background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
                     {allCrates.map((c) => {
                       const active = filterCrate === c;
                       return (
