@@ -1023,48 +1023,31 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
           </div>
           <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
             {recs.slice(0, 6).map(rec => (
-              <div key={rec.id} style={{ flex: '0 0 200px', height: 290, scrollSnapAlign: 'start', borderRadius: 20, overflow: 'hidden', position: 'relative', flexShrink: 0, boxShadow: '0 12px 40px -8px rgba(0,0,0,0.6)' }}>
-                {/* Full-bleed cover art */}
-                {rec.thumb
-                  ? <img src={rec.thumb} alt={rec.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(135deg, rgba(${accentRGB},0.15), rgba(var(--fg),0.04))`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <VinylRecord size={44} weight="thin" style={{ opacity: 0.18 }} />
-                    </div>
-                }
-                {/* Gradient scrim rising from bottom */}
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.65) 42%, transparent 70%)', pointerEvents: 'none' }} />
-                {/* Text + buttons */}
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 10px 10px' }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.artist || 'Various'}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.3, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.title}</div>
-                  <div style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)', marginBottom: rec.reason ? 5 : 7 }}>
-                    {[rec.label, rec.year].filter(Boolean).join(' · ')}
-                  </div>
-                  {rec.reason && (
-                    <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},0.88)`, lineHeight: 1.4, marginBottom: 7, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.reason}</div>
-                  )}
-                  {/* Store buttons -- horizontal pill pair */}
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    {(rec.storeLinks || []).map(store => (
-                      <a key={store.key} href={store.url} target="_blank" rel="noopener noreferrer"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 6px', borderRadius: 20, textDecoration: 'none', background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', transition: 'opacity 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-                        <img src={`https://www.google.com/s2/favicons?domain=${store.key === 'roughTrade' ? 'roughtrade.com' : 'bleep.com'}&sz=32`}
-                          style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0 }} alt="" />
-                        <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.82)' }}>{store.name}</span>
-                      </a>
-                    ))}
-                    {(!rec.storeLinks || rec.storeLinks.length === 0) && rec.buyUrl && (
-                      <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                        style={{ flex: 1, display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'all 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
-                        Buy now
-                      </a>
-                    )}
-                  </div>
+              <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 120, scrollSnapAlign: 'start' }}>
+                {/* Square art -- matches RecordCard exactly */}
+                <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: '0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)' }}>
+                  {rec.thumb
+                    ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
+                        <VinylRecord size={24} weight="thin" className="opacity-20" />
+                      </div>
+                  }
                 </div>
+                {/* Text -- matches RecordCard exactly */}
+                <div className="text-[14px] leading-snug font-display truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{rec.artist || 'Various'}</div>
+                <div className="text-[13px] truncate font-mono" style={{ color: 'rgba(var(--fg),0.5)' }}>{rec.title}</div>
+                {rec.reason && (
+                  <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.7})`, lineHeight: 1.4, marginTop: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.reason}</div>
+                )}
+                {/* Single lime green buy button */}
+                {(rec.storeLinks?.[0]?.url || rec.buyUrl) && (
+                  <a href={rec.storeLinks?.[0]?.url || rec.buyUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', textAlign: 'center', marginTop: 7, padding: '5px 0', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
+                    Buy now
+                  </a>
+                )}
               </div>
             ))}
           </div>
