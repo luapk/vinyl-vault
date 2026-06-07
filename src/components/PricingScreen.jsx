@@ -293,10 +293,10 @@ export default function PricingScreen({ onGetStarted, onSignIn }) {
         {/* Headline */}
         <div style={{ textAlign: 'center', marginBottom: 24, ...anim(120) }}>
           <h1 style={{ fontSize: 'clamp(22px, 5.5vw, 30px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, color: 'rgba(var(--fg),0.9)', margin: '0 0 6px' }}>
-            For collectors who play out.
+            For collectors who play out
           </h1>
           <p style={{ fontSize: 13, color: 'rgba(var(--fg),0.35)', margin: 0, lineHeight: 1.4 }}>
-            Free for the community. Funded by paying members.
+            Smart vinyl sorting tool, from shelf to booth.
           </p>
         </div>
 
