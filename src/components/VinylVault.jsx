@@ -1041,12 +1041,32 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                   {rec.reason && (
                     <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.6})`, lineHeight: 1.4, marginBottom: 4 }}>{rec.reason}</div>
                   )}
-                  <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', border: '1px solid rgba(201,255,0,0.6)', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto', transition: 'all 0.15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
-                    Buy now
-                  </a>
+                  <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {(rec.storeLinks || []).map(store => (
+                      <a key={store.key} href={store.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, textDecoration: 'none', transition: 'opacity 0.15s',
+                          ...(store.key === 'roughTrade'
+                            ? { background: '#111', border: '1px solid rgba(255,255,255,0.18)' }
+                            : { background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)' }) }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+                        <img src={`https://www.google.com/s2/favicons?domain=${store.key === 'roughTrade' ? 'roughtrade.com' : 'bleep.com'}&sz=32`}
+                          style={{ width: 10, height: 10, borderRadius: 2, flexShrink: 0 }} alt="" />
+                        <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.06em',
+                          color: store.key === 'roughTrade' ? 'rgba(255,255,255,0.85)' : 'rgba(var(--fg),0.55)' }}>
+                          {store.name}
+                        </span>
+                      </a>
+                    ))}
+                    {(!rec.storeLinks || rec.storeLinks.length === 0) && rec.buyUrl && (
+                      <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', border: '1px solid rgba(201,255,0,0.6)', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
+                        Buy now
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

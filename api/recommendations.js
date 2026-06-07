@@ -1,6 +1,8 @@
 const BASE = 'https://api.discogs.com';
 const UA = 'VinylVault/1.0';
 
+import { buildStoreLinks } from './buy-link.js';
+
 function authHeaders(token) {
   return {
     Authorization: `Discogs token=${token}`,
@@ -120,6 +122,7 @@ export default async function handler(req, res) {
         year: r.year || null,
         thumb: r.cover_image || r.thumb || null,
         buyUrl: `https://www.discogs.com/sell/list?release_id=${r.id}`,
+        storeLinks: buildStoreLinks(artist, title),
       });
     }
   }
