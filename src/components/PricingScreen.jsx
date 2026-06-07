@@ -181,7 +181,7 @@ function TierCard({ tier, onGetStarted }) {
 
 // ---- Swipe carousel ----------------------------------------------------------
 
-function TierCarousel({ onGetStarted }) {
+export function TierCarousel({ onGetStarted }) {
   const [idx, setIdx] = useState(0);
   const startXRef   = useRef(null);
   const startTRef   = useRef(null);

@@ -13,7 +13,7 @@ import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
 import ChatPanel from "./ChatPanel.jsx";
-import PricingScreen from "./PricingScreen.jsx";
+import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
@@ -351,6 +351,7 @@ export default function VinylVault() {
   const [pricingSeen, setPricingSeen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
@@ -816,7 +817,22 @@ export default function VinylVault() {
           onAddRecordsBulk={addRecordsBulk}
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
+          onUpgrade={() => { setShowAccount(false); setShowPricingModal(true); }}
         />
+      )}
+
+      {showPricingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+          onClick={() => setShowPricingModal(false)}>
+          <div style={{ width: '100%', maxWidth: 420, padding: '0 16px' }} onClick={e => e.stopPropagation()}>
+            <TierCarousel onGetStarted={() => setShowPricingModal(false)} />
+            <button onClick={() => setShowPricingModal(false)}
+              style={{ display: 'block', margin: '16px auto 0', fontSize: 13, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -945,7 +961,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
         <div className="grid sm:grid-cols-2 gap-4">
         {/* Camera / scan card */}
         <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: `linear-gradient(145deg, rgba(255,255,255,0.48) 0%, rgba(${accentRGB},0.05) 60%, rgba(255,255,255,0.34) 100%)`,
+          background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
           boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7), 0 0 48px -10px rgba(${accentRGB},0.28)`,
           backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
@@ -964,7 +980,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
 
         {/* Batch queue card */}
         <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.48) 0%, rgba(200,180,255,0.08) 60%, rgba(255,255,255,0.34) 100%)',
+          background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
           boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)',
           backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
@@ -1023,9 +1039,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                     <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.6})`, lineHeight: 1.4, marginBottom: 4 }}>{rec.reason}</div>
                   )}
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: 'rgba(91,33,212,0.18)', border: '1px solid rgba(91,33,212,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#AC90E2', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto', transition: 'all 0.15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(91,33,212,0.32)'; e.currentTarget.style.color = '#c8aaff'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(91,33,212,0.18)'; e.currentTarget.style.color = '#AC90E2'; }}>
+                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', border: '1px solid rgba(201,255,0,0.6)', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
                     Buy now
                   </a>
                 </div>
@@ -2299,7 +2315,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin }) {
+function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2494,8 +2510,22 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
         {errorMsg && <p style={{ fontSize: 15, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{errorMsg}</p>}
 
+        {/* Plan row */}
+        <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)', borderBottom: '1px solid rgba(var(--fg),0.07)', paddingTop: 14, paddingBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
+          <span style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', background: 'rgba(var(--fg),0.07)', border: '1px solid rgba(var(--fg),0.12)', borderRadius: 6, padding: '3px 8px', letterSpacing: '0.06em' }}>Digger -- Free</span>
+            <button onClick={onUpgrade}
+              style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 600, color: '#000', background: '#C9FF00', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', letterSpacing: '0.04em', transition: 'background 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#d8ff33'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#C9FF00'; }}>
+              Upgrade
+            </button>
+          </div>
+        </div>
+
         {/* Accordion sections */}
-        <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)' }}>
+        <div>
 
           <AccountSection label="Profile name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
             <div className="flex gap-2">
@@ -2809,9 +2839,9 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                 <div className="flex items-center gap-2.5 p-3">
                   <RotatingCube color={activeColor || 'rgba(var(--fg),0.35)'} size={10} />
                   {editingName === crate ? (
-                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-[11px] font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
                   ) : (
-                    <span className="flex-1 text-sm font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
+                    <span className="flex-1 text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
                   )}
                   {editingName === crate ? (
                     <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>
@@ -3007,9 +3037,9 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
                 <div className="flex items-center gap-2.5 p-3">
                   <RotatingCube color={activeColor || 'rgba(var(--fg),0.35)'} size={10} />
                   {editingName === crate ? (
-                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-sm font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
+                    <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-[11px] font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
                   ) : (
-                    <span className="flex-1 text-sm font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
+                    <span className="flex-1 text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.70)' }}>{crate}</span>
                   )}
                   {editingName === crate ? (
                     <button onClick={commitRename} className="w-7 h-7 rounded-full flex items-center justify-center transition-all text-white/50 hover:text-white/90"><Check size={12} weight="bold" /></button>
