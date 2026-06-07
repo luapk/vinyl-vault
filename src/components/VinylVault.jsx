@@ -1041,12 +1041,14 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                 )}
                 {/* Single lime green buy button */}
                 {(rec.storeLinks?.[0]?.url || rec.buyUrl) && (
-                  <a href={rec.storeLinks?.[0]?.url || rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', marginTop: 7, padding: '5px 0', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'background 0.15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
-                    Buy now
-                  </a>
+                  <div style={{ marginTop: 7, display: 'flex', justifyContent: 'center' }}>
+                    <a href={rec.storeLinks?.[0]?.url || rec.buyUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-block', padding: '5px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'background 0.15s', whiteSpace: 'nowrap' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
+                      Buy now
+                    </a>
+                  </div>
                 )}
               </div>
             ))}
