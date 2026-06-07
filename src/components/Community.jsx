@@ -37,11 +37,12 @@ function relativeTime(ts) {
 }
 
 function Avatar({ profile, size = 40 }) {
+  const [imgFailed, setImgFailed] = useState(false);
   return (
     <div className="rounded-full overflow-hidden flex items-center justify-center shrink-0"
       style={{ width: size, height: size, border: '1px solid rgba(var(--fg),0.15)', background: 'rgba(var(--fg),0.06)' }}>
-      {profile?.avatar_url
-        ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+      {profile?.avatar_url && !imgFailed
+        ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
         : <span style={{ fontSize: size * 0.4, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)' }}>{initials(profile)}</span>}
     </div>
   );
@@ -138,6 +139,7 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState(null);
 
   const reload = useCallback(() => {
     getComments(ownerUserId, recordLocalId)
@@ -150,12 +152,13 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
     const body = draft.trim();
     if (!body || posting || !currentUserId) return;
     setPosting(true);
+    setPostError(null);
     try {
       await addComment(ownerUserId, recordLocalId, body, currentUserId);
       setDraft('');
       reload();
     } catch (e) {
-      // keep draft so user can retry
+      setPostError('Could not post comment. Please try again.');
       console.error(e);
     } finally {
       setPosting(false);
@@ -225,6 +228,9 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
         </div>
       ) : (
         <div className="text-white/25 text-[10px] font-mono">Sign in to comment.</div>
+      )}
+      {postError && (
+        <div className="text-red-400 text-[11px] mt-1.5">{postError}</div>
       )}
     </div>
   );
@@ -475,8 +481,9 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
   const searchTimer = useRef(null);
 
   useEffect(() => {
+    setFeedLoading(true);
     getFeed(40).then(setFeed).catch(() => {}).finally(() => setFeedLoading(false));
-  }, []);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     if (!currentUser?.id) return;

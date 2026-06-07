@@ -13,6 +13,7 @@ import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
 import ChatPanel from "./ChatPanel.jsx";
+import PricingScreen from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
@@ -345,6 +346,10 @@ export default function VinylVault() {
   }
   const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
+  // Pricing screen: always shown to unauthenticated visitors before auth.
+  // Dismissed in-session only -- no localStorage needed.
+  const [pricingSeen, setPricingSeen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
@@ -438,9 +443,17 @@ export default function VinylVault() {
     });
   }, []);
 
-  // Gate: show login screen when Supabase is configured but no user is logged in.
+  // Gate: unauthenticated visitors see pricing first, then auth.
   if (isSupabaseEnabled && !authLoading && !user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} />;
+    if (!pricingSeen) {
+      return (
+        <PricingScreen
+          onGetStarted={() => { setAuthInitialMode('signup'); setPricingSeen(true); }}
+          onSignIn={() => { setAuthInitialMode('signin'); setPricingSeen(true); }}
+        />
+      );
+    }
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} initialMode={authInitialMode} />;
   }
   if (isSupabaseEnabled && authLoading) {
     if (showWalkthrough) {
@@ -658,7 +671,7 @@ export default function VinylVault() {
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)" }}>
         <div className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, mixBlendMode: "screen", opacity: 0.92 }} />
+          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
