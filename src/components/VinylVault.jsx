@@ -352,6 +352,9 @@ export default function VinylVault() {
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [smartCrateNames, setSmartCrateNames] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('vv_smart_crate_names') || '[]'); } catch { return []; }
+  });
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
@@ -752,7 +755,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} collection={collection} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} collection={collection} smartCrateNames={smartCrateNames} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
           </>
@@ -1075,7 +1078,7 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, collection = [] }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, collection = [], smartCrateNames = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -1141,10 +1144,12 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // AI-suggested crates for this record minus already-pending, capped at 3
-  const suggestedCrates = (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c)).slice(0, 3);
-  // Custom crates from existing collection (non-genre) minus already-pending and suggestions
-  const existingCustom = allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c) && !(release.suggestedBoxes || []).includes(c));
+  // If smart crates has run, use those as suggestions (alphabetical); otherwise fall back to per-scan AI suggestions + existing custom crates
+  const smartSuggestions = smartCrateNames.length > 0
+    ? [...smartCrateNames].filter(c => !pendingCrates.includes(c)).sort()
+    : null;
+  const suggestedCrates = smartSuggestions ?? (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c)).slice(0, 3);
+  const existingCustom = smartSuggestions !== null ? [] : allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c) && !(release.suggestedBoxes || []).includes(c));
 
   const duplicate = release && collection.find(r =>
     (release.id && r.discogsId && String(r.discogsId) === String(release.id)) ||
@@ -1253,10 +1258,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             </div>
           )}
 
-          {/* AI-suggested crates — opt-in */}
+          {/* Crate suggestions */}
           {suggestedCrates.length > 0 && (
             <div>
-              <div className="text-[11px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>Suggested</div>
+              <div className="text-[11px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>{smartSuggestions !== null ? 'Your crates' : 'Suggested'}</div>
               <div className="flex flex-wrap gap-1.5">
                 {suggestedCrates.map((name) => (
                   <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.38)" }}>
@@ -1472,7 +1477,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
       {/* CRATES MODE */}
       {collectionMode === "crates" && (
-        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} />
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} />
       )}
 
       {/* STATS MODE */}
@@ -1525,7 +1530,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
           {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
 
           {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} />
+            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -1547,7 +1552,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -1561,7 +1566,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [] }) {
+function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [], smartCrateNames = [] }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const startXRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -1724,23 +1729,39 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                   ))}
                 </div>
               )}
-              {/* Genre list */}
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {GENRE_CRATES.filter(g => !recordCrates.includes(g)).map(g => (
-                  <button key={g} onClick={() => toggleCrate(g)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
-                    <Plus size={9} />{g}
-                  </button>
-                ))}
-              </div>
-              {/* Custom crates */}
-              {customOther.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5">
-                  {customOther.map(c => (
-                    <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
-                      <Plus size={9} />{c}
-                    </button>
-                  ))}
-                </div>
+              {/* Crate suggestions */}
+              {smartCrateNames.length > 0 ? (
+                (() => {
+                  const smart = [...smartCrateNames].filter(c => !recordCrates.includes(c)).sort();
+                  return smart.length > 0 ? (
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {smart.map(c => (
+                        <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                          <Plus size={9} />{c}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null;
+                })()
+              ) : (
+                <>
+                  <div className="flex flex-wrap justify-center gap-1.5">
+                    {GENRE_CRATES.filter(g => !recordCrates.includes(g)).map(g => (
+                      <button key={g} onClick={() => toggleCrate(g)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                        <Plus size={9} />{g}
+                      </button>
+                    ))}
+                  </div>
+                  {customOther.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {customOther.map(c => (
+                        <button key={c} onClick={() => toggleCrate(c)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                          <Plus size={9} />{c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
               {/* Custom input */}
               <div className="flex gap-2">
@@ -1851,7 +1872,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [] }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [], smartCrateNames = [] }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
@@ -2124,25 +2145,44 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               </div>
               {showCrateEditor && (
                 <div className="space-y-2 mt-1">
-                  <div className="flex flex-wrap gap-1.5">
-                    {genreChips.map((g) => (
-                      <button key={g} onClick={() => toggleRecordCrate(g)}
-                        className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
-                        style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
-                        <Plus size={9} />{g}
-                      </button>
-                    ))}
-                  </div>
-                  {otherCrates.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {otherCrates.map((c) => (
-                        <button key={c} onClick={() => toggleRecordCrate(c)}
-                          className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
-                          style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.35)' }}>
-                          <Plus size={10} />{c}
-                        </button>
-                      ))}
-                    </div>
+                  {smartCrateNames.length > 0 ? (
+                    (() => {
+                      const smart = [...smartCrateNames].filter(c => !recordCrates.includes(c)).sort();
+                      return smart.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {smart.map((c) => (
+                            <button key={c} onClick={() => toggleRecordCrate(c)}
+                              className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                              style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.35)' }}>
+                              <Plus size={9} />{c}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        {genreChips.map((g) => (
+                          <button key={g} onClick={() => toggleRecordCrate(g)}
+                            className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/55 hover:border-white/20"
+                            style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.32)' }}>
+                            <Plus size={9} />{g}
+                          </button>
+                        ))}
+                      </div>
+                      {otherCrates.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {otherCrates.map((c) => (
+                            <button key={c} onClick={() => toggleRecordCrate(c)}
+                              className="inline-flex items-center gap-1 text-[13px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:text-white/60 hover:border-white/20"
+                              style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.35)' }}>
+                              <Plus size={10} />{c}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="flex items-center gap-2">
                     <input value={crateInput} onChange={(e) => setCrateInput(e.target.value)}
@@ -2890,7 +2930,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
 
 // ----- SmartCratesModal ------------------------------------------------------
 
-function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onSetColor }) {
+function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onSetColor, onApplied }) {
   const [loading, setLoading] = useState(true);
   const [crates, setCrates] = useState(null);
   const [error, setError] = useState(null);
@@ -2939,6 +2979,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
         }
       }
     }
+    onApplied?.((crates || []).map(c => c.name));
     onClose();
   };
 
@@ -2997,7 +3038,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 
 // ----- CratesTabView ---------------------------------------------------------
 
-function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor }) {
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied }) {
   const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
@@ -3070,7 +3111,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         </div>
       )}
 
-      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} crateColors={crateColors} onSetColor={onSetColor} />}
+      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} crateColors={crateColors} onSetColor={onSetColor} onApplied={onSmartCratesApplied} />}
     </div>
   );
 }
