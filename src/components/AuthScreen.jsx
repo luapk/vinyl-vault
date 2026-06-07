@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading }) {
-  const [mode, setMode]               = useState('signup');
+export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, initialMode = 'signup' }) {
+  const [mode, setMode]               = useState(initialMode);
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [displayName, setDisplayName] = useState('');
