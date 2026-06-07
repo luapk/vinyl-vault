@@ -1010,9 +1010,9 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                     <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.6})`, lineHeight: 1.4, marginBottom: 4 }}>{rec.reason}</div>
                   )}
                   <a href={rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: 'rgba(var(--fg),0.06)', border: `1px solid rgba(var(--fg),0.14)`, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: `rgba(var(--fg),0.60)`, textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.11)'; e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(var(--fg),0.06)'; e.currentTarget.style.color = 'rgba(var(--fg),0.60)'; }}>
+                    style={{ display: 'block', textAlign: 'center', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: 'rgba(91,33,212,0.18)', border: '1px solid rgba(91,33,212,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#AC90E2', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 'auto', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(91,33,212,0.32)'; e.currentTarget.style.color = '#c8aaff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(91,33,212,0.18)'; e.currentTarget.style.color = '#AC90E2'; }}>
                     Buy now
                   </a>
                 </div>
@@ -1293,24 +1293,23 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 // ----- Crate colour system ---------------------------------------------------
 
 const CRATE_PALETTE = [
-  { id: 'white',   hex: '#f5f5f3' },
-  { id: 'cyan',    hex: '#7dd9e8' },
-  { id: 'amber',   hex: '#f5c97a' },
-  { id: 'rose',    hex: '#f5a0b0' },
-  { id: 'violet',  hex: '#bba8f5' },
-  { id: 'emerald', hex: '#7dd4b5' },
+  { id: 'purple', hex: '#5B21D4', rgb: '91,33,212'   },
+  { id: 'violet', hex: '#AC90E2', rgb: '172,144,226' },
+  { id: 'cyan',   hex: '#60EDD6', rgb: '96,237,214'  },
+  { id: 'blue',   hex: '#3498EF', rgb: '52,152,239'  },
+  { id: 'lime',   hex: '#C9FF00', rgb: '201,255,0'   },
 ];
 
-// Shared animated glassmorphism style for colored crate pills.
-// background-size + pillSwirl keyframe (in index.css) animates the gradient.
+// Palette RGB strings for use in rgba() — matches CRATE_PALETTE order
+const PALETTE_RGB = CRATE_PALETTE.map(c => c.rgb);
+
 function pillGlassStyle(col, extraStyle = {}) {
   return {
-    background: `linear-gradient(135deg, ${col}f0 0%, rgba(255,255,255,0.80) 28%, ${col}c0 52%, rgba(255,255,255,0.52) 76%, ${col}f0 100%)`,
-    backgroundSize: '280% 280%',
-    border: `1px solid ${col}a8`,
+    background: `linear-gradient(135deg, ${col}d8 0%, ${col}88 100%)`,
+    border: `1px solid ${col}90`,
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.72), inset 0 -1px 0 rgba(0,0,0,0.08), 0 4px 16px ${col}50`,
+    boxShadow: `inset 0 1.5px 0 rgba(255,255,255,0.38), inset 0 -1px 0 rgba(0,0,0,0.10), 0 4px 16px ${col}45`,
     color: 'rgba(var(--fg),0.95)',
     ...extraStyle,
   };
@@ -1477,7 +1476,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                 const active = filterCrate === c;
                 return (
                   <button key={c} onClick={() => setFilterCrate(active ? null : c)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all${col ? ' crate-pill-color' : ''}`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
                     style={col ? pillGlassStyle(col, { opacity: active ? 1 : 0.72 }) : {
                       background: active ? 'rgba(var(--fg),0.10)' : 'rgba(var(--fg),0.025)',
                       border: `1px solid ${active ? 'rgba(var(--fg),0.18)' : 'rgba(var(--fg),0.08)'}`,
@@ -1650,7 +1649,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
           {(current.crates || []).map((c) => {
             const col = crateColors[c] || null;
             return (
-              <span key={c} className={`inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono${col ? ' crate-pill-color' : ''}`}
+              <span key={c} className="inline-flex items-center text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono"
                 style={col ? pillGlassStyle(col) : {
                   background: `rgba(${accentRGB},0.10)`,
                   border: `1px solid rgba(${accentRGB},0.22)`,
@@ -2073,7 +2072,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
                   const col = crateColors[c] || null;
                   return (
                     <button key={c} onClick={() => toggleRecordCrate(c)}
-                      className={`inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80${col ? ' crate-pill-color' : ''}`}
+                      className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.12em] uppercase px-2.5 py-1 rounded-full font-mono transition-all hover:opacity-80"
                       style={col ? pillGlassStyle(col) : {
                         background: `rgba(${localAccent},0.10)`,
                         border: `1px solid rgba(${localAccent},0.22)`,
@@ -2887,10 +2886,14 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
       const merged = [...new Set([...(record.crates || []), ...newCrateNames])];
       onUpdate(id, { ...record, crates: merged });
     }
-    // Default new crates to white so they get the animated glass pill immediately
+    // Distribute palette colors across new crates in order
     if (onSetColor) {
+      let colorIdx = 0;
       for (const crate of (crates || [])) {
-        if (!crateColors[crate.name]) onSetColor(crate.name, '#f5f5f3');
+        if (!crateColors[crate.name]) {
+          onSetColor(crate.name, CRATE_PALETTE[colorIdx % CRATE_PALETTE.length].hex);
+          colorIdx++;
+        }
       }
     }
     onClose();
@@ -3193,7 +3196,7 @@ function StatsView({ collection, accentRGB }) {
     .map(c => ({ name: c, count: collection.filter(r => (r.crates || []).includes(c)).length }))
     .sort((a, b) => b.count - a.count);
 
-  const barColors = [accentRGB, '130, 175, 255', '255, 145, 175'];
+  const barColors = PALETTE_RGB;
 
   const barTrack = { flex: 1, position: 'relative', height: 18, borderRadius: 4, background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.08)', overflow: 'hidden' };
   const barFill = (pct, colorIdx = 0, delay = 0) => {
