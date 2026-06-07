@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check } from '@phosphor-icons/react';
+import { useState, useRef } from 'react';
+import { Check, CaretLeft, CaretRight } from '@phosphor-icons/react';
 import {
   PRICE_SELECTOR_YEAR,
   PRICE_RESIDENT_YEAR,
@@ -9,148 +9,274 @@ import {
   FREE_LABELS,
 } from '../lib/pricing.js';
 
-// ---- Tier feature lists -------------------------------------------------------
+// ---- Tier definitions --------------------------------------------------------
 
-const DIGGER_FEATURES = [
-  `${FREE_SCANS} AI photo scans`,
-  `${FREE_LABELS} BPM label prints`,
-  'Discogs bulk import',
-  'Smart sort into crates',
-  'Browse and search',
+const TIERS = [
+  {
+    image:    '/tier-digger.png',
+    name:     'Digger',
+    price:    'Free',
+    billing:  null,
+    accentRGB: '91,33,212',
+    comingSoon: false,
+    features: [
+      `${FREE_SCANS} AI photo scans`,
+      `${FREE_LABELS} BPM label prints`,
+      'Discogs bulk import',
+      'Smart sort into crates',
+      'Browse and search',
+    ],
+  },
+  {
+    image:    '/tier-selector.png',
+    name:     'Selector',
+    price:    `£${PRICE_SELECTOR_YEAR}`,
+    billing:  '/ year',
+    accentRGB: '201,255,0',
+    comingSoon: true,
+    founding: `or £${PRICE_FOUNDING} lifetime -- first ${FOUNDING_SEATS}`,
+    features: [
+      'Unlimited AI scans',
+      'BPM label printing',
+      'CSV export',
+      'Multi-device sync',
+      'All Digger features',
+    ],
+  },
+  {
+    image:    '/tier-resident.png',
+    name:     'Resident',
+    price:    `£${PRICE_RESIDENT_YEAR}`,
+    billing:  '/ year',
+    accentRGB: '172,144,226',
+    comingSoon: true,
+    features: [
+      'Harmonic and key sorting',
+      'Saved, reorderable set crates',
+      'Offline booth mode',
+      'Priority support and early access',
+      'All Selector features',
+    ],
+  },
 ];
 
-const SELECTOR_FEATURES = [
-  'Unlimited AI scans',
-  'BPM label printing',
-  'CSV export',
-  'Multi-device sync',
-  'All Digger features',
-];
+// ---- Glass panel style matching VinylCarousel active card -------------------
 
-const RESIDENT_FEATURES = [
-  'Harmonic and key sorting',
-  'Saved, reorderable set crates',
-  'Offline booth mode',
-  'Priority support and early access',
-  'All Selector features',
-];
+function glassCard(accentRGB, comingSoon) {
+  return {
+    borderRadius: 24,
+    padding: '28px 28px 24px',
+    background: comingSoon
+      ? 'linear-gradient(145deg, rgba(var(--fg),0.04) 0%, rgba(var(--fg),0.01) 100%)'
+      : `linear-gradient(145deg, rgba(${accentRGB},0.13) 0%, rgba(${accentRGB},0.05) 55%, rgba(var(--fg),0.02) 100%)`,
+    backdropFilter: 'blur(28px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+    border: `1px solid rgba(var(--fg),${comingSoon ? '0.07' : '0.13'})`,
+    boxShadow: comingSoon
+      ? '0 8px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(var(--fg),0.08)'
+      : `0 32px 72px -12px rgba(0,0,0,0.85), inset 0 1px 0 rgba(var(--fg),0.18), inset 0 -1px 0 rgba(0,0,0,0.15), 0 0 0 1px rgba(var(--fg),0.07)`,
+    opacity: comingSoon ? 0.6 : 1,
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    boxSizing: 'border-box',
+  };
+}
 
 // ---- Sub-components ----------------------------------------------------------
 
 function FeatureRow({ text }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <Check size={13} weight="bold" style={{ color: 'rgba(var(--fg),0.45)', marginTop: 2, flexShrink: 0 }} />
-      <span style={{ fontSize: 13, color: 'rgba(var(--fg),0.6)', lineHeight: 1.4 }}>{text}</span>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+      <Check size={13} weight="bold" style={{ color: 'rgba(var(--fg),0.4)', marginTop: 2, flexShrink: 0 }} />
+      <span style={{ fontSize: 13, color: 'rgba(var(--fg),0.6)', lineHeight: 1.45 }}>{text}</span>
     </div>
   );
 }
 
-function TierCard({ image, name, price, billing, features, cta, ctaAction, comingSoon, accentHex, foundingRibbon, dimmed }) {
+function TierCard({ tier, onGetStarted }) {
+  const { image, name, price, billing, accentRGB, comingSoon, founding, features } = tier;
+  const accentHex = accentRGB === '91,33,212' ? '#5B21D4'
+    : accentRGB === '201,255,0' ? '#C9FF00'
+    : '#AC90E2';
+  const ctaOnDark = accentHex === '#C9FF00' || accentHex === '#60EDD6';
+
   return (
-    <div className="relative flex flex-col rounded-3xl overflow-hidden"
-      style={{
-        background: 'rgba(var(--bg),0.6)',
-        border: `1px solid ${comingSoon ? 'rgba(var(--fg),0.07)' : 'rgba(var(--fg),0.13)'}`,
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        boxShadow: comingSoon
-          ? 'none'
-          : '0 24px 56px -12px rgba(0,0,0,0.7), inset 0 1px 0 rgba(var(--fg),0.1)',
-        opacity: dimmed ? 0.55 : 1,
-        flex: 1,
-        minWidth: 0,
-        transition: 'opacity 0.2s',
-      }}>
-
-      {/* Founding offer ribbon */}
-      {foundingRibbon && !comingSoon && (
-        <div className="absolute top-0 right-0 overflow-hidden" style={{ width: 120, height: 120, pointerEvents: 'none', zIndex: 10 }}>
-          <div style={{
-            position: 'absolute',
-            top: 22,
-            right: -30,
-            width: 130,
-            textAlign: 'center',
-            fontSize: 9,
-            fontFamily: 'monospace',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: '#000',
-            background: accentHex,
-            padding: '4px 0',
-            transform: 'rotate(45deg)',
-          }}>
-            Founding offer
-          </div>
-        </div>
-      )}
-
-      {/* Sticker image */}
-      <div className="flex items-center justify-center pt-7 pb-4 px-6">
+    <div style={glassCard(accentRGB, comingSoon)}>
+      {/* Roundel image -- 30% bigger than original 110px = 143px */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
         <img src={image} alt={name}
-          style={{ width: 110, height: 110, objectFit: 'contain', filter: comingSoon ? 'grayscale(0.4)' : 'none' }} />
+          style={{ width: 143, height: 143, objectFit: 'contain', filter: comingSoon ? 'grayscale(0.35) brightness(0.8)' : 'none' }} />
+      </div>
+
+      {/* Tier name */}
+      <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>
+        {name}
       </div>
 
       {/* Price */}
-      <div className="px-6 pb-3">
-        <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
-          {name}
-        </div>
-        <div className="flex items-baseline gap-1.5">
-          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', color: comingSoon ? 'rgba(var(--fg),0.4)' : 'rgba(var(--fg),0.9)' }}>
-            {price}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: founding ? 4 : 16 }}>
+        <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', color: comingSoon ? 'rgba(var(--fg),0.35)' : 'rgba(var(--fg),0.92)', lineHeight: 1 }}>
+          {price}
+        </span>
+        {billing && (
+          <span style={{ fontSize: 12, color: 'rgba(var(--fg),0.3)', fontFamily: 'monospace' }}>
+            {billing}
           </span>
-          {billing && (
-            <span style={{ fontSize: 12, color: 'rgba(var(--fg),0.3)', fontFamily: 'monospace' }}>
-              {billing}
-            </span>
-          )}
-        </div>
-        {foundingRibbon && (
-          <div style={{ fontSize: 11, marginTop: 4, color: accentHex, fontFamily: 'monospace', fontWeight: 600 }}>
-            or £{PRICE_FOUNDING} lifetime -- first {FOUNDING_SEATS}
-          </div>
         )}
       </div>
 
+      {/* Founding offer note */}
+      {founding && (
+        <div style={{ fontSize: 11, marginBottom: 16, color: `rgb(${accentRGB})`, fontFamily: 'monospace', fontWeight: 600, opacity: 0.7 }}>
+          {founding}
+        </div>
+      )}
+
       {/* Divider */}
-      <div style={{ height: 1, background: 'rgba(var(--fg),0.06)', margin: '0 24px 18px' }} />
+      <div style={{ height: 1, background: 'rgba(var(--fg),0.07)', marginBottom: 18 }} />
 
       {/* Features */}
-      <div className="px-6 flex flex-col gap-2.5 flex-1">
+      <div style={{ flex: 1 }}>
         {features.map(f => <FeatureRow key={f} text={f} />)}
       </div>
 
       {/* CTA */}
-      <div className="p-6 pt-5">
-        <button
-          onClick={ctaAction}
-          disabled={comingSoon}
-          style={{
-            width: '100%',
-            padding: '12px 0',
-            borderRadius: 14,
-            fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: '0.01em',
-            cursor: comingSoon ? 'default' : 'pointer',
-            border: comingSoon
-              ? '1px solid rgba(var(--fg),0.08)'
-              : `1px solid ${accentHex}60`,
-            background: comingSoon
-              ? 'rgba(var(--fg),0.04)'
-              : `linear-gradient(160deg, ${accentHex}dd 0%, ${accentHex}99 100%)`,
-            color: comingSoon
-              ? 'rgba(var(--fg),0.2)'
-              : accentHex === '#C9FF00' || accentHex === '#60EDD6' ? '#000' : '#fff',
-            boxShadow: comingSoon
-              ? 'none'
-              : `0 4px 20px ${accentHex}35, inset 0 1px 0 rgba(255,255,255,0.2)`,
-            transition: 'all 0.15s',
-          }}>
-          {cta}
+      <button
+        onClick={comingSoon ? undefined : onGetStarted}
+        disabled={comingSoon}
+        style={{
+          width: '100%',
+          marginTop: 20,
+          padding: '12px 0',
+          borderRadius: 14,
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: '0.01em',
+          cursor: comingSoon ? 'default' : 'pointer',
+          border: comingSoon
+            ? '1px solid rgba(var(--fg),0.08)'
+            : `1px solid rgba(${accentRGB},0.5)`,
+          background: comingSoon
+            ? 'rgba(var(--fg),0.04)'
+            : `linear-gradient(160deg, rgba(${accentRGB},0.9) 0%, rgba(${accentRGB},0.65) 100%)`,
+          color: comingSoon
+            ? 'rgba(var(--fg),0.18)'
+            : ctaOnDark ? '#000' : '#fff',
+          boxShadow: comingSoon
+            ? 'none'
+            : `0 4px 20px rgba(${accentRGB},0.3), inset 0 1px 0 rgba(255,255,255,0.2)`,
+          transition: 'all 0.15s',
+        }}>
+        {comingSoon ? 'Coming soon' : 'Get started'}
+      </button>
+    </div>
+  );
+}
+
+// ---- Swipe carousel ----------------------------------------------------------
+
+function TierCarousel({ onGetStarted }) {
+  const [idx, setIdx] = useState(0);
+  const startXRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const didDragRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const [dragDelta, setDragDelta] = useState(0);
+
+  const goTo = (i) => setIdx(Math.max(0, Math.min(TIERS.length - 1, i)));
+
+  const onTouchStart = (e) => {
+    startXRef.current = e.touches[0].clientX;
+    startTimeRef.current = performance.now();
+    didDragRef.current = false;
+    setDragging(true);
+    setDragDelta(0);
+  };
+  const onTouchMove = (e) => {
+    if (startXRef.current === null) return;
+    const d = e.touches[0].clientX - startXRef.current;
+    if (Math.abs(d) > 6) didDragRef.current = true;
+    if (didDragRef.current) setDragDelta(d);
+  };
+  const onTouchEnd = (e) => {
+    if (startXRef.current === null) return;
+    const d = e.changedTouches[0].clientX - startXRef.current;
+    const vel = d / Math.max(performance.now() - startTimeRef.current, 1);
+    startXRef.current = null;
+    setDragging(false);
+    setDragDelta(0);
+    if (!didDragRef.current) return;
+    if (d < -40 || vel < -0.22) goTo(idx + 1);
+    else if (d > 40 || vel > 0.22) goTo(idx - 1);
+  };
+
+  // Mouse drag for desktop
+  const mouseDownX = useRef(null);
+  const onMouseDown = (e) => { mouseDownX.current = e.clientX; didDragRef.current = false; setDragging(true); };
+  const onMouseMove = (e) => {
+    if (mouseDownX.current === null) return;
+    const d = e.clientX - mouseDownX.current;
+    if (Math.abs(d) > 6) didDragRef.current = true;
+    if (didDragRef.current) setDragDelta(d);
+  };
+  const onMouseUp = (e) => {
+    if (mouseDownX.current === null) return;
+    const d = e.clientX - mouseDownX.current;
+    mouseDownX.current = null;
+    setDragging(false);
+    setDragDelta(0);
+    if (!didDragRef.current) return;
+    if (d < -40) goTo(idx + 1);
+    else if (d > 40) goTo(idx - 1);
+  };
+
+  const clampedDelta = Math.sign(dragDelta) * Math.min(Math.abs(dragDelta), 60);
+
+  return (
+    <div style={{ width: '100%', userSelect: 'none' }}>
+      {/* Track */}
+      <div
+        style={{ overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab' }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
+      >
+        <div style={{
+          display: 'flex',
+          transform: `translateX(calc(${-idx * 100}% + ${clampedDelta}px))`,
+          transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(0.25,1.1,0.5,1)',
+          willChange: 'transform',
+        }}>
+          {TIERS.map((tier, i) => (
+            <div key={tier.name} style={{ minWidth: '100%', padding: '0 4px', boxSizing: 'border-box' }}>
+              <TierCard tier={tier} onGetStarted={onGetStarted} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dot indicators + arrows */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 24 }}>
+        <button onClick={() => goTo(idx - 1)} disabled={idx === 0}
+          style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: `rgba(var(--fg),${idx === 0 ? '0.15' : '0.45'})`, padding: 4, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}>
+          <CaretLeft size={16} weight="bold" />
+        </button>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          {TIERS.map((_, i) => (
+            <button key={i} onClick={() => goTo(i)}
+              style={{
+                width: i === idx ? 20 : 6, height: 6,
+                borderRadius: 3, border: 'none', cursor: 'pointer', padding: 0,
+                background: i === idx ? `rgba(var(--fg),0.6)` : 'rgba(var(--fg),0.15)',
+                transition: 'all 0.25s cubic-bezier(0.25,1.1,0.5,1)',
+              }} />
+          ))}
+        </div>
+
+        <button onClick={() => goTo(idx + 1)} disabled={idx === TIERS.length - 1}
+          style={{ background: 'none', border: 'none', cursor: idx === TIERS.length - 1 ? 'default' : 'pointer', color: `rgba(var(--fg),${idx === TIERS.length - 1 ? '0.15' : '0.45'})`, padding: 4, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}>
+          <CaretRight size={16} weight="bold" />
         </button>
       </div>
     </div>
@@ -160,90 +286,47 @@ function TierCard({ image, name, price, billing, features, cta, ctaAction, comin
 // ---- Main component ----------------------------------------------------------
 
 export default function PricingScreen({ onGetStarted, onSignIn }) {
-  const [email, setEmail] = useState('');
-  const [notifySubmitted, setNotifySubmitted] = useState(false);
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start px-4 py-10 overflow-y-auto"
-      style={{
-        background: 'radial-gradient(ellipse at 30% 0%, rgba(91,33,212,0.18) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(201,255,0,0.06) 0%, transparent 45%), var(--bg-hex)',
-      }}>
+    <div className="min-h-screen flex flex-col items-center justify-start px-5 py-10 overflow-y-auto"
+      style={{ background: 'var(--bg-hex)' }}>
 
-      {/* Ambient layers */}
+      {/* Subtle top vignette */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(var(--fg),0.04) 0%, transparent 40%)',
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(var(--fg),0.04) 0%, transparent 50%)',
       }} />
 
-      <div className="w-full max-w-4xl relative">
+      <div className="w-full relative" style={{ maxWidth: 440 }}>
 
-        {/* Logo */}
-        <div className="flex justify-center mb-8">
+        {/* Logo -- 25% bigger than original 72px = 90px, screen blend for transparent bg */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
           <img src="/logo.png" alt="Vinyl Vault"
-            style={{ height: 72, mixBlendMode: 'screen', opacity: 0.9, filter: 'drop-shadow(0 0 20px rgba(var(--fg),0.12))' }} />
+            style={{ height: 90, mixBlendMode: 'screen', opacity: 0.92, filter: 'drop-shadow(0 0 20px rgba(var(--fg),0.1))' }} />
         </div>
 
         {/* Headline */}
-        <div className="text-center mb-10">
-          <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, color: 'rgba(var(--fg),0.92)', marginBottom: 10 }}>
-            For collectors who play out.
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <h1 style={{ fontSize: 'clamp(26px, 6vw, 38px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05, color: 'rgba(var(--fg),0.92)', margin: '0 0 10px' }}>
+            For collectors<br />who play out.
           </h1>
-          <p style={{ fontSize: 15, color: 'rgba(var(--fg),0.4)', maxWidth: 420, margin: '0 auto', lineHeight: 1.55 }}>
-            Free for the community. Funded by paying members who keep Vinyl Vault free for everyone else.
+          <p style={{ fontSize: 14, color: 'rgba(var(--fg),0.38)', margin: 0, lineHeight: 1.55 }}>
+            Free for the community. Funded by paying members.
           </p>
         </div>
 
-        {/* Tier cards */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <TierCard
-            image="/tier-digger.png"
-            name="Digger"
-            price="Free"
-            billing={null}
-            features={DIGGER_FEATURES}
-            cta="Get started"
-            ctaAction={onGetStarted}
-            comingSoon={false}
-            accentHex="#5B21D4"
-            dimmed={false}
-          />
-          <TierCard
-            image="/tier-selector.png"
-            name="Selector"
-            price={`£${PRICE_SELECTOR_YEAR}`}
-            billing="/ year"
-            features={SELECTOR_FEATURES}
-            cta="Coming soon"
-            ctaAction={null}
-            comingSoon={true}
-            accentHex="#C9FF00"
-            foundingRibbon={true}
-            dimmed={true}
-          />
-          <TierCard
-            image="/tier-resident.png"
-            name="Resident"
-            price={`£${PRICE_RESIDENT_YEAR}`}
-            billing="/ year"
-            features={RESIDENT_FEATURES}
-            cta="Coming soon"
-            ctaAction={null}
-            comingSoon={true}
-            accentHex="#AC90E2"
-            dimmed={true}
-          />
-        </div>
+        {/* Swipeable tier carousel */}
+        <TierCarousel onGetStarted={onGetStarted} />
 
-        {/* Sign-in and fine print */}
-        <div className="text-center space-y-3">
-          <p style={{ fontSize: 13, color: 'rgba(var(--fg),0.25)' }}>
+        {/* Footer links */}
+        <div style={{ textAlign: 'center', marginTop: 28, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 13, color: 'rgba(var(--fg),0.25)', margin: 0 }}>
             Already have an account?{' '}
             <button onClick={onSignIn}
               style={{ color: 'rgba(var(--fg),0.5)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0 }}>
               Sign in
             </button>
           </p>
-          <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.18)', letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.18)', margin: 0, letterSpacing: '0.04em' }}>
             Selector and Resident launching soon. Fair use applies to AI scans.
           </p>
         </div>
