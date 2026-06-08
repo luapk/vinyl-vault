@@ -116,9 +116,6 @@ function TierCard({ tier, onGetStarted }) {
           objectFit: 'contain',
           filter: comingSoon ? 'grayscale(0.4) brightness(0.75)' : 'none',
           pointerEvents: 'none',
-          mixBlendMode: 'screen',
-          maskImage: 'radial-gradient(circle, black 50%, rgba(0,0,0,0.6) 68%, transparent 84%)',
-          WebkitMaskImage: 'radial-gradient(circle, black 50%, rgba(0,0,0,0.6) 68%, transparent 84%)',
         }} />
 
         {/* Tier name */}
