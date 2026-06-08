@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
 
 // "admin" is a convenience alias for the real admin account.
@@ -14,6 +14,9 @@ export function useAuth() {
   const [user, setUser]       = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Track in-flight fetchProfile calls so INITIAL_SESSION and getSession()
+  // don't both trigger a full round-trip concurrently.
+  const fetchingRef = useRef(null);
 
   const fetchProfile = useCallback(async (userId) => {
     if (!supabase || !userId) return null;
@@ -25,6 +28,17 @@ export function useAuth() {
     return data || null;
   }, []);
 
+  // Deduplicated fetch: if a fetch is already in flight for this userId, reuse it.
+  const fetchProfileOnce = useCallback((userId) => {
+    if (!userId) return Promise.resolve(null);
+    if (fetchingRef.current?.userId === userId) return fetchingRef.current.promise;
+    const promise = fetchProfile(userId).finally(() => {
+      if (fetchingRef.current?.userId === userId) fetchingRef.current = null;
+    });
+    fetchingRef.current = { userId, promise };
+    return promise;
+  }, [fetchProfile]);
+
   useEffect(() => {
     if (!isSupabaseEnabled) { setLoading(false); return; }
 
@@ -33,7 +47,7 @@ export function useAuth() {
       .then(async ({ data: { session } }) => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          const p = await fetchProfile(session.user.id);
+          const p = await fetchProfileOnce(session.user.id);
           setProfile(p);
         }
         setLoading(false);
@@ -43,7 +57,10 @@ export function useAuth() {
       async (event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          const p = await fetchProfile(session.user.id);
+          // For INITIAL_SESSION, reuse any in-flight getSession fetch.
+          // For subsequent events (TOKEN_REFRESHED, SIGNED_IN) always re-fetch.
+          const fetch = event === 'INITIAL_SESSION' ? fetchProfileOnce : fetchProfile;
+          const p = await fetch(session.user.id);
           setProfile(p);
         } else {
           setProfile(null);
@@ -51,7 +68,7 @@ export function useAuth() {
       }
     );
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchProfileOnce]);
 
   const signIn = useCallback(async (usernameOrEmail, password) => {
     if (!supabase) throw new Error('Supabase not configured');

@@ -1,5 +1,41 @@
 import { supabase } from './supabase';
 
+// ─── In-memory stale-while-revalidate cache ───────────────────────────────────
+// Keyed by string, value is { data, ts }. Returns stale data immediately while
+// refreshing in background, so components never wait on re-mount.
+const _cache = {};
+const TTL = 90_000; // 90 s
+
+function fromCache(key) {
+  const e = _cache[key];
+  return e ? e.data : null;
+}
+
+function toCache(key, data) {
+  _cache[key] = { data, ts: Date.now() };
+}
+
+function isFresh(key) {
+  const e = _cache[key];
+  return e && Date.now() - e.ts < TTL;
+}
+
+// Calls fn() and caches the result. If cached data exists (even stale), returns
+// it immediately and refreshes the cache in the background.
+async function cachedFetch(key, fn, onFresh) {
+  const stale = fromCache(key);
+  if (isFresh(key)) return stale; // still fresh, no need to refetch
+  if (stale) {
+    // Return stale immediately, refresh silently
+    fn().then(data => { toCache(key, data); onFresh?.(data); }).catch(() => {});
+    return stale;
+  }
+  // No cache at all -- fetch and wait
+  const data = await fn();
+  toCache(key, data);
+  return data;
+}
+
 // ─── Notification helpers ─────────────────────────────────────────────────────
 
 const NOTIF_LAST_SEEN_KEY = 'vv_notifs_last_seen';
@@ -159,34 +195,46 @@ export async function followUser(targetId, currentUserId) {
   if (!supabase) throw new Error('Not configured');
   const { error } = await supabase.from('follows').insert({ follower_id: currentUserId, following_id: targetId });
   if (error && error.code !== '23505') throw error; // ignore duplicate
+  bustFollowCache(currentUserId);
 }
 
 export async function unfollowUser(targetId, currentUserId) {
   if (!supabase) throw new Error('Not configured');
   const { error } = await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', targetId);
   if (error) throw error;
+  bustFollowCache(currentUserId);
 }
 
-export async function getFollowing(userId, limit = 50) {
-  if (!supabase || !userId) return [];
-  const { data, error } = await supabase
-    .from('follows')
-    .select(`profiles:following_id(${PROFILE_FIELDS})`)
-    .eq('follower_id', userId)
-    .limit(limit);
-  if (error) throw error;
-  return (data || []).map(row => row.profiles).filter(Boolean);
+export function getFollowing(userId, limit = 50, onFresh) {
+  if (!supabase || !userId) return Promise.resolve([]);
+  return cachedFetch(`following:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`profiles:following_id(${PROFILE_FIELDS})`)
+      .eq('follower_id', userId)
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).map(row => row.profiles).filter(Boolean);
+  }, onFresh);
 }
 
-export async function getFollowers(userId, limit = 50) {
-  if (!supabase || !userId) return [];
-  const { data, error } = await supabase
-    .from('follows')
-    .select(`profiles:follower_id(${PROFILE_FIELDS})`)
-    .eq('following_id', userId)
-    .limit(limit);
-  if (error) throw error;
-  return (data || []).map(row => row.profiles).filter(Boolean);
+export function getFollowers(userId, limit = 50, onFresh) {
+  if (!supabase || !userId) return Promise.resolve([]);
+  return cachedFetch(`followers:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('follows')
+      .select(`profiles:follower_id(${PROFILE_FIELDS})`)
+      .eq('following_id', userId)
+      .limit(limit);
+    if (error) throw error;
+    return (data || []).map(row => row.profiles).filter(Boolean);
+  }, onFresh);
+}
+
+// Bust following/followers caches after a follow/unfollow action.
+export function bustFollowCache(userId) {
+  delete _cache[`following:${userId}`];
+  delete _cache[`followers:${userId}`];
 }
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
@@ -312,8 +360,7 @@ export async function deleteComment(commentId) {
 
 // ─── Direct messages ──────────────────────────────────────────────────────────
 
-export async function getConversations(userId) {
-  if (!supabase || !userId) return [];
+async function _fetchConversations(userId) {
   const { data, error } = await supabase
     .from('messages')
     .select('id, from_user_id, to_user_id, body, created_at, read_at')
@@ -346,6 +393,15 @@ export async function getConversations(userId) {
   }
 
   return [...map.values()];
+}
+
+export function getConversations(userId, onFresh) {
+  if (!supabase || !userId) return Promise.resolve([]);
+  return cachedFetch(`convs:${userId}`, () => _fetchConversations(userId), onFresh);
+}
+
+export function bustConversationsCache(userId) {
+  delete _cache[`convs:${userId}`];
 }
 
 export async function getMessages(userId, otherUserId, limit = 80) {

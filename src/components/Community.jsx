@@ -8,7 +8,7 @@ import {
   getFollowState, followUser, unfollowUser, getFollowing, getFollowers, getFeed, searchUsers,
   REACTION_EMOJI, getReactionsForRecords, getReactions, toggleReaction,
   getComments, addComment, deleteComment, sendMessage,
-  getNotifications, getLastSeenTs,
+  getNotifications, getLastSeenTs, bustFollowCache,
 } from "../lib/social.js";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -563,7 +563,9 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
   useEffect(() => {
     if (!currentUser?.id) return;
-    getFollowing(currentUser.id).then(setFollowing).catch(() => {});
+    // getFollowing uses stale-while-revalidate: returns cached data immediately,
+    // then calls setFollowing again with fresh data via onFresh.
+    getFollowing(currentUser.id, 50, setFollowing).then(setFollowing).catch(() => {});
     getNotifications(currentUser.id, notifSinceRef.current).then(setNotifications).catch(() => {});
   }, [currentUser?.id]);
 
@@ -584,7 +586,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
     <div className="pt-6 md:pt-10 max-w-2xl mx-auto" style={{ animation: 'fadeUp 0.4s ease-out' }}>
       <div className="text-[11px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">Community</div>
       <h1 className="text-[31px] md:text-[41px] leading-[0.95] mb-8 font-display tracking-tight">
-        Connect with likeminded collectors.
+        Connect with <span className="italic" style={{ color: 'rgba(var(--fg),0.45)' }}>likeminded collectors.</span>
       </h1>
 
       {/* Your profile card */}

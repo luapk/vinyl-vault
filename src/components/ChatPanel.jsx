@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
-import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction } from '../lib/social';
+import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction, bustConversationsCache } from '../lib/social';
 
 const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
@@ -56,14 +56,18 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     setLoadingFollowing(false);
   }, [currentUser.id, followingList.length]);
 
+  const applyConversations = useCallback((convs) => {
+    setConversations(convs);
+    const total = convs.reduce((s, c) => s + c.unread, 0);
+    onUnreadChange?.(total);
+  }, [onUnreadChange]);
+
   const loadConversations = useCallback(async () => {
     try {
-      const convs = await getConversations(currentUser.id);
-      setConversations(convs);
-      const total = convs.reduce((s, c) => s + c.unread, 0);
-      onUnreadChange?.(total);
+      const convs = await getConversations(currentUser.id, applyConversations);
+      applyConversations(convs);
     } catch { /* silent */ }
-  }, [currentUser.id, onUnreadChange]);
+  }, [currentUser.id, applyConversations]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -140,6 +144,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
     try {
       const msg = await sendMessage(currentUser.id, recipient.id, body);
+      bustConversationsCache(currentUser.id);
       setMessages(prev => [...prev, msg]);
       setConversations(prev => {
         const exists = prev.find(c => c.userId === recipient.id);
