@@ -150,7 +150,29 @@ export function useCollection(userId = null) {
     if (!useDb) { dbHasData.current = false; return; }
     dbLoad(userId).then(async records => {
       records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
-      const dbRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+      const rawRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+
+      // Deduplicate by artist+title, keeping the newest copy and deleting orphan rows.
+      // Ghost rows are created when a record is re-scanned (addRecord previously inserted
+      // a new DB row on every scan, even for records already in the collection).
+      const seen = new Map();
+      for (const r of rawRecords) {
+        const key = `${r.artist}|||${r.title}`;
+        const prev = seen.get(key);
+        if (prev) {
+          const dropOld = (r.savedAt || 0) >= (prev.savedAt || 0);
+          const orphan = dropOld ? prev : r;
+          const orphanDbId = dbIds.current[orphan.id];
+          if (orphanDbId) {
+            dbDelete(orphanDbId).catch(() => {});
+            delete dbIds.current[orphan.id];
+          }
+          if (dropOld) seen.set(key, r);
+        } else {
+          seen.set(key, r);
+        }
+      }
+      const dbRecords = [...seen.values()];
       const confirmed = new Set(dbRecords.map(r => r.id));
 
       // Push localStorage records that are not yet in Supabase into the DB.
@@ -186,23 +208,40 @@ export function useCollection(userId = null) {
 
   const addRecord = useCallback((release, crates = []) => {
     const record = recordFromRelease(release, crates);
+    // Check for a duplicate before dispatching so we can decide insert vs update.
+    const existing = collectionRef.current.find(
+      r => r.artist === record.artist && r.title === record.title
+    );
     dispatch({ type: 'ADD', record });
-    if (useDb) {
-      return dbInsert(userId, record).then(dbId => {
-        dbIds.current[record.id] = dbId;
-        setSyncedIds(s => s ? new Set([...s, record.id]) : new Set([record.id]));
-      });
+    if (!useDb) return Promise.resolve();
+    if (existing && dbIds.current[existing.id]) {
+      // Duplicate: update the existing DB row instead of creating a ghost second row.
+      return dbUpdate(dbIds.current[existing.id], { ...record, id: existing.id }).catch(console.error);
     }
-    return Promise.resolve();
+    return dbInsert(userId, record).then(dbId => {
+      dbIds.current[record.id] = dbId;
+      setSyncedIds(s => s ? new Set([...s, record.id]) : new Set([record.id]));
+    });
   }, [useDb, userId]);
 
   const removeRecord = useCallback((id) => {
     dispatch({ type: 'REMOVE', id });
-    if (useDb && dbIds.current[id]) {
+    if (!useDb) return;
+    if (dbIds.current[id]) {
       dbDelete(dbIds.current[id]).catch(console.error);
       delete dbIds.current[id];
+    } else {
+      // Fallback: dbIds mapping is missing (race or ghost row). Delete by the
+      // local id stored inside the data jsonb column so nothing is left behind.
+      supabase
+        .from('records')
+        .delete()
+        .eq('user_id', userId)
+        .filter('data->>id', 'eq', id)
+        .then(({ error }) => { if (error) console.error(error); })
+        .catch(console.error);
     }
-  }, [useDb]);
+  }, [useDb, userId]);
 
   const updateRecord = useCallback((id, patch) => {
     dispatch({ type: 'UPDATE', id, patch });
