@@ -22,7 +22,7 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, role, avatar_url, display_name, username, bio, is_public')
+      .select('id, email, role, avatar_url, display_name, username, bio, is_public, preferences')
       .eq('id', userId)
       .single();
     return data || null;
@@ -169,7 +169,16 @@ export function useAuth() {
     if (error) throw error;
   }, [user]);
 
+  // Merges `updates` into the preferences jsonb column and keeps local state in sync.
+  // Fire-and-forget safe -- callers can ignore the returned promise.
+  const updatePreferences = useCallback(async (updates) => {
+    if (!supabase || !user?.id) return;
+    const next = { ...(profile?.preferences || {}), ...updates };
+    setProfile(p => p ? { ...p, preferences: next } : p);
+    await supabase.from('profiles').update({ preferences: next }).eq('id', user.id);
+  }, [user, profile]);
+
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar };
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences };
 }

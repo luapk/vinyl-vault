@@ -319,7 +319,7 @@ function getGreeting(name) {
 
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences } = useAuth();
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -759,7 +759,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
@@ -1380,7 +1380,7 @@ function RotatingCube({ color, size = 9 }) {
 
 // ----- CollectionView --------------------------------------------------------
 
-function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied }) {
+function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
@@ -1390,12 +1390,34 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [detailRecordId, setDetailRecordId] = useState(null);
   const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
+  const cloudSyncedRef = useRef(false);
+  const colorSaveTimerRef = useRef(null);
+
+  // One-time sync: when the profile first loads, merge cloud colours in (cloud wins).
+  useEffect(() => {
+    if (cloudSyncedRef.current) return;
+    const cloudColors = profile?.preferences?.crate_colors;
+    if (!cloudColors || Object.keys(cloudColors).length === 0) return;
+    cloudSyncedRef.current = true;
+    setCrateColorsState(prev => {
+      const merged = { ...prev, ...cloudColors };
+      localStorage.setItem('vinylvault_crate_colors', JSON.stringify(merged));
+      return merged;
+    });
+  }, [profile]);
 
   const setCrateColor = (name, hex) => {
     setCrateColorsState(prev => {
       const next = { ...prev };
       if (hex) next[name] = hex; else delete next[name];
       localStorage.setItem('vinylvault_crate_colors', JSON.stringify(next));
+      // Debounce cloud save by 1 s so rapid palette changes don't spam Supabase.
+      if (onUpdatePreferences) {
+        clearTimeout(colorSaveTimerRef.current);
+        colorSaveTimerRef.current = setTimeout(() => {
+          onUpdatePreferences({ crate_colors: next });
+        }, 1000);
+      }
       return next;
     });
   };
