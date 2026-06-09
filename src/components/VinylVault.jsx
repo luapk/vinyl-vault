@@ -1027,7 +1027,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
                 {/* Square art -- matches RecordCard exactly */}
                 <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: '0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)' }}>
                   {rec.thumb
-                    ? <img src={rec.thumb} alt={rec.title} className="w-full h-full object-cover" />
+                    ? <img src={rec.thumb} alt={rec.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
                         <VinylRecord size={24} weight="thin" className="opacity-20" />
                       </div>
@@ -1387,6 +1387,10 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [filterCrate, setFilterCrate] = useState(null);
   const [crateMenuOpen, setCrateMenuOpen] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
+  // Grid renders in pages of GRID_PAGE; an IntersectionObserver sentinel grows
+  // the limit as you scroll so large collections don't mount thousands of nodes.
+  const [gridLimit, setGridLimit] = useState(GRID_PAGE);
+  const gridSentinelRef = useRef(null);
   const [detailRecordId, setDetailRecordId] = useState(null);
   const detailRecord = detailRecordId ? collection.find(r => r.id === detailRecordId) || null : null;
   const [crateColors, setCrateColorsState] = useState(loadCrateColors);
@@ -1445,7 +1449,17 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
     return matchSearch && matchCrate;
   });
 
-  useEffect(() => { setCarouselIdx(0); }, [search, filterCrate]);
+  useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate]);
+
+  useEffect(() => {
+    const el = gridSentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) setGridLimit((l) => l + GRID_PAGE);
+    }, { rootMargin: '600px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [viewMode, gridLimit, filtered.length]);
 
   const goNext = useCallback(() => setCarouselIdx((i) => Math.min(i + 1, filtered.length - 1)), [filtered.length]);
   const goPrev = useCallback(() => setCarouselIdx((i) => Math.max(i - 1, 0)), []);
@@ -1597,21 +1611,24 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
           )}
           {viewMode === "grid" && filtered.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {filtered.map((record) => (
-                <RecordCard
-                  key={record.id}
-                  record={record}
-                  onSelect={labelSelectMode ? null : () => setDetailRecordId(record.id)}
-                  onRemove={labelSelectMode ? null : () => onRemove(record.id)}
-                  accentRGB={accentRGB}
-                  selectMode={labelSelectMode}
-                  selected={selectedForLabels.has(record.id)}
-                  onToggleSelect={() => onToggleLabelSelect(record.id)}
-                  localOnly={syncedIds !== null && !syncedIds.has(record.id)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {filtered.slice(0, gridLimit).map((record) => (
+                  <RecordCard
+                    key={record.id}
+                    record={record}
+                    onSelect={labelSelectMode ? null : () => setDetailRecordId(record.id)}
+                    onRemove={labelSelectMode ? null : () => onRemove(record.id)}
+                    accentRGB={accentRGB}
+                    selectMode={labelSelectMode}
+                    selected={selectedForLabels.has(record.id)}
+                    onToggleSelect={() => onToggleLabelSelect(record.id)}
+                    localOnly={syncedIds !== null && !syncedIds.has(record.id)}
+                  />
+                ))}
+              </div>
+              {filtered.length > gridLimit && <div ref={gridSentinelRef} style={{ height: 1 }} />}
+            </>
           )}
         </>
       )}
@@ -1908,13 +1925,15 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 
 // ----- RecordCard (grid) -----------------------------------------------------
 
+const GRID_PAGE = 60;
+
 function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect, localOnly = false }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   return (
-    <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect}>
+    <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }}>
       <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
         {record.coverUrl ? (
-          <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
+          <img src={record.coverUrl} alt={record.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
             <VinylRecord size={28} weight="thin" className="opacity-20" />
@@ -2359,7 +2378,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {reidentifyResults.map(c => (
                   <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={reidentifyPicking} className="text-left p-2.5 rounded-xl text-[13px] transition-all hover:bg-white/5 disabled:opacity-40" style={{ border: '1px solid rgba(var(--fg),0.07)' }}>
-                    {c.coverUrl && <img src={c.coverUrl} alt="" className="w-full aspect-square object-cover rounded-lg mb-1.5 opacity-80" />}
+                    {c.coverUrl && <img src={c.coverUrl} alt="" loading="lazy" decoding="async" className="w-full aspect-square object-cover rounded-lg mb-1.5 opacity-80" />}
                     <div className="font-mono text-white/60 truncate">{c.artist}</div>
                     <div className="text-white/40 truncate">{c.recordTitle}</div>
                     <div className="text-white/25 font-mono text-[11px] mt-0.5">{[c.catalogNumber, c.year].filter(Boolean).join(' · ')}</div>
@@ -3268,7 +3287,7 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
           <div key={idx} className="rounded-2xl overflow-hidden" style={glassSubtle()}>
             <div className="flex items-center gap-4 p-4">
               <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0" style={{ border: "1px solid rgba(var(--fg),0.06)" }}>
-                {item.imageUrl ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[0.03]" />}
+                {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[0.03]" />}
               </div>
               <div className="flex-1 min-w-0">
                 {item.release ? (
@@ -3550,7 +3569,7 @@ function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick })
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.08), transparent)` }} />
             <div className="relative aspect-square overflow-hidden">
               {candidate.coverUrl ? (
-                <img src={candidate.coverUrl} alt={candidate.recordTitle || candidate.artist} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={candidate.coverUrl} alt={candidate.recordTitle || candidate.artist} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.05)` }}><VinylRecord size={40} weight="thin" className="opacity-15" /></div>
               )}

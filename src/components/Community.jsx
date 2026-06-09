@@ -55,7 +55,7 @@ function PublicRecordCard({ record, accentRGB, reactionCount, onSelect }) {
     <div className="relative group cursor-pointer" onClick={onSelect}>
       <div className="aspect-square rounded-xl overflow-hidden mb-2 relative" style={{ boxShadow: "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
         {record.coverUrl
-          ? <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
+          ? <img src={record.coverUrl} alt={record.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
           : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
               <VinylRecord size={28} weight="thin" className="opacity-20" />
             </div>}
@@ -767,7 +767,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                       style={{ background: 'rgba(var(--fg),0.03)' }}>
                       <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ boxShadow: '0 3px 8px -3px rgba(0,0,0,0.5)' }}>
                         {record.coverUrl
-                          ? <img src={record.coverUrl} alt="" className="w-full h-full object-cover" />
+                          ? <img src={record.coverUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.08)` }}><VinylRecord size={14} weight="thin" className="opacity-20" /></div>}
                       </div>
                       <div className="flex-1 min-w-0">

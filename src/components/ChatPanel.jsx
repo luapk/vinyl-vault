@@ -352,7 +352,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px 8px', borderBottom: `1px solid ${isMe ? `rgba(${accentRGB},0.15)` : 'rgba(var(--fg),0.08)'}` }}>
                             <div style={{ width: 34, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(var(--fg),0.08)' }}>
                               {ref.coverUrl
-                                ? <img src={ref.coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ? <img src={ref.coverUrl} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><VinylRecord size={15} weight="thin" style={{ opacity: 0.3 }} /></div>
                               }
                             </div>
