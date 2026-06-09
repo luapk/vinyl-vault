@@ -339,14 +339,14 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       padding: msg.record_ref ? 0 : '9px 13px',
                       borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
                       background: isMe
-                        ? `linear-gradient(160deg, rgba(${accentRGB},0.92) 0%, rgba(${accentRGB},0.72) 55%, rgba(${accentRGB},0.60) 100%)`
-                        : 'linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.055) 100%)',
-                      border: isMe ? `1px solid rgba(${accentRGB},0.9)` : '1px solid rgba(255,255,255,0.10)',
-                      backdropFilter: isMe ? 'none' : 'blur(28px) saturate(160%)',
-                      WebkitBackdropFilter: isMe ? 'none' : 'blur(28px) saturate(160%)',
+                        ? `linear-gradient(160deg, rgba(${accentRGB},0.30) 0%, rgba(${accentRGB},0.20) 55%, rgba(${accentRGB},0.15) 100%)`
+                        : 'linear-gradient(160deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.04) 100%)',
+                      border: isMe ? `1px solid rgba(${accentRGB},0.35)` : '1px solid rgba(255,255,255,0.08)',
+                      backdropFilter: 'blur(28px) saturate(150%)',
+                      WebkitBackdropFilter: 'blur(28px) saturate(150%)',
                       boxShadow: isMe
-                        ? `0 8px 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35), 0 0 22px rgba(${accentRGB},0.40), inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -3px 7px rgba(0,0,0,0.22)`
-                        : `0 6px 22px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 1px rgba(255,255,255,0.04)`,
+                        ? `0 6px 22px rgba(0,0,0,0.35), 0 0 18px rgba(${accentRGB},0.18), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 5px rgba(0,0,0,0.18)`
+                        : `0 6px 22px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 1px rgba(255,255,255,0.03)`,
                       fontSize: 15, lineHeight: 1.45,
                       color: 'rgba(255,255,255,0.92)',
                       wordBreak: 'break-word',
