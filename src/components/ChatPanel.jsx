@@ -288,7 +288,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
           </div>
 
           {/* Message thread */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px', background: 'linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.28) 100%)' }}>
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(var(--fg),0.28)', fontSize: 14, fontFamily: 'monospace' }}>
                 Start the conversation
@@ -338,19 +338,17 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       maxWidth: '78%',
                       padding: msg.record_ref ? 0 : '9px 13px',
                       borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
-                      background: isMe
-                        ? `linear-gradient(145deg, rgba(${accentRGB},0.26) 0%, rgba(${accentRGB},0.14) 100%)`
-                        : 'linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.06) 100%)',
+                      background: 'linear-gradient(155deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.025) 100%)',
                       border: isMe
-                        ? `1px solid rgba(${accentRGB},0.32)`
-                        : '1px solid rgba(var(--fg),0.12)',
+                        ? `1px solid rgba(${accentRGB},0.52)`
+                        : '1px solid rgba(255,255,255,0.085)',
                       boxShadow: isMe
-                        ? `0 4px 18px rgba(${accentRGB},0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.10)`
-                        : `0 3px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(var(--fg),0.06)`,
-                      backdropFilter: 'blur(12px)',
-                      WebkitBackdropFilter: 'blur(12px)',
+                        ? `0 4px 20px rgba(0,0,0,0.5), 0 0 14px rgba(${accentRGB},0.22), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.18)`
+                        : `0 4px 18px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -1px 0 rgba(0,0,0,0.18)`,
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
                       fontSize: 15, lineHeight: 1.45,
-                      color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.88)',
+                      color: 'rgba(var(--fg),0.92)',
                       wordBreak: 'break-word',
                       overflow: 'hidden',
                     }}>
