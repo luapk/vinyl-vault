@@ -803,6 +803,7 @@ export default function VinylVault() {
         <ChatPanel
           currentUser={user}
           accentRGB={accentRGB}
+          isDark={isDark}
           initialRecipient={chatRecipient}
           onClose={() => { setChatOpen(false); setChatRecipient(null); }}
           onUnreadChange={setMsgUnread}

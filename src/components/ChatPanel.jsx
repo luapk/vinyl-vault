@@ -29,7 +29,7 @@ function msgTime(ts) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-export default function ChatPanel({ currentUser, onClose, initialRecipient, accentRGB, onUnreadChange }) {
+export default function ChatPanel({ currentUser, onClose, initialRecipient, accentRGB, isDark, onUnreadChange }) {
   const [view, setView] = useState(initialRecipient ? 'thread' : 'list');
   const [conversations, setConversations] = useState([]);
   const [recipient, setRecipient] = useState(initialRecipient || null);
@@ -288,7 +288,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
           </div>
 
           {/* Message thread */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px', background: 'linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.28) 100%)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px', background: isDark ? 'linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.28) 100%)' : '#ffffff' }}>
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '36px 0', color: 'rgba(var(--fg),0.28)', fontSize: 14, fontFamily: 'monospace' }}>
                 Start the conversation
