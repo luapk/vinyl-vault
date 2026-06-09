@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine } from '@phosphor-icons/react';
+import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley, VinylRecord } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
-import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing } from '../lib/social';
+import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction, bustConversationsCache, checkRecordsExist } from '../lib/social';
+
+const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
 function ChatAvatar({ profile, size = 32 }) {
   const letter = (profile?.display_name || profile?.username || '?')[0].toUpperCase();
@@ -36,6 +38,9 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
   const [sending, setSending] = useState(false);
   const [followingList, setFollowingList] = useState([]);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [reactions, setReactions] = useState({});
+  const [pickerMsg, setPickerMsg] = useState(null);
+  const [deletedRefs, setDeletedRefs] = useState(new Set());
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const recipientRef = useRef(recipient);
@@ -52,14 +57,18 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     setLoadingFollowing(false);
   }, [currentUser.id, followingList.length]);
 
+  const applyConversations = useCallback((convs) => {
+    setConversations(convs);
+    const total = convs.reduce((s, c) => s + c.unread, 0);
+    onUnreadChange?.(total);
+  }, [onUnreadChange]);
+
   const loadConversations = useCallback(async () => {
     try {
-      const convs = await getConversations(currentUser.id);
-      setConversations(convs);
-      const total = convs.reduce((s, c) => s + c.unread, 0);
-      onUnreadChange?.(total);
+      const convs = await getConversations(currentUser.id, applyConversations);
+      applyConversations(convs);
     } catch { /* silent */ }
-  }, [currentUser.id, onUnreadChange]);
+  }, [currentUser.id, applyConversations]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -67,15 +76,37 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     setRecipient(profile);
     setView('thread');
     setMessages([]);
+    setReactions({});
+    setPickerMsg(null);
     try {
       const msgs = await getMessages(currentUser.id, profile.id);
       setMessages(msgs);
+      if (msgs.length > 0) {
+        getReactionsForMessages(msgs.map(m => m.id)).then(setReactions).catch(() => {});
+      }
       await markMessagesRead(currentUser.id, profile.id);
       setConversations(prev => prev.map(c => c.userId === profile.id ? { ...c, unread: 0 } : c));
       onUnreadChange?.(0);
     } catch { /* silent */ }
     setTimeout(() => inputRef.current?.focus(), 150);
   }, [currentUser.id, onUnreadChange]);
+
+  const handleReact = useCallback(async (msgId, emoji) => {
+    setPickerMsg(null);
+    const prev = reactions[msgId] || [];
+    const hasIt = prev.some(r => r.user_id === currentUser.id && r.emoji === emoji);
+    setReactions(r => ({
+      ...r,
+      [msgId]: hasIt
+        ? (r[msgId] || []).filter(x => !(x.user_id === currentUser.id && x.emoji === emoji))
+        : [...(r[msgId] || []), { emoji, user_id: currentUser.id }],
+    }));
+    try {
+      await toggleMessageReaction(msgId, emoji, currentUser.id);
+    } catch {
+      getReactionsForMessages([msgId]).then(fresh => setReactions(r => ({ ...r, ...fresh }))).catch(() => {});
+    }
+  }, [currentUser.id, reactions]);
 
   // Open initial recipient once on mount
   useEffect(() => {
@@ -104,15 +135,40 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Check if referenced records still exist in their owner's collection
+  useEffect(() => {
+    const refs = messages.filter(m => m.record_ref?.owner_user_id && m.record_ref?.record_local_id).map(m => m.record_ref);
+    if (!refs.length) return;
+    const byOwner = {};
+    for (const ref of refs) {
+      const s = (byOwner[ref.owner_user_id] = byOwner[ref.owner_user_id] || new Set());
+      s.add(ref.record_local_id);
+    }
+    Promise.all(
+      Object.entries(byOwner).map(([ownerId, ids]) =>
+        checkRecordsExist(ownerId, [...ids]).then(existing => ({ ownerId, existing }))
+      )
+    ).then(results => {
+      const gone = new Set();
+      for (const { ownerId, existing } of results) {
+        for (const id of byOwner[ownerId]) {
+          if (!existing.has(id)) gone.add(`${ownerId}:${id}`);
+        }
+      }
+      setDeletedRefs(gone);
+    }).catch(() => {});
+  }, [messages]);
+
   const handleSend = async () => {
     if (!input.trim() || !recipient || sending) return;
     const body = input.trim();
     setInput('');
     setSending(true);
-    // Reset textarea height
+    setPickerMsg(null);
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
     try {
       const msg = await sendMessage(currentUser.id, recipient.id, body);
+      bustConversationsCache(currentUser.id);
       setMessages(prev => [...prev, msg]);
       setConversations(prev => {
         const exists = prev.find(c => c.userId === recipient.id);
@@ -242,24 +298,92 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
               const isMe = msg.from_user_id === currentUser.id;
               const prevMsg = messages[i - 1];
               const showTime = !prevMsg || (new Date(msg.created_at) - new Date(prevMsg.created_at)) > 300000;
+              const msgRxs = reactions[msg.id] || [];
+              const rxGroups = {};
+              for (const r of msgRxs) {
+                if (!rxGroups[r.emoji]) rxGroups[r.emoji] = { count: 0, mine: false };
+                rxGroups[r.emoji].count++;
+                if (r.user_id === currentUser.id) rxGroups[r.emoji].mine = true;
+              }
+              const hasRx = Object.keys(rxGroups).length > 0;
+              const pickerOpen = pickerMsg === msg.id;
+              const reactBtn = (
+                <button
+                  onClick={() => setPickerMsg(p => p === msg.id ? null : msg.id)}
+                  className={`transition-opacity ${pickerOpen ? 'opacity-80' : 'opacity-20 hover:opacity-70'}`}
+                  style={{ width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'rgba(var(--fg),0.7)' }}>
+                  <Smiley size={14} />
+                </button>
+              );
               return (
                 <div key={msg.id}>
                   {showTime && (
                     <div style={{ textAlign: 'center', fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', margin: '6px 0 10px' }}>{msgTime(msg.created_at)}</div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
+                  {pickerOpen && (
+                    <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 4 }}>
+                      {REACT_EMOJIS.map(emoji => (
+                        <button key={emoji} onClick={() => handleReact(msg.id, emoji)}
+                          style={{ fontSize: 18, padding: '4px 6px', borderRadius: 10, border: '1px solid rgba(var(--fg),0.1)', background: 'rgba(var(--fg),0.05)', cursor: 'pointer', lineHeight: 1, transition: 'transform 0.1s' }}
+                          onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
+                          onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'center', gap: 4, marginBottom: hasRx ? 2 : 4 }}>
+                    {!isMe && reactBtn}
                     <div style={{
-                      maxWidth: '78%', padding: '8px 12px',
+                      maxWidth: '78%',
+                      padding: msg.record_ref ? 0 : '8px 12px',
                       borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       background: isMe ? `rgba(${accentRGB},0.16)` : 'rgba(var(--fg),0.07)',
                       border: `1px solid ${isMe ? `rgba(${accentRGB},0.24)` : 'rgba(var(--fg),0.10)'}`,
                       fontSize: 15, lineHeight: 1.45,
                       color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.82)',
                       wordBreak: 'break-word',
+                      overflow: 'hidden',
                     }}>
-                      {msg.body}
+                      {msg.record_ref && (() => {
+                        const ref = msg.record_ref;
+                        const isGone = deletedRefs.has(`${ref.owner_user_id}:${ref.record_local_id}`);
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px 8px', borderBottom: `1px solid ${isMe ? `rgba(${accentRGB},0.15)` : 'rgba(var(--fg),0.08)'}` }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(var(--fg),0.08)' }}>
+                              {!isGone && ref.coverUrl
+                                ? <img src={ref.coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><VinylRecord size={15} weight="thin" style={{ opacity: 0.3 }} /></div>
+                              }
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', marginBottom: 1, opacity: 0.45 }}>
+                                {isGone ? 'no longer available' : 'in response to'}
+                              </div>
+                              {!isGone && (
+                                <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.78 }}>
+                                  {ref.artist}{ref.title ? ` — ${ref.title}` : ''}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      <div style={{ padding: msg.record_ref ? '7px 12px' : 0 }}>{msg.body}</div>
                     </div>
+                    {isMe && reactBtn}
                   </div>
+                  {hasRx && (
+                    <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 6 }}>
+                      {Object.entries(rxGroups).map(([emoji, { count, mine }]) => (
+                        <button key={emoji} onClick={() => handleReact(msg.id, emoji)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 10, border: mine ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.10)', background: mine ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.05)', cursor: 'pointer' }}>
+                          <span style={{ fontSize: 13 }}>{emoji}</span>
+                          <span style={{ fontSize: 11, fontFamily: 'monospace', color: mine ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.50)' }}>{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
