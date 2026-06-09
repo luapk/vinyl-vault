@@ -1,5 +1,6 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
+import { cacheCover, isCachedCover } from '../lib/coverCache';
 
 const STORAGE_KEY = 'vinylvault_collection';
 
@@ -144,6 +145,22 @@ export function useCollection(userId = null) {
   const collectionRef = useRef(collection);
   collectionRef.current = collection;
 
+  // Copy a record's cover into Supabase storage and swap coverUrl to the
+  // durable URL (keeping the original in sourceCoverUrl). Fire-and-forget;
+  // on any failure the record keeps its original hotlinked URL.
+  const cacheCoverFor = useCallback(async (record) => {
+    if (!useDb || !record?.coverUrl || isCachedCover(record.coverUrl)) return;
+    const url = await cacheCover(userId, record.id, record.coverUrl);
+    if (!url) return;
+    const patch = { coverUrl: url, sourceCoverUrl: record.coverUrl };
+    dispatch({ type: 'UPDATE', id: record.id, patch });
+    const dbId = dbIds.current[record.id];
+    if (dbId) {
+      const current = collectionRef.current.find(r => r.id === record.id) || record;
+      dbUpdate(dbId, { ...current, ...patch }).catch(() => {});
+    }
+  }, [useDb, userId]);
+
   // Load from Supabase when userId arrives or changes.
   // Also migrates any localStorage-only records into Supabase so all devices stay in sync.
   useEffect(() => {
@@ -197,8 +214,15 @@ export function useCollection(userId = null) {
       dbHasData.current = dbRecords.length > 0;
       setSyncedIds(confirmed);
       dispatch({ type: 'SET', records: dbRecords });
+
+      // Backfill: migrate a few hotlinked covers into storage per login so
+      // existing collections converge without a burst of uploads.
+      const uncached = dbRecords
+        .filter(r => r.coverUrl && !isCachedCover(r.coverUrl))
+        .slice(0, 10);
+      for (const r of uncached) await cacheCoverFor(r);
     }).catch(console.error);
-  }, [useDb, userId]);
+  }, [useDb, userId, cacheCoverFor]);
 
   // Always persist to localStorage so logout never destroys local data.
   useEffect(() => {
@@ -216,13 +240,16 @@ export function useCollection(userId = null) {
     if (!useDb) return Promise.resolve();
     if (existing && dbIds.current[existing.id]) {
       // Duplicate: update the existing DB row instead of creating a ghost second row.
-      return dbUpdate(dbIds.current[existing.id], { ...record, id: existing.id }).catch(console.error);
+      return dbUpdate(dbIds.current[existing.id], { ...record, id: existing.id })
+        .then(() => { cacheCoverFor({ ...record, id: existing.id }); })
+        .catch(console.error);
     }
     return dbInsert(userId, record).then(dbId => {
       dbIds.current[record.id] = dbId;
       setSyncedIds(s => s ? new Set([...s, record.id]) : new Set([record.id]));
+      cacheCoverFor(record);
     });
-  }, [useDb, userId]);
+  }, [useDb, userId, cacheCoverFor]);
 
   const removeRecord = useCallback((id) => {
     dispatch({ type: 'REMOVE', id });
@@ -311,6 +338,11 @@ export function useCollection(userId = null) {
               newRecords.forEach(r => next.add(r.id));
               return next;
             });
+            // Cache covers sequentially in the background to avoid a burst of
+            // parallel proxy fetches and storage uploads after a batch scan.
+            (async () => {
+              for (const r of newRecords) await cacheCoverFor(r);
+            })();
           }
         } catch (e) {
           console.error('Bulk insert error', e);
@@ -318,7 +350,7 @@ export function useCollection(userId = null) {
       }
     }
     return { added: newRecords.length, skipped: releases.length - newRecords.length };
-  }, [useDb, userId]);
+  }, [useDb, userId, cacheCoverFor]);
 
   return {
     collection,

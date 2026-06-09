@@ -38,13 +38,14 @@ api/                   # Vercel serverless functions (all secret keys live here)
   discogs-search.js    # Discogs search proxy
   spotify-features.js  # Spotify BPM / key lookup
   audio-proxy.js       # preview audio proxy (CORS)
+  image-proxy.js       # cover art proxy (CORS) for caching covers into storage
   price.js             # Discogs price history
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
 
 supabase/
   schema.sql           # full schema (run on a fresh project)
-  storage.sql          # storage bucket policies (unused -- avatars use profiles table)
+  storage.sql          # storage buckets: avatars (profile photos), covers (cached cover art)
 ```
 
 ## Security rules
@@ -97,6 +98,10 @@ drop policy if exists "profiles_self_update" on public.profiles;
 create policy "profiles_self_update" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 ```
+
+Also run when updating an existing database:
+- the `records_exist` function from `supabase/social-schema.sql` (accurate chat thumbnail existence check)
+- the `covers` bucket section from `supabase/storage.sql` (cover art caching)
 
 ## Data model
 

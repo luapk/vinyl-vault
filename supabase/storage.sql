@@ -29,3 +29,31 @@ drop policy if exists "avatars_own_delete" on storage.objects;
 create policy "avatars_own_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Cover art storage bucket
+-- Discogs image URLs are hotlinked, rate limited, and can expire. Covers are
+-- copied here when a record is saved so collection, community, and chat
+-- thumbnails stay durable. Path: covers/<uid>/<record local id>.jpg
+
+insert into storage.buckets (id, name, public)
+values ('covers', 'covers', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "covers_public_read" on storage.objects;
+create policy "covers_public_read" on storage.objects
+  for select using (bucket_id = 'covers');
+
+drop policy if exists "covers_own_insert" on storage.objects;
+create policy "covers_own_insert" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "covers_own_update" on storage.objects;
+create policy "covers_own_update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'covers' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "covers_own_delete" on storage.objects;
+create policy "covers_own_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'covers' and (storage.foldername(name))[1] = auth.uid()::text);
