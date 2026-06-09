@@ -1,3 +1,6 @@
+// Vercel: disable body parsing so Stripe can verify the raw signature
+export const config = { api: { bodyParser: false } };
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -38,8 +41,13 @@ export default async function handler(req, res) {
   const sig = req.headers['stripe-signature'];
   let event;
   try {
-    // req.body must be the raw buffer -- Vercel provides it when bodyParser is off
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    const rawBody = await new Promise((resolve, reject) => {
+      const chunks = [];
+      req.on('data', chunk => chunks.push(chunk));
+      req.on('end', () => resolve(Buffer.concat(chunks)));
+      req.on('error', reject);
+    });
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('[stripe-webhook] signature error:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -123,6 +131,3 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ received: true });
 }
-
-// Vercel: disable body parsing so we can verify Stripe's raw signature
-export const config = { api: { bodyParser: false } };
