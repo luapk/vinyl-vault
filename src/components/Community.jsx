@@ -315,7 +315,7 @@ function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB }) {
 
   useEffect(() => {
     const fn = mode === 'followers' ? getFollowers : getFollowing;
-    fn(userId).then(setList).catch(() => {}).finally(() => setLoading(false));
+    fn(userId, 50, setList).then(setList).catch(() => {}).finally(() => setLoading(false));
   }, [userId, mode]);
 
   return (

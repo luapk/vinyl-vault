@@ -62,7 +62,9 @@ export function useAuth() {
           const fetch = event === 'INITIAL_SESSION' ? fetchProfileOnce : fetchProfile;
           const p = await fetch(session.user.id);
           setProfile(p);
-        } else {
+        } else if (event === 'SIGNED_OUT') {
+          // Only clear profile on explicit sign-out, not on token refresh edge cases
+          // where session is briefly null before a new token arrives.
           setProfile(null);
         }
       }

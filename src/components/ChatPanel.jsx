@@ -336,12 +336,21 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                     {!isMe && reactBtn}
                     <div style={{
                       maxWidth: '78%',
-                      padding: msg.record_ref ? 0 : '8px 12px',
-                      borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                      background: isMe ? `rgba(${accentRGB},0.16)` : 'rgba(var(--fg),0.07)',
-                      border: `1px solid ${isMe ? `rgba(${accentRGB},0.24)` : 'rgba(var(--fg),0.10)'}`,
+                      padding: msg.record_ref ? 0 : '9px 13px',
+                      borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
+                      background: isMe
+                        ? `linear-gradient(145deg, rgba(${accentRGB},0.26) 0%, rgba(${accentRGB},0.14) 100%)`
+                        : 'linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.06) 100%)',
+                      border: isMe
+                        ? `1px solid rgba(${accentRGB},0.32)`
+                        : '1px solid rgba(var(--fg),0.12)',
+                      boxShadow: isMe
+                        ? `0 4px 18px rgba(${accentRGB},0.18), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.10)`
+                        : `0 3px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(var(--fg),0.06)`,
+                      backdropFilter: 'blur(12px)',
+                      WebkitBackdropFilter: 'blur(12px)',
                       fontSize: 15, lineHeight: 1.45,
-                      color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.82)',
+                      color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.88)',
                       wordBreak: 'break-word',
                       overflow: 'hidden',
                     }}>
@@ -349,19 +358,19 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                         const ref = msg.record_ref;
                         const isGone = deletedRefs.has(`${ref.owner_user_id}:${ref.record_local_id}`);
                         return (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px 8px', borderBottom: `1px solid ${isMe ? `rgba(${accentRGB},0.15)` : 'rgba(var(--fg),0.08)'}` }}>
-                            <div style={{ width: 34, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(var(--fg),0.08)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px 9px', borderBottom: `1px solid ${isMe ? `rgba(${accentRGB},0.18)` : 'rgba(var(--fg),0.09)'}` }}>
+                            <div style={{ width: 41, height: 41, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: 'rgba(var(--fg),0.08)', boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}>
                               {ref.coverUrl
                                 ? <img src={ref.coverUrl} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><VinylRecord size={15} weight="thin" style={{ opacity: 0.3 }} /></div>
+                                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><VinylRecord size={17} weight="thin" style={{ opacity: 0.3 }} /></div>
                               }
                             </div>
                             <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', marginBottom: 1, opacity: 0.45 }}>
+                              <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', marginBottom: 2, opacity: 0.45 }}>
                                 {isGone ? 'no longer available' : 'in response to'}
                               </div>
                               {(ref.artist || ref.title) && (
-                                <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.78 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.82 }}>
                                   {ref.artist}{ref.title ? ` / ${ref.title}` : ''}
                                 </div>
                               )}
@@ -369,7 +378,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                           </div>
                         );
                       })()}
-                      <div style={{ padding: msg.record_ref ? '7px 12px' : 0 }}>{msg.body}</div>
+                      <div style={{ padding: msg.record_ref ? '8px 13px' : 0 }}>{msg.body}</div>
                     </div>
                     {isMe && reactBtn}
                   </div>
@@ -377,7 +386,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                     <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 6 }}>
                       {Object.entries(rxGroups).map(([emoji, { count, mine }]) => (
                         <button key={emoji} onClick={() => handleReact(msg.id, emoji)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 10, border: mine ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.10)', background: mine ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.05)', cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 10, border: mine ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.10)', background: mine ? `rgba(${accentRGB},0.14)` : 'rgba(var(--fg),0.06)', cursor: 'pointer', backdropFilter: 'blur(8px)', boxShadow: mine ? `0 2px 8px rgba(${accentRGB},0.15)` : '0 1px 4px rgba(0,0,0,0.12)' }}>
                           <span style={{ fontSize: 13 }}>{emoji}</span>
                           <span style={{ fontSize: 11, fontFamily: 'monospace', color: mine ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.50)' }}>{count}</span>
                         </button>

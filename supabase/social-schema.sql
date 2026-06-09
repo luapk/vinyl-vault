@@ -131,6 +131,23 @@ CREATE POLICY "comments_select" ON public.record_comments FOR SELECT USING (true
 CREATE POLICY "comments_insert" ON public.record_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "comments_delete" ON public.record_comments FOR DELETE USING (auth.uid() = user_id);
 
+-- ─── Message reactions (DM emoji reactions) ──────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.message_reactions (
+  id          uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  message_id  uuid NOT NULL REFERENCES public.messages(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  emoji       text NOT NULL CHECK (length(emoji) <= 10),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (message_id, user_id, emoji)
+);
+
+ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "msg_reactions_select" ON public.message_reactions FOR SELECT USING (true);
+CREATE POLICY "msg_reactions_insert" ON public.message_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "msg_reactions_delete" ON public.message_reactions FOR DELETE USING (auth.uid() = user_id);
+
 -- ─── Helper: set own profile fields (bypasses UPDATE RLS edge cases) ──────────
 
 CREATE OR REPLACE FUNCTION public.update_own_profile(
