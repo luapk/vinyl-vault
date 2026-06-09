@@ -151,6 +151,11 @@ BEGIN
 END;
 $$;
 
+-- ─── Messages: record context ────────────────────────────────────────────────
+-- Stores a snapshot of the record being commented on so chat bubbles can show
+-- a thumbnail. Migration for existing databases:
+-- alter table public.messages add column if not exists record_ref jsonb;
+
 -- ─── Feed helper RPC ──────────────────────────────────────────────────────────
 -- Returns recent records from users the current user follows.
 

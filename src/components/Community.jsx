@@ -291,7 +291,13 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
               accentRGB={accentRGB}
               onOpenProfile={onOpenProfile}
               onAfterPost={ownerUserId !== currentUserId && currentUserId
-                ? (body) => sendMessage(currentUserId, ownerUserId, body).catch(() => {})
+                ? (body) => sendMessage(currentUserId, ownerUserId, body, {
+                    record_local_id: record.id,
+                    owner_user_id: ownerUserId,
+                    artist: record.artist || '',
+                    title: record.title || '',
+                    coverUrl: record.coverUrl || null,
+                  }).catch(() => {})
                 : undefined}
             />
           </div>

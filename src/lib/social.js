@@ -408,7 +408,7 @@ export async function getMessages(userId, otherUserId, limit = 80) {
   if (!supabase || !userId || !otherUserId) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('id, from_user_id, to_user_id, body, created_at, read_at')
+    .select('id, from_user_id, to_user_id, body, created_at, read_at, record_ref')
     .or(`and(from_user_id.eq.${userId},to_user_id.eq.${otherUserId}),and(from_user_id.eq.${otherUserId},to_user_id.eq.${userId})`)
     .order('created_at', { ascending: true })
     .limit(limit);
@@ -416,18 +416,35 @@ export async function getMessages(userId, otherUserId, limit = 80) {
   return data || [];
 }
 
-export async function sendMessage(fromUserId, toUserId, body) {
+export async function sendMessage(fromUserId, toUserId, body, recordRef = null) {
   if (!supabase) throw new Error('Not configured');
   const trimmed = (body || '').trim();
   if (!trimmed) throw new Error('Message is empty');
   if (trimmed.length > 500) throw new Error('Message too long (500 char max)');
+  const row = { from_user_id: fromUserId, to_user_id: toUserId, body: trimmed };
+  if (recordRef) row.record_ref = recordRef;
   const { data, error } = await supabase
     .from('messages')
-    .insert({ from_user_id: fromUserId, to_user_id: toUserId, body: trimmed })
-    .select('id, from_user_id, to_user_id, body, created_at, read_at')
+    .insert(row)
+    .select('id, from_user_id, to_user_id, body, created_at, read_at, record_ref')
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function checkRecordsExist(ownerUserId, recordLocalIds) {
+  if (!supabase || !recordLocalIds.length) return new Set(recordLocalIds);
+  try {
+    const { data, error } = await supabase
+      .from('records')
+      .select('data')
+      .eq('user_id', ownerUserId)
+      .or(recordLocalIds.map(id => `data->>id.eq.${id}`).join(','));
+    if (error) return new Set(recordLocalIds);
+    return new Set((data || []).map(r => r.data?.id).filter(Boolean));
+  } catch {
+    return new Set(recordLocalIds);
+  }
 }
 
 export async function markMessagesRead(toUserId, fromUserId) {
@@ -484,3 +501,36 @@ export async function getUnreadMessageCount(userId) {
   if (error) return 0;
   return count || 0;
 }
+
+// ─── Message reactions ────────────────────────────────────────────────────────
+
+export async function getReactionsForMessages(messageIds) {
+  if (!supabase || !messageIds.length) return {};
+  const { data } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id')
+    .in('message_id', messageIds);
+  const out = {};
+  for (const r of data || []) {
+    (out[r.message_id] = out[r.message_id] || []).push(r);
+  }
+  return out;
+}
+
+export async function toggleMessageReaction(messageId, emoji, userId) {
+  if (!supabase) throw new Error('Not configured');
+  const { data: existing } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle();
+  if (existing) {
+    await supabase.from('message_reactions').delete().eq('id', existing.id);
+  } else {
+    await supabase.from('message_reactions').insert({ message_id: messageId, user_id: userId, emoji });
+  }
+}
+
+export function bustConversationsCache() {} // no-op; kept for API compat

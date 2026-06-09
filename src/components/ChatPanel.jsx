@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley } from '@phosphor-icons/react';
+import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley, VinylRecord } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
-import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction, bustConversationsCache } from '../lib/social';
+import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction, bustConversationsCache, checkRecordsExist } from '../lib/social';
 
 const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
@@ -40,6 +40,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const [reactions, setReactions] = useState({});
   const [pickerMsg, setPickerMsg] = useState(null);
+  const [deletedRefs, setDeletedRefs] = useState(new Set());
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const recipientRef = useRef(recipient);
@@ -134,13 +135,36 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Check if referenced records still exist in their owner's collection
+  useEffect(() => {
+    const refs = messages.filter(m => m.record_ref?.owner_user_id && m.record_ref?.record_local_id).map(m => m.record_ref);
+    if (!refs.length) return;
+    const byOwner = {};
+    for (const ref of refs) {
+      const s = (byOwner[ref.owner_user_id] = byOwner[ref.owner_user_id] || new Set());
+      s.add(ref.record_local_id);
+    }
+    Promise.all(
+      Object.entries(byOwner).map(([ownerId, ids]) =>
+        checkRecordsExist(ownerId, [...ids]).then(existing => ({ ownerId, existing }))
+      )
+    ).then(results => {
+      const gone = new Set();
+      for (const { ownerId, existing } of results) {
+        for (const id of byOwner[ownerId]) {
+          if (!existing.has(id)) gone.add(`${ownerId}:${id}`);
+        }
+      }
+      setDeletedRefs(gone);
+    }).catch(() => {});
+  }, [messages]);
+
   const handleSend = async () => {
     if (!input.trim() || !recipient || sending) return;
     const body = input.trim();
     setInput('');
     setSending(true);
     setPickerMsg(null);
-    // Reset textarea height
     if (inputRef.current) { inputRef.current.style.height = 'auto'; }
     try {
       const msg = await sendMessage(currentUser.id, recipient.id, body);
@@ -311,15 +335,41 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                   <div style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start', alignItems: 'center', gap: 4, marginBottom: hasRx ? 2 : 4 }}>
                     {!isMe && reactBtn}
                     <div style={{
-                      maxWidth: '78%', padding: '8px 12px',
+                      maxWidth: '78%',
+                      padding: msg.record_ref ? 0 : '8px 12px',
                       borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       background: isMe ? `rgba(${accentRGB},0.16)` : 'rgba(var(--fg),0.07)',
                       border: `1px solid ${isMe ? `rgba(${accentRGB},0.24)` : 'rgba(var(--fg),0.10)'}`,
                       fontSize: 15, lineHeight: 1.45,
                       color: isMe ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.82)',
                       wordBreak: 'break-word',
+                      overflow: 'hidden',
                     }}>
-                      {msg.body}
+                      {msg.record_ref && (() => {
+                        const ref = msg.record_ref;
+                        const isGone = deletedRefs.has(`${ref.owner_user_id}:${ref.record_local_id}`);
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px 8px', borderBottom: `1px solid ${isMe ? `rgba(${accentRGB},0.15)` : 'rgba(var(--fg),0.08)'}` }}>
+                            <div style={{ width: 34, height: 34, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(var(--fg),0.08)' }}>
+                              {!isGone && ref.coverUrl
+                                ? <img src={ref.coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><VinylRecord size={15} weight="thin" style={{ opacity: 0.3 }} /></div>
+                              }
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', marginBottom: 1, opacity: 0.45 }}>
+                                {isGone ? 'no longer available' : 'in response to'}
+                              </div>
+                              {!isGone && (
+                                <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.78 }}>
+                                  {ref.artist}{ref.title ? ` — ${ref.title}` : ''}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      <div style={{ padding: msg.record_ref ? '7px 12px' : 0 }}>{msg.body}</div>
                     </div>
                     {isMe && reactBtn}
                   </div>
