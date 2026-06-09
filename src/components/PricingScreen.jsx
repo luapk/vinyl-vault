@@ -7,6 +7,7 @@ import {
   FOUNDING_SEATS,
   FREE_SCANS,
   FREE_LABELS,
+  TIERS as TIER_IDS,
 } from '../lib/pricing.js';
 
 // ---- Tier definitions --------------------------------------------------------
@@ -33,7 +34,9 @@ const TIERS = [
     price:     `£${PRICE_SELECTOR_YEAR}`,
     billing:   '/ year',
     accentRGB: '201,255,0',
-    comingSoon: true,
+    comingSoon: false,
+    priceEnvKey:        'VITE_STRIPE_PRICE_SELECTOR_YEAR',
+    foundingPriceEnvKey:'VITE_STRIPE_PRICE_SELECTOR_FOUNDING',
     founding:  `or £${PRICE_FOUNDING} lifetime -- first ${FOUNDING_SEATS}`,
     features: [
       'Unlimited AI scans',
@@ -49,7 +52,8 @@ const TIERS = [
     price:     `£${PRICE_RESIDENT_YEAR}`,
     billing:   '/ year',
     accentRGB: '172,144,226',
-    comingSoon: true,
+    comingSoon: false,
+    priceEnvKey: 'VITE_STRIPE_PRICE_RESIDENT_YEAR',
     features: [
       'Harmonic and key sorting',
       'Saved, reorderable set crates',
@@ -76,9 +80,27 @@ const OVERLAP = 68;  // px -- how much roundel hangs above the glass card
 // How much of the roundel sits inside the card (= ROUNDEL - OVERLAP)
 const ROUNDEL_INSIDE = ROUNDEL - OVERLAP; // 100px
 
-function TierCard({ tier, onGetStarted }) {
-  const { image, name, price, billing, accentRGB, comingSoon, founding, features } = tier;
+function TierCard({ tier, onGetStarted, onCheckout }) {
+  const { image, name, price, billing, accentRGB, comingSoon, founding, features, priceEnvKey, foundingPriceEnvKey } = tier;
   const ctaOnDark = accentRGB === '201,255,0' || accentRGB === '96,237,214';
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
+  const handleCta = async () => {
+    if (comingSoon) return;
+    if (!priceEnvKey || !onCheckout) { onGetStarted?.(); return; }
+    const priceId = import.meta.env[priceEnvKey];
+    if (!priceId) { onGetStarted?.(); return; } // env not configured yet
+    setCheckoutLoading(true);
+    try { await onCheckout(priceId); } catch { setCheckoutLoading(false); }
+  };
+
+  const handleFounding = async () => {
+    if (!foundingPriceEnvKey || !onCheckout) return;
+    const priceId = import.meta.env[foundingPriceEnvKey];
+    if (!priceId) return;
+    setCheckoutLoading(true);
+    try { await onCheckout(priceId); } catch { setCheckoutLoading(false); }
+  };
 
   return (
     // Outer wrapper provides space for the overhanging roundel
@@ -136,7 +158,9 @@ function TierCard({ tier, onGetStarted }) {
         {/* Founding note */}
         {founding && (
           <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: `rgb(${accentRGB})`, fontFamily: 'monospace', fontWeight: 600, opacity: 0.65 }}>
-            {founding}
+            {foundingPriceEnvKey && import.meta.env[foundingPriceEnvKey]
+              ? <button onClick={handleFounding} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>{founding}</button>
+              : founding}
           </div>
         )}
 
@@ -153,8 +177,8 @@ function TierCard({ tier, onGetStarted }) {
 
         {/* CTA */}
         <button
-          onClick={comingSoon ? undefined : onGetStarted}
-          disabled={comingSoon}
+          onClick={handleCta}
+          disabled={comingSoon || checkoutLoading}
           style={{
             width: '100%',
             marginTop: 14,
@@ -163,7 +187,7 @@ function TierCard({ tier, onGetStarted }) {
             fontSize: 13,
             fontWeight: 600,
             letterSpacing: '0.01em',
-            cursor: comingSoon ? 'default' : 'pointer',
+            cursor: comingSoon || checkoutLoading ? 'default' : 'pointer',
             border: comingSoon ? '1px solid rgba(var(--fg),0.08)' : `1px solid rgba(${accentRGB},0.45)`,
             background: comingSoon
               ? 'rgba(var(--fg),0.04)'
@@ -171,8 +195,9 @@ function TierCard({ tier, onGetStarted }) {
             color: comingSoon ? 'rgba(var(--fg),0.18)' : ctaOnDark ? '#000' : '#fff',
             boxShadow: comingSoon ? 'none' : `0 4px 20px rgba(${accentRGB},0.28), inset 0 1px 0 rgba(255,255,255,0.18)`,
             transition: 'all 0.15s',
+            opacity: checkoutLoading ? 0.7 : 1,
           }}>
-          {comingSoon ? 'Coming soon' : 'Get started'}
+          {checkoutLoading ? 'Redirecting...' : comingSoon ? 'Coming soon' : 'Get started'}
         </button>
       </div>
     </div>
@@ -181,7 +206,7 @@ function TierCard({ tier, onGetStarted }) {
 
 // ---- Swipe carousel ----------------------------------------------------------
 
-export function TierCarousel({ onGetStarted }) {
+export function TierCarousel({ onGetStarted, onCheckout }) {
   const [idx, setIdx] = useState(0);
   const startXRef   = useRef(null);
   const startTRef   = useRef(null);
@@ -245,7 +270,7 @@ export function TierCarousel({ onGetStarted }) {
         }}>
           {TIERS.map(tier => (
             <div key={tier.name} style={{ minWidth: '100%', paddingLeft: 2, paddingRight: 2, boxSizing: 'border-box' }}>
-              <TierCard tier={tier} onGetStarted={onGetStarted} />
+              <TierCard tier={tier} onGetStarted={onGetStarted} onCheckout={onCheckout} />
             </div>
           ))}
         </div>

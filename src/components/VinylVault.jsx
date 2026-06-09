@@ -9,6 +9,7 @@ import {
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useTheme } from "../hooks/useTheme.js";
+import { useSubscription } from "../hooks/useSubscription.js";
 import AuthScreen from "./AuthScreen.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
@@ -338,6 +339,7 @@ function getGreeting(name) {
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences } = useAuth();
+  const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
@@ -509,8 +511,13 @@ export default function VinylVault() {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
+        body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg", userId: user?.id }),
       });
+      if (response.status === 402) {
+        setPhase("idle");
+        setShowPricingModal(true);
+        return null;
+      }
       if (!response.ok) {
         const errorBody = await response.text();
         throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
@@ -546,7 +553,7 @@ export default function VinylVault() {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
+        body: JSON.stringify({ discogsId: candidate.id, vision: visionData, userId: user?.id }),
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
@@ -651,7 +658,7 @@ export default function VinylVault() {
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision }),
+        body: JSON.stringify({ discogsId: candidate.id, vision, userId: user?.id }),
       });
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
@@ -838,6 +845,9 @@ export default function VinylVault() {
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
           onUpgrade={() => { setShowAccount(false); setShowPricingModal(true); }}
+          tier={tier}
+          isPaid={isPaid}
+          onManageSubscription={openPortal}
         />
       )}
 
@@ -846,7 +856,7 @@ export default function VinylVault() {
           style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
           onClick={() => setShowPricingModal(false)}>
           <div style={{ width: '100%', maxWidth: 420, padding: '0 16px' }} onClick={e => e.stopPropagation()}>
-            <TierCarousel onGetStarted={() => setShowPricingModal(false)} />
+            <TierCarousel onGetStarted={() => setShowPricingModal(false)} onCheckout={startCheckout} />
             <button onClick={() => setShowPricingModal(false)}
               style={{ display: 'block', margin: '16px auto 0', fontSize: 13, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               Close
@@ -2475,7 +2485,7 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade }) {
+function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -2675,13 +2685,22 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
         <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)', borderBottom: '1px solid rgba(var(--fg),0.07)', paddingTop: 11, paddingBottom: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', letterSpacing: '0.06em' }}>Digger</span>
-            <button onClick={onUpgrade}
-              style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.55)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.18)'; }}>
-              Upgrade →
-            </button>
+            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', letterSpacing: '0.06em', textTransform: 'capitalize' }}>{tier || 'Digger'}</span>
+            {isPaid ? (
+              <button onClick={onManageSubscription}
+                style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.55)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.18)'; }}>
+                Manage →
+              </button>
+            ) : (
+              <button onClick={onUpgrade}
+                style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.55)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.18)'; }}>
+                Upgrade →
+              </button>
+            )}
           </div>
         </div>
 

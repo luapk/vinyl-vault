@@ -3,6 +3,45 @@ import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
 import { analyzeImage } from './lib/google-vision.js';
+import { createClient } from '@supabase/supabase-js';
+
+const SCAN_LIMITS = { digger: 50, selector: Infinity, resident: Infinity };
+
+async function checkAndIncrementScanLimit(userId) {
+  if (!userId) return null; // unauthenticated: allow (will be rate-limited separately)
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null; // payments not configured: don't block scans
+
+  const supabase = createClient(url, key);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('subscription_tier, subscription_status, scans_this_period, scans_period_end')
+    .eq('id', userId)
+    .single();
+
+  if (!profile) return null;
+
+  const tier   = profile.subscription_tier || 'digger';
+  const status = profile.subscription_status || 'active';
+  const limit  = SCAN_LIMITS[tier] ?? SCAN_LIMITS.digger;
+
+  // Treat past_due as still having access (Stripe gives a grace period)
+  const hasAccess = status === 'active' || status === 'trialing' || status === 'past_due';
+
+  // Auto-reset if period has rolled over
+  const now = new Date();
+  const periodEnd = new Date(profile.scans_period_end);
+  const currentCount = now >= periodEnd ? 0 : (profile.scans_this_period || 0);
+
+  if (hasAccess && currentCount >= limit) {
+    return { blocked: true, tier, limit, used: currentCount };
+  }
+
+  // Increment counter (the RPC handles reset atomically)
+  await supabase.rpc('increment_scan_count', { p_user_id: userId });
+  return null;
+}
 
 // Score how well a Discogs candidate matches Vision-identified metadata.
 // Negative scores mean the candidate is likely a false catno collision.
@@ -125,7 +164,18 @@ function toCandidate(r) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { image, mediaType, discogsId, vision: clientVision } = req.body || {};
+  const { image, mediaType, discogsId, vision: clientVision, userId } = req.body || {};
+
+  // Enforce scan limits before doing any expensive work
+  const limitResult = await checkAndIncrementScanLimit(userId).catch(() => null);
+  if (limitResult?.blocked) {
+    return res.status(402).json({
+      error: 'scan_limit_reached',
+      tier: limitResult.tier,
+      limit: limitResult.limit,
+      used: limitResult.used,
+    });
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const hasDiscogs = !!process.env.DISCOGS_PERSONAL_ACCESS_TOKEN;
