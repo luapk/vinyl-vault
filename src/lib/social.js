@@ -435,13 +435,16 @@ export async function sendMessage(fromUserId, toUserId, body, recordRef = null) 
 export async function checkRecordsExist(ownerUserId, recordLocalIds) {
   if (!supabase || !recordLocalIds.length) return new Set(recordLocalIds);
   try {
-    const { data, error } = await supabase
-      .from('records')
-      .select('data')
-      .eq('user_id', ownerUserId)
-      .or(recordLocalIds.map(id => `data->>id.eq.${id}`).join(','));
+    // SECURITY DEFINER RPC: a direct SELECT on records is blocked by RLS for
+    // non-public profiles, which made deleted and not-visible records
+    // indistinguishable. On error (e.g. function not yet migrated) treat all
+    // records as existing so nothing is falsely marked unavailable.
+    const { data, error } = await supabase.rpc('records_exist', {
+      p_owner_user_id: ownerUserId,
+      p_local_ids: recordLocalIds,
+    });
     if (error) return new Set(recordLocalIds);
-    return new Set((data || []).map(r => r.data?.id).filter(Boolean));
+    return new Set(data || []);
   } catch {
     return new Set(recordLocalIds);
   }

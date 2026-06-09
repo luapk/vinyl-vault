@@ -156,6 +156,21 @@ $$;
 -- a thumbnail. Migration for existing databases:
 -- alter table public.messages add column if not exists record_ref jsonb;
 
+-- ─── Record existence check ──────────────────────────────────────────────────
+-- Chat thumbnails need to know whether a referenced record still exists in the
+-- owner's collection. A plain SELECT on records is blocked by RLS when the
+-- owner's profile is not public, which made deleted and not-visible records
+-- indistinguishable. This SECURITY DEFINER function bypasses RLS but returns
+-- only which local IDs still exist; no record data is exposed.
+
+CREATE OR REPLACE FUNCTION public.records_exist(p_owner_user_id uuid, p_local_ids text[])
+RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(array_agg(r.data->>'id'), '{}')
+  FROM public.records r
+  WHERE r.user_id = p_owner_user_id
+    AND r.data->>'id' = ANY(p_local_ids);
+$$;
+
 -- ─── Feed helper RPC ──────────────────────────────────────────────────────────
 -- Returns recent records from users the current user follows.
 
