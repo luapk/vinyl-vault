@@ -22,7 +22,7 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data } = await supabase
       .from('profiles')
-      .select('id, email, role, avatar_url, display_name, username, bio, is_public, preferences')
+      .select('id, email, role, avatar_url, display_name, username, bio, is_public, preferences, subscription_tier, subscription_status, scans_this_period, scans_period_end')
       .eq('id', userId)
       .single();
     return data || null;
