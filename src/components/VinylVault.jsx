@@ -250,28 +250,46 @@ async function detectBPM(previewUrl) {
       return s / (hi - lo + 1);
     });
 
-    const mean = smoothed.reduce((a, b) => a + b, 0) / smoothed.length;
-    const threshold = mean * 1.4;
-    const minGap = 25; // 250 ms at 10 ms/frame = max ~240 BPM
+    // Onset-strength envelope: a half-wave rectified first difference emphasises
+    // beat attacks. Autocorrelating this is far more reliable than counting
+    // peaks, which fails on anything but a clean four-on-the-floor kick.
+    const fps = 100; // 10 ms frames
+    const onset = new Float32Array(numFrames);
+    for (let i = 1; i < numFrames; i++) {
+      const d = smoothed[i] - smoothed[i - 1];
+      onset[i] = d > 0 ? d : 0;
+    }
+    const oMean = onset.reduce((a, b) => a + b, 0) / (onset.length || 1);
+    if (oMean <= 0) { bpmCache.set(previewUrl, null); return null; }
+    for (let i = 0; i < onset.length; i++) onset[i] -= oMean; // remove DC bias
 
-    const peaks = [];
-    for (let i = 1; i < smoothed.length - 1; i++) {
-      if (
-        smoothed[i] > threshold &&
-        smoothed[i] >= smoothed[i - 1] &&
-        smoothed[i] >= smoothed[i + 1] &&
-        (!peaks.length || i - peaks[peaks.length - 1] >= minGap)
-      ) peaks.push(i);
+    // Autocorrelate across a wide tempo band (60-200 BPM) and take the strongest lag.
+    const minLag = Math.floor((60 * fps) / 200); // 30 frames
+    const maxLag = Math.ceil((60 * fps) / 60);   // 100 frames
+    if (onset.length < maxLag * 2) { bpmCache.set(previewUrl, null); return null; }
+
+    const ac = new Float32Array(maxLag + 1);
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let sum = 0;
+      for (let i = lag; i < onset.length; i++) sum += onset[i] * onset[i - lag];
+      ac[lag] = sum / (onset.length - lag);
     }
 
-    if (peaks.length < 4) { bpmCache.set(previewUrl, null); return null; }
+    let bestLag = minLag, bestScore = -Infinity;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      // Reward harmonic support: a true beat period also correlates at 2x and 3x
+      // its lag, which biases away from picking a random sub-multiple.
+      let score = ac[lag];
+      if (lag * 2 <= maxLag) score += 0.5 * ac[lag * 2];
+      if (lag * 3 <= maxLag) score += 0.25 * ac[lag * 3];
+      if (score > bestScore) { bestScore = score; bestLag = lag; }
+    }
 
-    const intervals = peaks.slice(1).map((p, i) => p - peaks[i]);
-    intervals.sort((a, b) => a - b);
-    const median = intervals[Math.floor(intervals.length / 2)];
-    let bpm = Math.round(60 / (median * 0.01));
+    if (bestScore <= 0) { bpmCache.set(previewUrl, null); return null; }
+
+    let bpm = (60 * fps) / bestLag;
     while (bpm < 70) bpm *= 2;
-    while (bpm > 175) bpm /= 2;
+    while (bpm > 180) bpm /= 2;
     bpm = Math.round(bpm);
 
     bpmCache.set(previewUrl, bpm);

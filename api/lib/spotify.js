@@ -32,6 +32,16 @@ async function getToken() {
 
 const normStr = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
+// Parse a Discogs duration string ("m:ss" or "h:mm:ss") into seconds.
+function parseDurationSecs(str) {
+  if (!str) return null;
+  const parts = String(str).split(':').map(n => parseInt(n, 10));
+  if (parts.some(Number.isNaN)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
 function titleSim(a, b) {
   const na = normStr(a), nb = normStr(b);
   if (!na || !nb) return 0;
@@ -49,9 +59,9 @@ function titleSim(a, b) {
   return base;
 }
 
-async function searchTrack(token, artist, trackTitle, releaseYear) {
+async function searchTrack(token, artist, trackTitle, releaseYear, discogsDuration) {
   const q = artist ? `track:${trackTitle} artist:${artist}` : `track:${trackTitle}`;
-  const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=5`;
+  const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=8`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     console.log(`[spotify] search ${res.status} for "${q}"`);
@@ -67,6 +77,7 @@ async function searchTrack(token, artist, trackTitle, releaseYear) {
   // Score each candidate: require title similarity >= 0.5 to avoid wrong-song matches
   const normArtist = normStr(artist || '');
   const artistWords = normArtist.split(' ').filter(w => w.length > 2);
+  const wantSecs = parseDurationSecs(discogsDuration);
 
   const scored = items
     .map(t => {
@@ -85,6 +96,17 @@ async function searchTrack(token, artist, trackTitle, releaseYear) {
         if (!hasOverlap && spotifyWords.length > 0) s -= 0.6;  // drops below 0.5 threshold even for exact title
       }
 
+      // Duration: the single strongest disambiguator between same-named versions.
+      // Discogs gives us the exact pressing length, so a big gap means it is a
+      // different edit/version -- hard reject it rather than serve a wrong preview.
+      if (wantSecs && t.duration_ms) {
+        const diff = Math.abs(t.duration_ms / 1000 - wantSecs);
+        if (diff > 45) return null;              // clearly a different version
+        else if (diff < 4) s += 0.5;
+        else if (diff < 12) s += 0.3;
+        else if (diff < 25) s += 0.1;
+      }
+
       // Year proximity: penalise re-recordings from a different era
       if (releaseYear && t.album?.release_date) {
         const trackYear = parseInt(t.album.release_date.slice(0, 4), 10);
@@ -99,7 +121,7 @@ async function searchTrack(token, artist, trackTitle, releaseYear) {
     .sort((a, b) => b.s - a.s);
 
   if (!scored.length) {
-    console.log(`[spotify] no confident title match for "${trackTitle}" in results`);
+    console.log(`[spotify] no confident match for "${trackTitle}" in results`);
     return null;
   }
 
@@ -109,13 +131,24 @@ async function searchTrack(token, artist, trackTitle, releaseYear) {
   return { id: track.id, previewUrl: preview };
 }
 
+// Spotify deprecated /v1/audio-features in Nov 2024; app credentials issued
+// after the cutoff receive 403 here. When that happens there is no bpm/key to
+// be had from Spotify -- the client-side waveform analyser fills bpm instead.
+let featuresDisabled = false;
+
 async function fetchAudioFeatures(token, trackId) {
+  if (featuresDisabled) return null;
   const res = await fetch(
     `https://api.spotify.com/v1/audio-features/${trackId}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) {
-    console.log(`[spotify] features=${res.status}`);
+    if (res.status === 403 || res.status === 401) {
+      featuresDisabled = true;  // stop hammering a blocked endpoint for the rest of this batch
+      console.log(`[spotify] audio-features ${res.status}: endpoint unavailable for this app (deprecated). Falling back to waveform bpm.`);
+    } else {
+      console.log(`[spotify] features=${res.status}`);
+    }
     return null;
   }
   const f = await res.json();
@@ -132,7 +165,7 @@ export async function enrichTracks(tracks, artist, releaseContext = {}) {
   return Promise.all(
     tracks.map(async track => {
       try {
-        const result = await searchTrack(token, artist, track.title, releaseYear);
+        const result = await searchTrack(token, artist, track.title, releaseYear, track.duration);
         if (!result) return { ...track, ...noMatch };
 
         const features = await fetchAudioFeatures(token, result.id);
