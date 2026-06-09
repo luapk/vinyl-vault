@@ -341,7 +341,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       background: isMe
                         ? `linear-gradient(160deg, rgba(${accentRGB},0.30) 0%, rgba(${accentRGB},0.20) 55%, rgba(${accentRGB},0.15) 100%)`
                         : 'linear-gradient(160deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.04) 100%)',
-                      border: isMe ? `1px solid rgba(${accentRGB},0.35)` : '1px solid rgba(255,255,255,0.08)',
+                      border: 'none',
                       backdropFilter: 'blur(28px) saturate(150%)',
                       WebkitBackdropFilter: 'blur(28px) saturate(150%)',
                       boxShadow: isMe
