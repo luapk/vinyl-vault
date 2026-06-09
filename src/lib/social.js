@@ -312,7 +312,7 @@ export async function deleteComment(commentId) {
 
 // ─── Direct messages ──────────────────────────────────────────────────────────
 
-export async function getConversations(userId) {
+export async function getConversations(userId, onFresh = null) { // onFresh ignored; kept for API compat
   if (!supabase || !userId) return [];
   const { data, error } = await supabase
     .from('messages')
@@ -411,3 +411,36 @@ export async function getUnreadMessageCount(userId) {
   if (error) return 0;
   return count || 0;
 }
+
+// ─── Message reactions ────────────────────────────────────────────────────────
+
+export async function getReactionsForMessages(messageIds) {
+  if (!supabase || !messageIds.length) return {};
+  const { data } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id')
+    .in('message_id', messageIds);
+  const out = {};
+  for (const r of data || []) {
+    (out[r.message_id] = out[r.message_id] || []).push(r);
+  }
+  return out;
+}
+
+export async function toggleMessageReaction(messageId, emoji, userId) {
+  if (!supabase) throw new Error('Not configured');
+  const { data: existing } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle();
+  if (existing) {
+    await supabase.from('message_reactions').delete().eq('id', existing.id);
+  } else {
+    await supabase.from('message_reactions').insert({ message_id: messageId, user_id: userId, emoji });
+  }
+}
+
+export function bustConversationsCache() {} // no-op; kept for API compat
