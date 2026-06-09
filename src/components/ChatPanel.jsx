@@ -340,13 +340,13 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
                       background: isMe
                         ? `linear-gradient(180deg, rgba(${accentRGB},0.22) 0%, rgba(${accentRGB},0.09) 45%, rgba(30,30,34,1) 100%)`
-                        : 'linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.09) 52%, rgba(255,255,255,0.05) 100%)',
-                      border: 'none',
-                      backdropFilter: isMe ? 'none' : 'blur(16px)',
-                      WebkitBackdropFilter: isMe ? 'none' : 'blur(16px)',
+                        : 'linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 40%, rgba(255,255,255,0.055) 100%)',
+                      border: isMe ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                      backdropFilter: isMe ? 'none' : 'blur(28px) saturate(160%)',
+                      WebkitBackdropFilter: isMe ? 'none' : 'blur(28px) saturate(160%)',
                       boxShadow: isMe
                         ? `0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4), 0 0 18px rgba(${accentRGB},0.20), inset 0 1px 0 rgba(255,255,255,0.10), inset 0 -4px 8px rgba(0,0,0,0.30)`
-                        : `0 6px 20px rgba(0,0,0,0.38), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -4px 8px rgba(0,0,0,0.18)`,
+                        : `0 6px 22px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 1px rgba(255,255,255,0.04)`,
                       fontSize: 15, lineHeight: 1.45,
                       color: 'rgba(255,255,255,0.92)',
                       wordBreak: 'break-word',
