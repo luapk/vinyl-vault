@@ -338,17 +338,25 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                       maxWidth: '78%',
                       padding: msg.record_ref ? 0 : '9px 13px',
                       borderRadius: isMe ? '18px 18px 5px 18px' : '18px 18px 18px 5px',
-                      background: isMe
-                        ? `linear-gradient(160deg, rgba(${accentRGB},0.30) 0%, rgba(${accentRGB},0.20) 55%, rgba(${accentRGB},0.15) 100%)`
-                        : 'linear-gradient(160deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.04) 100%)',
+                      background: isDark
+                        ? (isMe
+                            ? `linear-gradient(160deg, rgba(${accentRGB},0.30) 0%, rgba(${accentRGB},0.20) 55%, rgba(${accentRGB},0.15) 100%)`
+                            : 'linear-gradient(160deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.04) 100%)')
+                        : (isMe
+                            ? `linear-gradient(160deg, rgba(${accentRGB},0.30) 0%, rgba(${accentRGB},0.18) 100%)`
+                            : 'linear-gradient(160deg, #ededef 0%, #e3e3e6 100%)'),
                       border: 'none',
-                      backdropFilter: 'blur(28px) saturate(150%)',
-                      WebkitBackdropFilter: 'blur(28px) saturate(150%)',
-                      boxShadow: isMe
-                        ? `0 6px 22px rgba(0,0,0,0.35), 0 0 18px rgba(${accentRGB},0.18), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 5px rgba(0,0,0,0.18)`
-                        : `0 6px 22px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 1px rgba(255,255,255,0.03)`,
+                      backdropFilter: isDark ? 'blur(28px) saturate(150%)' : 'none',
+                      WebkitBackdropFilter: isDark ? 'blur(28px) saturate(150%)' : 'none',
+                      boxShadow: isDark
+                        ? (isMe
+                            ? `0 6px 22px rgba(0,0,0,0.35), 0 0 18px rgba(${accentRGB},0.18), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 5px rgba(0,0,0,0.18)`
+                            : `0 6px 22px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 1px rgba(255,255,255,0.03)`)
+                        : (isMe
+                            ? `0 4px 14px rgba(${accentRGB},0.28), 0 1px 3px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.55)`
+                            : `0 3px 10px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.70)`),
                       fontSize: 15, lineHeight: 1.45,
-                      color: 'rgba(255,255,255,0.92)',
+                      color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(var(--fg),0.88)',
                       wordBreak: 'break-word',
                       overflow: 'hidden',
                     }}>
