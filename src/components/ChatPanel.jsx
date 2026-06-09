@@ -360,9 +360,9 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
                               <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', marginBottom: 1, opacity: 0.45 }}>
                                 {isGone ? 'no longer available' : 'in response to'}
                               </div>
-                              {!isGone && (
+                              {(ref.artist || ref.title) && (
                                 <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.78 }}>
-                                  {ref.artist}{ref.title ? ` — ${ref.title}` : ''}
+                                  {ref.artist}{ref.title ? ` / ${ref.title}` : ''}
                                 </div>
                               )}
                             </div>
