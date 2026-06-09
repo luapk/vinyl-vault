@@ -182,5 +182,11 @@ export function useAuth() {
 
   const isAdmin = profile?.role === 'admin';
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences };
+  const refreshProfile = useCallback(async () => {
+    if (!user?.id) return;
+    const p = await fetchProfile(user.id);
+    if (p) setProfile(p);
+  }, [user?.id, fetchProfile]);
+
+  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile };
 }

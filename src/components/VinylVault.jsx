@@ -338,7 +338,7 @@ function getGreeting(name) {
 
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
@@ -372,6 +372,7 @@ export default function VinylVault() {
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(() => new URLSearchParams(window.location.search).get('checkout') === 'success');
   const [smartCrateNames, setSmartCrateNames] = useState(() => {
     try { return JSON.parse(localStorage.getItem('vv_smart_crate_names') || '[]'); } catch { return []; }
   });
@@ -382,6 +383,18 @@ export default function VinylVault() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatRecipient, setChatRecipient] = useState(null); // profile object
   const [msgUnread, setMsgUnread] = useState(0);
+
+  // When returning from Stripe Checkout, re-fetch the profile after a short
+  // delay so the webhook has time to update Supabase, then clear the URL param.
+  useEffect(() => {
+    if (!checkoutSuccess || !user?.id) return;
+    window.history.replaceState({}, '', window.location.pathname);
+    const timer = setTimeout(() => {
+      refreshProfile();
+      setCheckoutSuccess(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [checkoutSuccess, user?.id, refreshProfile]);
 
   const openProfile = useCallback((username) => {
     if (!username) return;
