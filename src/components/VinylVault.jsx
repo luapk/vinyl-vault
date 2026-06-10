@@ -2506,6 +2506,20 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [openSection, setOpenSection] = useState(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingErr, setBillingErr] = useState('');
+
+  async function openBillingPortal() {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    setBillingErr('');
+    try {
+      await onManageSubscription();
+    } catch (e) {
+      setBillingErr(e.message || 'Could not open billing. Please try again.');
+      setBillingBusy(false);
+    }
+  }
 
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || null);
   const [avatarSavedOk, setAvatarSavedOk] = useState(false);
@@ -2699,14 +2713,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', letterSpacing: '0.06em', textTransform: 'capitalize' }}>{tier || 'Digger'}</span>
-            {isPaid ? (
-              <button onClick={onManageSubscription}
-                style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.55)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.18)'; }}>
-                Manage →
-              </button>
-            ) : (
+            {!isPaid && (
               <button onClick={onUpgrade}
                 style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.85)'; e.currentTarget.style.borderColor = 'rgba(var(--fg),0.4)'; }}
@@ -2820,6 +2827,21 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
               </button>
             )}
           </AccountSection>
+
+          {isPaid && (
+            <AccountSection label="Billing" open={openSection === 'billing'} onToggle={() => toggleSection('billing')}>
+              <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
+                You're on the <span style={{ color: 'rgba(var(--fg),0.6)', textTransform: 'capitalize' }}>{tier}</span> plan. Manage your subscription on Stripe to change plan, update your payment method, view invoices, or cancel.
+              </p>
+              {billingErr && <p style={{ fontSize: 15, color: '#fca5a5', marginBottom: 10, fontFamily: 'monospace' }}>{billingErr}</p>}
+              <button onClick={openBillingPortal} disabled={billingBusy}
+                style={{ fontSize: 16, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: billingBusy ? 'default' : 'pointer', padding: 0 }}
+                onMouseEnter={e => { if (!billingBusy) e.currentTarget.style.color = 'rgba(var(--fg),0.75)'; }}
+                onMouseLeave={e => { if (!billingBusy) e.currentTarget.style.color = 'rgba(var(--fg),0.45)'; }}>
+                {billingBusy ? 'Opening...' : 'Manage billing on Stripe →'}
+              </button>
+            </AccountSection>
+          )}
 
           <AccountSection label="Export" open={openSection === 'export'} onToggle={() => toggleSection('export')}>
             <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>Download your collection as a spreadsheet, or print sleeve labels for selected records.</p>
