@@ -15,10 +15,12 @@ export function useSubscription(user, profile) {
 
   const startCheckout = useCallback(async (priceId) => {
     if (!user?.id) throw new Error('Not logged in');
+    const { data: { session } } = await supabase?.auth.getSession() ?? { data: { session: null } };
+    const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` };
     const res = await fetch('/api/stripe-checkout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priceId, userId: user.id, userEmail: user.email }),
+      headers: authHeaders,
+      body: JSON.stringify({ priceId, userEmail: user.email }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Checkout failed');
@@ -27,10 +29,12 @@ export function useSubscription(user, profile) {
 
   const openPortal = useCallback(async () => {
     if (!user?.id) throw new Error('Not logged in');
+    const { data: { session } } = await supabase?.auth.getSession() ?? { data: { session: null } };
+    const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` };
     const res = await fetch('/api/stripe-portal', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id }),
+      headers: authHeaders,
+      body: JSON.stringify({}),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Portal failed');
