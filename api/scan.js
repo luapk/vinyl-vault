@@ -5,6 +5,7 @@ import { fillItunesPreviews } from './lib/itunes.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from './lib/auth.js';
 
 const SCAN_LIMITS = { digger: 50, selector: Infinity, resident: Infinity };
 
@@ -100,10 +101,13 @@ function toCandidate(r) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { image, mediaType, discogsId, vision: clientVision, userId } = req.body || {};
+  const authUser = await requireAuth(req, res);
+  if (!authUser) return;
+
+  const { image, mediaType, discogsId, vision: clientVision } = req.body || {};
 
   // Enforce scan limits before doing any expensive work
-  const limitResult = await checkAndIncrementScanLimit(userId).catch(() => null);
+  const limitResult = await checkAndIncrementScanLimit(authUser.id).catch(() => null);
   if (limitResult?.blocked) {
     return res.status(402).json({
       error: 'scan_limit_reached',
@@ -232,9 +236,8 @@ export default async function handler(req, res) {
       if (soleScore < -1 && (vision.artist || vision.title)) {
         return res.status(200).json({ status: 'complete', release: visionFallback(vision) });
       }
-      const discogsRelease = rawMerged.indexOf(sole) < textMatches.length
-        ? await fetchDiscogsRelease(sole.id)
-        : googleOnlyReleases.find(r => String(r.id) === String(sole.id)) || await fetchDiscogsRelease(sole.id);
+      const cached = googleOnlyReleases.find(r => String(r.id) === String(sole.id));
+      const discogsRelease = cached || await fetchDiscogsRelease(sole.id);
       const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
       return res.status(200).json({ status: 'complete', release });
     }

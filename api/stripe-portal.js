@@ -1,13 +1,16 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from './lib/auth.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId } = req.body || {};
-  if (!userId) return res.status(400).json({ error: 'userId required' });
+  const authUser = await requireAuth(req, res);
+  if (!authUser) return;
+
+  const userId = authUser.id;
 
   const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,

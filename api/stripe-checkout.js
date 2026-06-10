@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from './lib/auth.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -13,8 +14,12 @@ const PRICE_TO_TIER = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { priceId, userId, userEmail } = req.body || {};
-  if (!priceId || !userId) return res.status(400).json({ error: 'priceId and userId required' });
+  const authUser = await requireAuth(req, res);
+  if (!authUser) return;
+
+  const { priceId, userEmail } = req.body || {};
+  if (!priceId) return res.status(400).json({ error: 'priceId required' });
+  const userId = authUser.id;
 
   const tier = PRICE_TO_TIER[priceId];
   if (!tier) return res.status(400).json({ error: 'Unknown price' });

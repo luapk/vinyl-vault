@@ -727,10 +727,12 @@ export default function VinylVault() {
     syncQueue(snapshot);
 
     try {
+      const { supabase: _batchSb } = await import('../lib/supabase.js');
+      const { data: { session: _batchSess } } = await _batchSb.auth.getSession();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision, userId: user?.id }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_batchSess?.access_token}` },
+        body: JSON.stringify({ discogsId: candidate.id, vision }),
       });
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
@@ -2226,7 +2228,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     if (!discogsId) return;
     setPriceLoading(true);
     try {
-      const res = await fetch(`/api/price?id=${encodeURIComponent(discogsId)}`);
+      const { supabase: _priceSb } = await import('../lib/supabase.js');
+      const { data: { session: _priceSess } } = await _priceSb.auth.getSession();
+      const res = await fetch(`/api/price?id=${encodeURIComponent(discogsId)}`, {
+        headers: { 'Authorization': `Bearer ${_priceSess?.access_token}` },
+      });
       const data = await res.json();
       setPrice(data.totalListings === 0 && !data.low ? false : data);
     } catch {
@@ -2266,9 +2272,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const pickReidentifyCandidate = async (candidate) => {
     setReidentifyPicking(true);
     try {
+      const { supabase: _reidentSb } = await import('../lib/supabase.js');
+      const { data: { session: _reidentSess } } = await _reidentSb.auth.getSession();
       const res = await fetch('/api/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_reidentSess?.access_token}` },
         body: JSON.stringify({ discogsId: candidate.id }),
       });
       const data = await res.json();

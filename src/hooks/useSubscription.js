@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { supabase } from '../lib/supabase.js';
 
 export function useSubscription(user, profile) {
   const tier   = profile?.subscription_tier   || 'digger';

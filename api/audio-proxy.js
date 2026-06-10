@@ -19,15 +19,17 @@ export default async function handler(req, res) {
     });
     if (!upstream.ok) return res.status(502).json({ error: 'Upstream error' });
 
-    const buffer = Buffer.from(await upstream.arrayBuffer());
     const ct = upstream.headers.get('content-type') || 'audio/mpeg';
 
     res.setHeader('Content-Type', ct);
-    res.setHeader('Content-Length', buffer.length);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.status(200).send(buffer);
+    const cc = upstream.headers.get('cache-control');
+    if (cc) res.setHeader('Cache-Control', cc);
+    const { Readable } = await import('stream');
+    Readable.fromWeb(upstream.body).pipe(res);
   } catch (err) {
     res.status(500).json({ error: err.message });
+    return;
   }
 }
