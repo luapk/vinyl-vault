@@ -28,6 +28,60 @@ const GENRE_CRATES = [
 
 const CONDITION_GRADES = ['', 'M', 'NM', 'VG+', 'VG', 'G+', 'G', 'F', 'P'];
 
+// Vinyl colour / pressing types
+const VINYL_COLORS = [
+  { id: 'black',    label: 'Black',       bg: '#1a1a1a' },
+  { id: 'clear',    label: 'Clear',       bg: 'rgba(190,220,240,0.45)', border: 'rgba(180,210,230,0.6)' },
+  { id: 'white',    label: 'White',       bg: '#e2e2e2', border: 'rgba(0,0,0,0.18)' },
+  { id: 'red',      label: 'Red',         bg: '#c0392b' },
+  { id: 'blue',     label: 'Blue',        bg: '#1a6fa8' },
+  { id: 'green',    label: 'Green',       bg: '#1e8449' },
+  { id: 'yellow',   label: 'Yellow',      bg: '#d4ac0d', border: 'rgba(0,0,0,0.12)' },
+  { id: 'orange',   label: 'Orange',      bg: '#ca6f1e' },
+  { id: 'pink',     label: 'Pink',        bg: '#cb4397' },
+  { id: 'purple',   label: 'Purple',      bg: '#7d3c98' },
+  { id: 'gold',     label: 'Gold',        bg: 'linear-gradient(135deg,#b8952a,#e8cf6a,#b8952a)' },
+  { id: 'marbled',  label: 'Marbled',     bg: 'conic-gradient(#c0392b 0deg,#1a6fa8 120deg,#1a1a1a 240deg,#c0392b 360deg)' },
+  { id: 'splatter', label: 'Splatter',    bg: 'radial-gradient(circle at 30% 40%,#cb4397 0%,#cb4397 12%,#1a1a1a 12%,#1a1a1a 100%),radial-gradient(circle at 70% 60%,#d4ac0d 0%,#d4ac0d 8%,transparent 8%)' },
+  { id: 'picture',  label: 'Picture',     bg: 'linear-gradient(135deg,#8e44ad,#2980b9,#27ae60)' },
+];
+
+function VinylColorDot({ colorId, size = 14 }) {
+  if (!colorId || colorId === 'black') return null;
+  const def = VINYL_COLORS.find(v => v.id === colorId);
+  if (!def) return null;
+  return (
+    <span title={def.label} style={{
+      display: 'inline-block', width: size, height: size, borderRadius: '50%',
+      background: def.bg,
+      border: `1px solid ${def.border || 'rgba(255,255,255,0.18)'}`,
+      flexShrink: 0,
+    }} />
+  );
+}
+
+function VinylColorPicker({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      {VINYL_COLORS.map(({ id, label, bg, border }) => (
+        <button
+          key={id}
+          title={label}
+          onClick={() => onChange(id === value ? null : id)}
+          style={{
+            width: 22, height: 22, borderRadius: '50%', border: 'none', padding: 0,
+            background: bg,
+            outline: value === id ? '2px solid rgba(120,220,140,0.85)' : '2px solid transparent',
+            outlineOffset: 2,
+            boxShadow: `inset 0 0 0 1px ${border || 'rgba(255,255,255,0.18)'}`,
+            cursor: 'pointer', flexShrink: 0, transition: 'outline 0.12s',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function conditionColor(grade) {
   if (!grade) return null;
   if (grade === 'M' || grade === 'NM') return '120,210,130';
@@ -521,10 +575,13 @@ export default function VinylVault() {
         setStatus("Searching Discogs");
       }
       const base64Data = dataUrl.split(",")[1];
+      const { supabase: _scanSb } = await import('../lib/supabase.js');
+      const { data: { session: _scanSess } } = await _scanSb.auth.getSession();
+      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${_scanSess?.access_token}` };
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg", userId: user?.id }),
+        headers: scanAuthHeaders,
+        body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
       });
       if (response.status === 402) {
         setPhase("idle");
@@ -563,10 +620,12 @@ export default function VinylVault() {
     setStatus("Pulling release data");
     setErrorMsg("");
     try {
+      const { supabase: _pickSb } = await import('../lib/supabase.js');
+      const { data: { session: _pickSess } } = await _pickSb.auth.getSession();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discogsId: candidate.id, vision: visionData, userId: user?.id }),
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_pickSess?.access_token}` },
+        body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
@@ -1479,7 +1538,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
     return counts;
   }, [collection]);
 
-  const filtered = collection.filter((r) => {
+  const filtered = useMemo(() => collection.filter((r) => {
     const q = search.toLowerCase();
     const matchSearch = !q
       || r.artist.toLowerCase().includes(q)
@@ -1489,7 +1548,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
       || (r.tags || []).some((t) => t.toLowerCase().includes(q));
     const matchCrate = !filterCrate || (r.crates || []).includes(filterCrate);
     return matchSearch && matchCrate;
-  });
+  }), [collection, search, filterCrate]);
 
   useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate]);
 
@@ -1689,46 +1748,83 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
 
 // ----- VinylCarousel ---------------------------------------------------------
 
+// Elastic resistance curve: free movement up to ELASTIC_START, then
+// progressively damped so the card feels like it's held by a spring.
+const ELASTIC_START   = 55;   // px -- free zone before resistance kicks in
+const SNAP_THRESHOLD  = 82;   // px raw drag -- commits the swipe
+const VELOCITY_SNAP   = 0.28; // px/ms -- fast flick commits regardless of distance
+const SPRING_DECAY    = 0.72; // per-frame multiplier for spring-back animation
+
+function elasticDelta(raw) {
+  if (Math.abs(raw) <= ELASTIC_START) return raw;
+  const sign = raw < 0 ? -1 : 1;
+  const excess = Math.abs(raw) - ELASTIC_START;
+  // Diminishing returns: each extra px beyond ELASTIC_START contributes less
+  return sign * (ELASTIC_START + excess * 0.28);
+}
+
 function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const startXRef = useRef(null);
+  const startXRef    = useRef(null);
   const startTimeRef = useRef(null);
-  const didDragRef = useRef(false);
-  const rafRef = useRef(null);
+  const rawDeltaRef  = useRef(0);
+  const didDragRef   = useRef(false);
+  const rafRef       = useRef(null);
   const [visualDelta, setVisualDelta] = useState(0);
   const [showCratePicker, setShowCratePicker] = useState(false);
   const [cratePickerInput, setCratePickerInput] = useState('');
 
+  // Spring-back: animate visualDelta toward 0 with exponential decay
+  const springBack = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    let v = visualDelta;
+    function step() {
+      v *= SPRING_DECAY;
+      if (Math.abs(v) < 0.8) { setVisualDelta(0); rafRef.current = null; return; }
+      setVisualDelta(v);
+      rafRef.current = requestAnimationFrame(step);
+    }
+    rafRef.current = requestAnimationFrame(step);
+  }, [visualDelta]);
+
   const onTouchStart = (e) => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     startXRef.current = e.touches[0].clientX;
     startTimeRef.current = performance.now();
+    rawDeltaRef.current = 0;
     didDragRef.current = false;
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     setVisualDelta(0);
   };
 
   const onTouchMove = (e) => {
     if (startXRef.current === null) return;
-    const delta = e.touches[0].clientX - startXRef.current;
-    if (Math.abs(delta) > 6) didDragRef.current = true;
+    const raw = e.touches[0].clientX - startXRef.current;
+    if (Math.abs(raw) > 6) didDragRef.current = true;
     if (!didDragRef.current) return;
+    rawDeltaRef.current = raw;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => setVisualDelta(delta));
+    rafRef.current = requestAnimationFrame(() => setVisualDelta(elasticDelta(raw)));
   };
 
   const onTouchEnd = (e) => {
     if (startXRef.current === null) return;
-    const lastX = e.changedTouches[0].clientX;
-    const delta = lastX - startXRef.current;
-    const velocity = delta / Math.max(performance.now() - startTimeRef.current, 1);
+    const raw = e.changedTouches[0].clientX - startXRef.current;
+    const dt = Math.max(performance.now() - startTimeRef.current, 1);
+    const velocity = raw / dt;
     const wasDrag = didDragRef.current;
     startXRef.current = null;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    setVisualDelta(0);
-    if (!wasDrag) return;
-    // Advance on distance or velocity threshold (velocity in px/ms)
-    if (delta < -40 || velocity < -0.22) onNext();
-    else if (delta > 40 || velocity > 0.22) onPrev();
+    if (!wasDrag) { setVisualDelta(0); return; }
+
+    const committed = Math.abs(raw) >= SNAP_THRESHOLD || Math.abs(velocity) >= VELOCITY_SNAP;
+    if (committed) {
+      setVisualDelta(0);
+      if (raw < 0 || velocity < -VELOCITY_SNAP) onNext();
+      else onPrev();
+    } else {
+      // Not far enough -- spring back
+      springBack();
+    }
   };
 
   // Close picker when navigating to a different record (must be before early return)
@@ -1785,6 +1881,11 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
                       </div>
                   }
                   {isActive && <div style={{ position: 'absolute', inset: 0, background: isLight ? "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 45%)" : "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)", pointerEvents: 'none' }} />}
+                  {record.vinylColor && record.vinylColor !== 'black' && (
+                    <div style={{ position: 'absolute', bottom: 7, right: 7, pointerEvents: 'none' }}>
+                      <VinylColorDot colorId={record.vinylColor} size={isActive ? 16 : 11} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1795,8 +1896,9 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
       {/* Info */}
       <div className="mt-11 text-center">
         <div key={current.id} style={{ animation: "fadeOnly 0.12s ease-out" }}>
-        <div className="text-[13px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono">
-          {[current.year, current.format, current.country].filter(Boolean).join(" · ")}
+        <div className="text-[13px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono flex items-center justify-center gap-2">
+          <span>{[current.year, current.format, current.country].filter(Boolean).join(" · ")}</span>
+          {current.vinylColor && current.vinylColor !== 'black' && <VinylColorDot colorId={current.vinylColor} size={12} />}
         </div>
         <div className="text-xl md:text-2xl leading-tight font-display"><span className="italic">{current.artist}</span></div>
         <div className="text-base md:text-lg text-white/50 font-display mb-3">{current.title}</div>
@@ -2252,6 +2354,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             <div className="flex items-center gap-4 mb-3">
               <ConditionSelect icon={<Mountains size={16} />} value={record.mediaCondition || ''} onChange={v => onUpdate?.(record.id, { mediaCondition: v })} />
               <ConditionSelect icon={<ImageSquare size={16} />} value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
+            </div>
+            <div className="mb-3">
+              <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.35)' }}>Vinyl colour</div>
+              <VinylColorPicker value={record.vinylColor || null} onChange={v => onUpdate?.(record.id, { vinylColor: v || null })} />
             </div>
             <div>
               <div className="text-[11px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>

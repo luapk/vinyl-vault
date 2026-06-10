@@ -225,9 +225,14 @@ export function useCollection(userId = null) {
   }, [useDb, userId, cacheCoverFor]);
 
   // Always persist to localStorage so logout never destroys local data.
+  // Debounced 800ms so rapid state changes (crate edits, BPM updates) don't
+  // serialise the whole array on every keystroke.
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collection)); }
-    catch { /* storage full */ }
+    const t = setTimeout(() => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collection)); }
+      catch { /* storage full */ }
+    }, 800);
+    return () => clearTimeout(t);
   }, [collection]);
 
   const addRecord = useCallback((release, crates = []) => {
