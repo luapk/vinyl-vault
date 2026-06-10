@@ -60,24 +60,61 @@ function VinylColorDot({ colorId, size = 14 }) {
   );
 }
 
-function VinylColorPicker({ value, onChange }) {
+function VinylColorSelect({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const current = VINYL_COLORS.find(v => v.id === (value || 'black')) || VINYL_COLORS[0];
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-      {VINYL_COLORS.map(({ id, label, bg, border }) => (
-        <button
-          key={id}
-          title={label}
-          onClick={() => onChange(id === value ? null : id)}
-          style={{
-            width: 22, height: 22, borderRadius: '50%', border: 'none', padding: 0,
-            background: bg,
-            outline: value === id ? '2px solid rgba(120,220,140,0.85)' : '2px solid transparent',
-            outlineOffset: 2,
-            boxShadow: `inset 0 0 0 1px ${border || 'rgba(255,255,255,0.18)'}`,
-            cursor: 'pointer', flexShrink: 0, transition: 'outline 0.12s',
-          }}
-        />
-      ))}
+    <div ref={ref} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ color: `rgba(var(--fg),${isLight ? 0.52 : 0.38})`, display: 'flex' }}>
+        <VinylRecord size={16} />
+      </span>
+      <button onClick={() => setOpen(v => !v)} style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)',
+        borderRadius: 20, padding: '3px 8px', cursor: 'pointer', outline: 'none',
+      }}>
+        <span style={{
+          width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+          background: current.bg,
+          boxShadow: `inset 0 0 0 1px ${current.border || 'rgba(255,255,255,0.18)'}`,
+        }} />
+        <span style={{ fontSize: 16, fontFamily: 'monospace', color: `rgba(var(--fg),0.45)` }}>
+          {current.label}
+        </span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+          background: 'var(--bg-hex)', border: '1px solid rgba(var(--fg),0.12)',
+          borderRadius: 12, padding: 8,
+          boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+          display: 'flex', flexWrap: 'wrap', gap: 5, width: 162,
+        }}>
+          {VINYL_COLORS.map(({ id, label, bg, border }) => (
+            <button key={id} title={label} onClick={() => { onChange(id); setOpen(false); }}
+              style={{
+                width: 22, height: 22, borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0,
+                background: bg,
+                outline: (value || 'black') === id ? '2px solid rgba(120,220,140,0.85)' : '2px solid transparent',
+                outlineOffset: 2,
+                boxShadow: `inset 0 0 0 1px ${border || 'rgba(255,255,255,0.18)'}`,
+                transition: 'outline 0.1s',
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2362,10 +2399,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
             <div className="flex items-center gap-4 mb-3">
               <ConditionSelect icon={<Mountains size={16} />} value={record.mediaCondition || ''} onChange={v => onUpdate?.(record.id, { mediaCondition: v })} />
               <ConditionSelect icon={<ImageSquare size={16} />} value={record.sleeveCondition || ''} onChange={v => onUpdate?.(record.id, { sleeveCondition: v })} />
-            </div>
-            <div className="mb-3">
-              <div className="text-[11px] tracking-[0.2em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.35)' }}>Vinyl colour</div>
-              <VinylColorPicker value={record.vinylColor || null} onChange={v => onUpdate?.(record.id, { vinylColor: v || null })} />
+              <VinylColorSelect value={record.vinylColor || 'black'} onChange={v => onUpdate?.(record.id, { vinylColor: v })} />
             </div>
             <div>
               <div className="text-[11px] tracking-[0.2em] uppercase text-white/40 font-mono mb-1.5">Crates</div>
