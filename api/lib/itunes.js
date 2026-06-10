@@ -4,7 +4,7 @@ function stripParens(s) {
   return s.replace(/\s*\([^)]*\)/g, '').trim();
 }
 
-function parseDurationSecs(str) {
+export function parseDurationSecs(str) {
   if (!str) return null;
   const parts = str.split(':');
   if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
@@ -17,9 +17,9 @@ function msToMmSs(ms) {
   return `${Math.floor(totalSec / 60)}:${String(totalSec % 60).padStart(2, '0')}`;
 }
 
-const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+export const norm = s => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
-function titleScore(a, b) {
+export function titleScore(a, b) {
   const na = norm(a), nb = norm(b);
   if (!na || !nb) return 0;
   if (na === nb) return 4;
@@ -42,7 +42,7 @@ function titleScore(a, b) {
   return s;
 }
 
-function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear, releaseTitle) {
+export function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear, releaseTitle) {
   const ts = titleScore(trackTitle, result.trackName || '');
   if (ts === 0) return 0;
 
@@ -92,7 +92,7 @@ function scoreMatch(result, artist, trackTitle, discogsDurationStr, releaseYear,
 
 const MIN_SCORE = 3;
 
-function bestMatch(results, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) {
+export function bestMatch(results, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) {
   const candidates = results
     .filter(r => r.previewUrl)
     .map(r => ({ r, s: scoreMatch(r, artist, trackTitle, discogsDuration, releaseYear, releaseTitle) }))
