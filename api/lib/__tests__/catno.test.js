@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { normalizeCatno, extractRawCatnos } from '../scoring.js';
 
 // ---------------------------------------------------------------------------
-// Catalogue number normalisation — the most important search key on a sleeve
+// Catalogue number normalisation -- the most important search key on a sleeve
 // ---------------------------------------------------------------------------
 
-describe('normalizeCatno() — real-world formats', () => {
+describe('normalizeCatno() -- real-world formats', () => {
   const cases = [
     // [input, must-include variants]
     ['WAP 63',     ['WAP63', 'WAP-63']],
@@ -21,7 +21,7 @@ describe('normalizeCatno() — real-world formats', () => {
   ];
 
   cases.forEach(([input, required]) => {
-    it(`${input} → includes ${required.join(', ')}`, () => {
+    it(`${input} -> includes ${required.join(', ')}`, () => {
       const result = normalizeCatno(input);
       required.forEach(r => expect(result).toContain(r));
     });
@@ -34,10 +34,10 @@ describe('normalizeCatno() — real-world formats', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractRawCatnos() — pulling catnos from OCR text
+// extractRawCatnos() -- pulling catnos from OCR text
 // ---------------------------------------------------------------------------
 
-describe('extractRawCatnos() — OCR extraction', () => {
+describe('extractRawCatnos() -- OCR extraction', () => {
 
   it('extracts WAP63 from sleeve text', () => {
     const raw = 'LFO WAP63 WARP RECORDS LEEDS';
@@ -65,8 +65,8 @@ describe('extractRawCatnos() — OCR extraction', () => {
   it('ignores plain years like "1992" or "2001"', () => {
     const raw = 'APHEX TWIN APOLLO 1992 SELECTED AMBIENT';
     const result = extractRawCatnos(raw, null);
-    // Years may match \d{4} but only if preceded by letters — "1992" alone should not
-    // (current regex requires [A-Z]{1,6} prefix — pure years won't match)
+    // Years may match \d{4} but only if preceded by letters -- "1992" alone should not
+    // (current regex requires [A-Z]{1,6} prefix -- pure years won't match)
     result.forEach(c => {
       expect(/^\d+$/.test(c)).toBe(false);
     });

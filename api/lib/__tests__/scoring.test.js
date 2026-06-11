@@ -54,10 +54,10 @@ describe('sim()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// scoreCandidate() — true positive cases
+// scoreCandidate() -- true positive cases
 // ---------------------------------------------------------------------------
 
-describe('scoreCandidate() — true positives', () => {
+describe('scoreCandidate() -- true positives', () => {
 
   it('perfect match: artist + title + label all correct', () => {
     const c = candidate('Aphex Twin', 'Selected Ambient Works 85-92', 'Apollo');
@@ -65,13 +65,13 @@ describe('scoreCandidate() — true positives', () => {
     expect(scoreCandidate(c, v)).toBeGreaterThanOrEqual(8);
   });
 
-  it('Plastikman — Spastik (artist + title match)', () => {
+  it('Plastikman -- Spastik (artist + title match)', () => {
     const c = candidate('Plastikman', 'Spastik', 'R&S Records');
     const v = vision('Plastikman', 'Spastik', 'R&S');
     expect(scoreCandidate(c, v)).toBeGreaterThanOrEqual(8);
   });
 
-  it('LFO — LFO (short title exact)', () => {
+  it('LFO -- LFO (short title exact)', () => {
     const c = candidate('LFO', 'LFO', 'Warp');
     const v = vision('LFO', 'LFO', 'Warp');
     expect(scoreCandidate(c, v)).toBeGreaterThanOrEqual(5);
@@ -109,10 +109,10 @@ describe('scoreCandidate() — true positives', () => {
 });
 
 // ---------------------------------------------------------------------------
-// scoreCandidate() — false catno collision detection
+// scoreCandidate() -- false catno collision detection
 // ---------------------------------------------------------------------------
 
-describe('scoreCandidate() — false catno collisions', () => {
+describe('scoreCandidate() -- false catno collisions', () => {
 
   it('completely wrong artist with matching catno scores negative', () => {
     // "PM-012" exists on two different labels; wrong artist should be penalised
@@ -144,12 +144,12 @@ describe('scoreCandidate() — false catno collisions', () => {
 });
 
 // ---------------------------------------------------------------------------
-// scoreCandidate() — artist reliability detection
+// scoreCandidate() -- artist reliability detection
 // ---------------------------------------------------------------------------
 
-describe('scoreCandidate() — artist reliability', () => {
+describe('scoreCandidate() -- artist reliability', () => {
 
-  it('label=artist confusion: artist same as label → no artist bonus or penalty', () => {
+  it('label=artist confusion: artist same as label -> no artist bonus or penalty', () => {
     // Vision misread "Warp Records" imprint as the artist
     const c = candidate('LFO', 'LFO', 'Warp');
     const v = vision('Warp', 'LFO', 'Warp');
@@ -170,7 +170,7 @@ describe('scoreCandidate() — artist reliability', () => {
   it('genre word as artist ("Techno") is treated as unreliable', () => {
     const c = candidate('Plastikman', 'Spastik', 'R&S');
     const v = vision('Techno', 'Spastik', 'R&S');
-    // "Techno" is in GENRE_WORDS → artist ignored → should not penalise for mismatch
+    // "Techno" is in GENRE_WORDS -> artist ignored -> should not penalise for mismatch
     const score = scoreCandidate(c, v);
     expect(score).toBeGreaterThanOrEqual(0);
   });
@@ -196,10 +196,10 @@ describe('scoreCandidate() — artist reliability', () => {
 });
 
 // ---------------------------------------------------------------------------
-// scoreCandidate() — null / missing field handling
+// scoreCandidate() -- null / missing field handling
 // ---------------------------------------------------------------------------
 
-describe('scoreCandidate() — missing fields', () => {
+describe('scoreCandidate() -- missing fields', () => {
 
   it('null title in candidate: no title signal', () => {
     const c = candidate('Aphex Twin', null, 'Warp');
@@ -249,7 +249,7 @@ describe('rankCandidates()', () => {
     expect(ranked[0]).toBe(correct);
   });
 
-  it('never returns empty — falls back to full list when all score negative', () => {
+  it('never returns empty -- falls back to full list when all score negative', () => {
     const c = [
       candidate('Madonna', 'Like a Prayer', 'Sire'),
       candidate('Spice Girls', 'Wannabe', 'Virgin'),
@@ -322,7 +322,7 @@ describe('normalizeCatno()', () => {
     expect(normalizeCatno('')).toEqual([]);
   });
 
-  it('STUMM 123 → STUMM123', () => {
+  it('STUMM 123 -> STUMM123', () => {
     const variants = normalizeCatno('STUMM 123');
     expect(variants).toContain('STUMM123');
   });

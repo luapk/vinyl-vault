@@ -6,13 +6,13 @@ import { parseDurationSecs, titleScore, scoreMatch, bestMatch, norm } from '../i
 // ---------------------------------------------------------------------------
 
 describe('parseDurationSecs()', () => {
-  it('parses "4:32" → 272', () => expect(parseDurationSecs('4:32')).toBe(272));
-  it('parses "0:45" → 45', () => expect(parseDurationSecs('0:45')).toBe(45));
-  it('parses "10:00" → 600', () => expect(parseDurationSecs('10:00')).toBe(600));
+  it('parses "4:32" -> 272', () => expect(parseDurationSecs('4:32')).toBe(272));
+  it('parses "0:45" -> 45', () => expect(parseDurationSecs('0:45')).toBe(45));
+  it('parses "10:00" -> 600', () => expect(parseDurationSecs('10:00')).toBe(600));
   it('returns null for null', () => expect(parseDurationSecs(null)).toBeNull());
   it('returns null for empty string', () => expect(parseDurationSecs('')).toBeNull());
   it('returns null for non-duration string', () => expect(parseDurationSecs('Spastik')).toBeNull());
-  it('parses "7:07" → 427', () => expect(parseDurationSecs('7:07')).toBe(427));
+  it('parses "7:07" -> 427', () => expect(parseDurationSecs('7:07')).toBe(427));
 });
 
 // ---------------------------------------------------------------------------
@@ -31,15 +31,15 @@ describe('norm() itunes', () => {
 // ---------------------------------------------------------------------------
 
 describe('titleScore()', () => {
-  it('exact match → 4', () => expect(titleScore('Spastik', 'Spastik')).toBe(4));
-  it('empty inputs → 0', () => {
+  it('exact match -> 4', () => expect(titleScore('Spastik', 'Spastik')).toBe(4));
+  it('empty inputs -> 0', () => {
     expect(titleScore('', 'Spastik')).toBe(0);
     expect(titleScore('Spastik', '')).toBe(0);
   });
-  it('full word overlap (3 words) → 3', () => {
+  it('full word overlap (3 words) -> 3', () => {
     expect(titleScore('Selected Ambient Works', 'Selected Ambient Works 85-92')).toBeGreaterThanOrEqual(2);
   });
-  it('no word overlap → 0', () => {
+  it('no word overlap -> 0', () => {
     expect(titleScore('Spastik', 'Windowlicker')).toBe(0);
   });
   it('substring containment gives partial credit', () => {
@@ -61,7 +61,7 @@ describe('titleScore()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// scoreMatch() — core iTunes matching
+// scoreMatch() -- core iTunes matching
 // ---------------------------------------------------------------------------
 
 function itunesResult(overrides = {}) {
@@ -84,39 +84,39 @@ describe('scoreMatch()', () => {
     expect(score).toBeGreaterThanOrEqual(10);
   });
 
-  it('title mismatch → 0 (returns early)', () => {
+  it('title mismatch -> 0 (returns early)', () => {
     const result = itunesResult({ trackName: 'Windowlicker' });
     const score = scoreMatch(result, 'Plastikman', 'Spastik', '7:07', 1998, null);
     expect(score).toBe(0);
   });
 
-  it('duration hard reject: >45s off → -1', () => {
+  it('duration hard reject: >45s off -> -1', () => {
     // Discogs has 7:07 (427s), iTunes result is 3:00 (180s) -- 247s difference
     const result = itunesResult({ trackTimeMillis: 3 * 60 * 1000 });
     const score = scoreMatch(result, 'Plastikman', 'Spastik', '7:07', 1998, null);
     expect(score).toBe(-1);
   });
 
-  it('duration within 5s → +3 bonus', () => {
+  it('duration within 5s -> +3 bonus', () => {
     const result = itunesResult({ trackTimeMillis: (427 + 3) * 1000 }); // 3s off
     const withDuration    = scoreMatch(result, 'Plastikman', 'Spastik', '7:07', 1998, null);
     const withoutDuration = scoreMatch(itunesResult(), 'Plastikman', 'Spastik', null, 1998, null);
     expect(withDuration).toBeGreaterThan(withoutDuration);
   });
 
-  it('duration 15-30s off → +1 bonus only', () => {
+  it('duration 15-30s off -> +1 bonus only', () => {
     const result = itunesResult({ trackTimeMillis: (427 + 20) * 1000 }); // 20s off
     const score = scoreMatch(result, 'Plastikman', 'Spastik', '7:07', 1998, null);
     expect(score).toBeGreaterThan(0); // not rejected
   });
 
-  it('artist mismatch with no word overlap → -2 penalty', () => {
+  it('artist mismatch with no word overlap -> -2 penalty', () => {
     const result = itunesResult({ artistName: 'Kylie Minogue' });
     const score = scoreMatch(result, 'Plastikman', 'Spastik', null, null, null);
     expect(score).toBeLessThan(scoreMatch(itunesResult(), 'Plastikman', 'Spastik', null, null, null));
   });
 
-  it('year within 2 years → +2 bonus', () => {
+  it('year within 2 years -> +2 bonus', () => {
     const sameYear = itunesResult({ releaseDate: '1998-06-01T00:00:00Z' });
     const farYear  = itunesResult({ releaseDate: '2020-01-01T00:00:00Z' });
     const baseScore = scoreMatch(itunesResult(), 'Plastikman', 'Spastik', null, null, null);
@@ -126,14 +126,14 @@ describe('scoreMatch()', () => {
     expect(farYearScore).toBeLessThan(sameYearScore);
   });
 
-  it('year more than 15 years off → -2 penalty', () => {
+  it('year more than 15 years off -> -2 penalty', () => {
     const base = { trackName: 'Windowlicker', artistName: 'Aphex Twin', trackTimeMillis: 360000, previewUrl: 'x' };
     const sameEra = scoreMatch({ ...base, releaseDate: '2020-01-01T00:00:00Z' }, 'Aphex Twin', 'Windowlicker', null, 2020, null);
     const farEra  = scoreMatch({ ...base, releaseDate: '1993-01-01T00:00:00Z' }, 'Aphex Twin', 'Windowlicker', null, 2020, null);
     expect(sameEra).toBeGreaterThan(farEra);
   });
 
-  it('album title match → additional bonus', () => {
+  it('album title match -> additional bonus', () => {
     const withAlbum    = itunesResult({ collectionName: 'Consumed' });
     const withoutAlbum = itunesResult({ collectionName: 'Greatest Hits' });
     const scoreWith    = scoreMatch(withAlbum, 'Plastikman', 'Spastik', null, null, 'Consumed');
@@ -147,7 +147,7 @@ describe('scoreMatch()', () => {
     expect(score).toBeGreaterThan(0);
   });
 
-  it('partial artist overlap → +1 (not -2)', () => {
+  it('partial artist overlap -> +1 (not -2)', () => {
     // "Aphex Twin" vs "Twin" -- one word overlaps
     const result = itunesResult({ artistName: 'Twin', trackName: 'Spastik' });
     const score = scoreMatch(result, 'Aphex Twin', 'Spastik', null, null, null);
@@ -156,7 +156,7 @@ describe('scoreMatch()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// bestMatch() — filter and pick winner
+// bestMatch() -- filter and pick winner
 // ---------------------------------------------------------------------------
 
 const MIN_SCORE = 3;
@@ -173,7 +173,7 @@ describe('bestMatch()', () => {
   });
 
   it('returns null when best score is below MIN_SCORE', () => {
-    // Title doesn't match at all → titleScore 0 → scoreMatch returns 0 → filtered out
+    // Title doesn't match at all -> titleScore 0 -> scoreMatch returns 0 -> filtered out
     const result = itunesResult({ trackName: 'Totally Different' });
     expect(bestMatch([result], 'Plastikman', 'Spastik', null, null, null)).toBeNull();
   });
@@ -194,7 +194,7 @@ describe('bestMatch()', () => {
   });
 
   it('hard-rejects duration mismatch even if title matches', () => {
-    // Same track title but 3-minute version when discogs says 7:07 (247s off → hard reject)
+    // Same track title but 3-minute version when discogs says 7:07 (247s off -> hard reject)
     const wrongVersion = itunesResult({
       trackTimeMillis: 3 * 60 * 1000,
       previewUrl: 'https://example.com/wrong.m4a',
@@ -214,9 +214,9 @@ describe('bestMatch()', () => {
 // Real-world electronic music scenarios
 // ---------------------------------------------------------------------------
 
-describe('iTunes matching — electronic music edge cases', () => {
+describe('iTunes matching -- electronic music edge cases', () => {
 
-  it('Burial — Archangel: long atmospheric track matched by title + artist', () => {
+  it('Burial -- Archangel: long atmospheric track matched by title + artist', () => {
     const result = {
       trackName: 'Archangel',
       artistName: 'Burial',
@@ -237,7 +237,7 @@ describe('iTunes matching — electronic music edge cases', () => {
   });
 
   it('remix version is NOT matched when we have exact duration for original', () => {
-    // Original is 7:07; remix is 4:30 — hard reject on duration
+    // Original is 7:07; remix is 4:30 -- hard reject on duration
     const remixResult = itunesResult({
       trackName: 'Spastik (Richie Hawtin Remix)',
       trackTimeMillis: 4 * 60 * 1000 + 30 * 1000, // 4:30
@@ -247,7 +247,7 @@ describe('iTunes matching — electronic music edge cases', () => {
     expect(result).toBeNull();
   });
 
-  it('four Tet — Rounds: hyphenated artist handled', () => {
+  it('four Tet -- Rounds: hyphenated artist handled', () => {
     const result = {
       trackName: 'My Angel Rocks Back and Forth',
       artistName: 'Four Tet',

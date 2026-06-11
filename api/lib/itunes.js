@@ -61,7 +61,7 @@ export function scoreMatch(result, artist, trackTitle, discogsDurationStr, relea
     }
   }
 
-  // Duration: tighter threshold — different versions/arrangements differ here
+  // Duration: tighter threshold -- different versions/arrangements differ here
   if (discogsDurationStr && result.trackTimeMillis) {
     const discogsSecs = parseDurationSecs(discogsDurationStr);
     if (discogsSecs) {
