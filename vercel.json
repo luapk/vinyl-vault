@@ -3,7 +3,6 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
-    "api/identify.js": { "maxDuration": 30 },
     "api/scan.js": { "maxDuration": 60 },
     "api/discogs-search.js": { "maxDuration": 15 },
     "api/spotify-features.js": { "maxDuration": 30 },
