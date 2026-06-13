@@ -4305,39 +4305,72 @@ function CameraModal({ onCapture, onClose }) {
 
   useEffect(() => {
     let mounted = true;
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
-    }).then(stream => {
-      if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => { if (mounted) setReady(true); };
+
+    const start = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (mounted) setError('Camera not supported on this browser');
+        return;
       }
-    }).catch(err => {
-      if (mounted) setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : err.message);
-    });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        const v = videoRef.current;
+        if (!v) return;
+        v.srcObject = stream;
+        // iOS Safari needs an explicit play() call -- autoPlay + onloadedmetadata
+        // alone frequently yields a permanently black frame. Awaiting play() and
+        // then flipping ready avoids depending on a metadata event that may never fire.
+        try { await v.play(); } catch { /* play() can reject on iOS; frames still arrive */ }
+        if (mounted) setReady(true);
+      } catch (err) {
+        if (mounted) setError(err.name === 'NotAllowedError' ? 'Camera permission denied' : (err.message || 'Camera unavailable'));
+      }
+    };
+
+    start();
+
+    // iOS pauses (or black-frames) the stream when the tab is backgrounded -- an
+    // app switch or the permission sheet itself does this. Resume on return.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && videoRef.current?.srcObject) {
+        videoRef.current.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       mounted = false;
+      document.removeEventListener('visibilitychange', onVisible);
       stopStream();
     };
   }, []);
 
   const capture = () => {
-    if (!videoRef.current || !ready || capturing) return;
+    const v = videoRef.current;
+    if (!v || !ready || capturing) return;
+    // Guard against capturing before any frames have decoded -- iOS can report
+    // ready while videoWidth is still 0, which would make a zero-size canvas.
+    if (!v.videoWidth || !v.videoHeight) return;
     setCapturing(true);
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
-    const v = videoRef.current;
+    // Cap the capture canvas: full-resolution iPhone sensors (up to ~4032x3024)
+    // can spike memory enough to crash the tab. The scan pipeline downsizes again.
+    const MAX = 1600;
+    const scale = Math.min(1, MAX / Math.max(v.videoWidth, v.videoHeight));
     const canvas = document.createElement('canvas');
-    canvas.width = v.videoWidth;
-    canvas.height = v.videoHeight;
-    canvas.getContext('2d').drawImage(v, 0, 0);
+    canvas.width = Math.round(v.videoWidth * scale);
+    canvas.height = Math.round(v.videoHeight * scale);
+    canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
     stopStream();
     canvas.toBlob(blob => {
       canvas.width = 0; canvas.height = 0;
       if (blob) onCapture(new File([blob], 'scan.jpg', { type: 'image/jpeg' }));
+      else { setCapturing(false); setError('Capture failed, please try again'); }
     }, 'image/jpeg', 0.92);
   };
 
@@ -4357,9 +4390,12 @@ function CameraModal({ onCapture, onClose }) {
 
       {/* Video feed */}
       <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        {/* Kept rendered (never display:none) -- iOS will not start a camera feed
+            on a hidden video element, which is a common cause of the black screen.
+            Fade in once the first frames arrive. */}
         <video ref={videoRef} autoPlay playsInline muted
-          className="w-full h-full object-cover"
-          style={{ display: ready ? 'block' : 'none' }} />
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.25s' }} />
 
         {!ready && !error && (
           <div className="text-white/50 text-sm font-mono flex flex-col items-center gap-3">
