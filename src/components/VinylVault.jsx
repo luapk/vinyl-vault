@@ -2464,8 +2464,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
         {/* Close bar: drag handle + label. Full-width tap target, especially useful on mobile. */}
         <button onClick={onClose} className="w-full flex flex-col items-center gap-1.5 pt-3 pb-3 transition-opacity hover:opacity-70 active:opacity-50" aria-label="Close">
-          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(var(--fg),0.18)" }} />
-          <span className="text-[13px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.22)" }}>Close</span>
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(var(--fg),0.30)" }} />
+          <span className="text-[13px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.45)" }}>Close</span>
         </button>
 
         <div className="px-6 md:px-8 pb-8">
