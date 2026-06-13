@@ -5,6 +5,7 @@ import {
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
+  MusicNotes, Waveform,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -889,6 +890,7 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
+    ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes }] : []),
     ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
   ];
 
@@ -992,6 +994,9 @@ export default function VinylVault() {
         )}
         {appView === "collection" && (
           <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
+        )}
+        {appView === "tracks" && (
+          <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} />
         )}
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
@@ -4153,6 +4158,327 @@ function PredictiveSearch({ value, onChange, collection, accentRGB }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ----- TracksView (group/filter individual tracks by BPM) --------------------
+
+const BPM_SLIDER_MIN = 60;
+const BPM_SLIDER_MAX = 200;
+const BPM_BUCKET = 5;
+
+function TracksView({ collection, accentRGB, onUpdate }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(null);
+  const [search, setSearch] = useState('');
+  const [range, setRange] = useState(null); // null = follow data bounds until touched
+  const [showUnanalyzed, setShowUnanalyzed] = useState(false);
+  const [detecting, setDetecting] = useState(() => new Set()); // previewUrls in flight
+  const triedRef = useRef(new Set());
+  const mountedRef = useRef(true);
+
+  // Live mirror so the detection pump and persist read fresh state without
+  // becoming effect dependencies (which would restart the pump on every save).
+  const collectionRef = useRef(collection);
+  collectionRef.current = collection;
+
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Flatten every track, carrying its parent record's cover/artist/title.
+  const allTracks = useMemo(() => {
+    const out = [];
+    for (const rec of collection) {
+      (rec.tracklist || []).forEach((t, i) => {
+        if (!t || (!t.title && !t.position)) return;
+        out.push({
+          uid: `${rec.id}:${i}`,
+          recordId: rec.id,
+          trackIndex: i,
+          artist: rec.artist || '',
+          recordTitle: rec.title || '',
+          coverUrl: rec.coverUrl || null,
+          title: t.title || `Track ${i + 1}`,
+          position: t.position || '',
+          bpm: typeof t.bpm === 'number' ? t.bpm : null,
+          key: t.key || null,
+          previewUrl: t.previewUrl || null,
+          duration: t.duration || null,
+        });
+      });
+    }
+    return out;
+  }, [collection]);
+
+  // Persist a detected BPM back into the record's tracklist (idempotent).
+  const persistBpm = useCallback((recordId, trackIndex, bpm) => {
+    const rec = collectionRef.current.find(r => r.id === recordId);
+    if (!rec) return;
+    const next = (rec.tracklist || []).map((t, i) => i === trackIndex ? { ...t, bpm } : t);
+    onUpdate?.(recordId, { tracklist: next });
+  }, [onUpdate]);
+
+  // Auto-detect on entry: waveform-analyse previewable tracks missing a BPM,
+  // two at a time, reading remaining work fresh each iteration. Runs once.
+  useEffect(() => {
+    let active = true;
+    const CONCURRENCY = 2;
+
+    const nextJob = () => {
+      for (const rec of collectionRef.current) {
+        const tl = rec.tracklist || [];
+        for (let i = 0; i < tl.length; i++) {
+          const t = tl[i];
+          if (t?.previewUrl && t.bpm == null && !triedRef.current.has(t.previewUrl)) {
+            return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl };
+          }
+        }
+      }
+      return null;
+    };
+
+    const worker = async () => {
+      while (active) {
+        const job = nextJob();
+        if (!job) return;
+        triedRef.current.add(job.previewUrl);
+        if (mountedRef.current) setDetecting(prev => new Set(prev).add(job.previewUrl));
+        let bpm = null;
+        try { bpm = await detectBPM(job.previewUrl); } catch { /* ignore */ }
+        if (bpm != null) persistBpm(job.recordId, job.trackIndex, bpm);
+        if (mountedRef.current) setDetecting(prev => { const s = new Set(prev); s.delete(job.previewUrl); return s; });
+      }
+    };
+
+    for (let i = 0; i < CONCURRENCY; i++) worker();
+    return () => { active = false; };
+  }, [persistBpm]);
+
+  useEffect(() => () => audioRef.current?.pause(), []);
+
+  const play = (url) => {
+    if (!url) return;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (playing === url) { setPlaying(null); return; }
+    const a = new Audio(url);
+    audioRef.current = a;
+    a.play().catch(() => {});
+    setPlaying(url);
+    a.onended = () => { setPlaying(null); audioRef.current = null; };
+  };
+
+  // Data-driven default slider bounds (snap out to nearest bucket).
+  const analyzedBpms = useMemo(() => allTracks.map(t => t.bpm).filter(b => b != null), [allTracks]);
+  const dataLo = analyzedBpms.length ? Math.max(BPM_SLIDER_MIN, Math.floor(Math.min(...analyzedBpms) / BPM_BUCKET) * BPM_BUCKET) : 110;
+  const dataHi = analyzedBpms.length ? Math.min(BPM_SLIDER_MAX, Math.ceil(Math.max(...analyzedBpms) / BPM_BUCKET) * BPM_BUCKET) : 150;
+  const selMin = range ? range[0] : dataLo;
+  const selMax = range ? range[1] : dataHi;
+
+  const q = search.trim().toLowerCase();
+  const matchesSearch = (t) =>
+    !q || t.artist.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || t.recordTitle.toLowerCase().includes(q);
+
+  const analyzed = useMemo(
+    () => allTracks.filter(t => t.bpm != null && matchesSearch(t)).sort((a, b) => a.bpm - b.bpm || a.artist.localeCompare(b.artist)),
+    [allTracks, q],
+  );
+  const visible = analyzed.filter(t => t.bpm >= selMin && t.bpm <= selMax);
+  const unanalyzed = useMemo(() => allTracks.filter(t => t.bpm == null && matchesSearch(t)), [allTracks, q]);
+
+  // Histogram: counts per 5-BPM bucket across the slider range.
+  const histogram = useMemo(() => {
+    const buckets = {};
+    for (const t of analyzed) {
+      const b = Math.floor(t.bpm / BPM_BUCKET) * BPM_BUCKET;
+      buckets[b] = (buckets[b] || 0) + 1;
+    }
+    const bars = [];
+    for (let b = BPM_SLIDER_MIN; b < BPM_SLIDER_MAX; b += BPM_BUCKET) bars.push({ low: b, count: buckets[b] || 0 });
+    const max = bars.reduce((m, x) => Math.max(m, x.count), 0) || 1;
+    return { bars, max };
+  }, [analyzed]);
+
+  const detectingCount = detecting.size;
+
+  if (allTracks.length === 0) {
+    return (
+      <div className="px-5 md:px-10 py-20 text-center">
+        <MusicNotes size={32} weight="thin" className="mx-auto mb-3 opacity-30" />
+        <div className="text-white/40 text-sm font-mono">No tracks yet. Scan some records to build your track pool.</div>
+      </div>
+    );
+  }
+
+  // Render the analyzed list with a small divider whenever the 5-BPM band changes.
+  const rows = [];
+  let lastBand = null;
+  for (const t of visible) {
+    const band = Math.floor(t.bpm / BPM_BUCKET) * BPM_BUCKET;
+    if (band !== lastBand) {
+      lastBand = band;
+      const count = visible.filter(x => Math.floor(x.bpm / BPM_BUCKET) * BPM_BUCKET === band).length;
+      rows.push(
+        <div key={`band-${band}`} className="flex items-baseline gap-2 px-1 pt-5 pb-1.5 sticky top-0 z-10" style={{ background: 'linear-gradient(to bottom, var(--bg-hex) 60%, transparent)' }}>
+          <span className="text-[20px] font-display" style={{ color: `rgb(${accentRGB})` }}>{band}–{band + BPM_BUCKET - 1}</span>
+          <span className="text-[12px] tracking-[0.18em] uppercase font-mono text-white/35">BPM · {count}</span>
+        </div>
+      );
+    }
+    rows.push(<TrackBpmRow key={t.uid} t={t} accentRGB={accentRGB} playing={playing} onPlay={play} detecting={detecting.has(t.previewUrl)} />);
+  }
+
+  return (
+    <div className="px-4 md:px-10 py-5 max-w-4xl mx-auto">
+      {/* Header stats */}
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Waveform size={20} weight="duotone" style={{ color: `rgb(${accentRGB})` }} />
+          <h2 className="text-[15px] tracking-[0.18em] uppercase font-mono text-white/70">Tracks by BPM</h2>
+        </div>
+        <div className="text-[12px] tracking-[0.12em] uppercase font-mono text-white/35">
+          {analyzed.length} analyzed · {unanalyzed.length} pending
+          {detectingCount > 0 && <span style={{ color: `rgb(${accentRGB})` }}> · detecting {detectingCount}</span>}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Filter by artist, track, or release"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl text-[14px] font-mono outline-none"
+          style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.85)' }}
+        />
+      </div>
+
+      {/* Histogram + dual-thumb BPM range slider */}
+      <div className="mb-5 rounded-2xl p-4" style={{ background: 'rgba(var(--fg),0.025)', border: '1px solid rgba(var(--fg),0.07)' }}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[13px] font-mono text-white/60">{selMin}–{selMax} BPM</span>
+          {range && (
+            <button onClick={() => setRange(null)} className="text-[11px] tracking-[0.14em] uppercase font-mono text-white/40 hover:text-white/70 transition-colors">Reset</button>
+          )}
+        </div>
+
+        {/* Histogram bars (tap a bar to snap the range to that band) */}
+        <div className="flex items-end gap-[2px] h-16 mb-1">
+          {histogram.bars.map(({ low, count }) => {
+            const inRange = low >= selMin && low < selMax;
+            return (
+              <button
+                key={low}
+                onClick={() => setRange([low, Math.min(BPM_SLIDER_MAX, low + BPM_BUCKET)])}
+                title={`${low}–${low + BPM_BUCKET - 1} BPM · ${count}`}
+                className="flex-1 rounded-t transition-all"
+                style={{
+                  height: `${Math.max(count ? 8 : 2, (count / histogram.max) * 100)}%`,
+                  background: inRange ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.14)',
+                  opacity: inRange ? 0.9 : 0.5,
+                  minHeight: 2,
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Dual-thumb range slider overlaid on the bucket axis */}
+        <div className="relative h-7">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[3px] rounded-full" style={{ background: 'rgba(var(--fg),0.12)' }} />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-[3px] rounded-full"
+            style={{
+              left: `${((selMin - BPM_SLIDER_MIN) / (BPM_SLIDER_MAX - BPM_SLIDER_MIN)) * 100}%`,
+              right: `${(1 - (selMax - BPM_SLIDER_MIN) / (BPM_SLIDER_MAX - BPM_SLIDER_MIN)) * 100}%`,
+              background: `rgb(${accentRGB})`,
+            }}
+          />
+          <input
+            type="range" className="bpm-range" min={BPM_SLIDER_MIN} max={BPM_SLIDER_MAX} step={1} value={selMin}
+            onChange={e => { const v = Math.min(+e.target.value, selMax - 1); setRange([v, selMax]); }}
+          />
+          <input
+            type="range" className="bpm-range" min={BPM_SLIDER_MIN} max={BPM_SLIDER_MAX} step={1} value={selMax}
+            onChange={e => { const v = Math.max(+e.target.value, selMin + 1); setRange([selMin, v]); }}
+          />
+        </div>
+        <div className="flex justify-between text-[10px] font-mono text-white/25 mt-1">
+          <span>{BPM_SLIDER_MIN}</span><span>{BPM_SLIDER_MAX} BPM</span>
+        </div>
+      </div>
+
+      {/* Analyzed track list, grouped by band */}
+      {visible.length === 0 ? (
+        <div className="text-center py-10 text-white/35 text-sm font-mono">
+          {analyzed.length === 0 ? 'No analyzed tracks yet — detection runs automatically for tracks with previews.' : 'No tracks in this BPM range.'}
+        </div>
+      ) : (
+        <div className="flex flex-col">{rows}</div>
+      )}
+
+      {/* Unanalyzed / pending section */}
+      {unanalyzed.length > 0 && (
+        <div className="mt-6">
+          <button onClick={() => setShowUnanalyzed(s => !s)} className="w-full flex items-center justify-between px-1 py-2 transition-opacity hover:opacity-80">
+            <span className="text-[13px] tracking-[0.16em] uppercase font-mono text-white/45">Unanalyzed · {unanalyzed.length}</span>
+            <CaretDown size={13} className="opacity-50" style={{ transform: showUnanalyzed ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+          </button>
+          {showUnanalyzed && (
+            <div className="flex flex-col mt-1">
+              {unanalyzed.map(t => (
+                <TrackBpmRow key={t.uid} t={t} accentRGB={accentRGB} playing={playing} onPlay={play} detecting={detecting.has(t.previewUrl)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
+  const isPlaying = t.previewUrl && playing === t.previewUrl;
+  const keyColor = t.key ? camelotColor(t.key) : null;
+  return (
+    <div className="flex items-center gap-3 px-2 py-2 rounded-xl transition-all hover:bg-white/[0.03]" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}>
+      {/* Cover */}
+      <div className="w-11 h-11 rounded-md overflow-hidden shrink-0" style={{ background: `rgba(${accentRGB},0.08)` }}>
+        {t.coverUrl
+          ? <img src={t.coverUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center"><VinylRecord size={16} weight="thin" className="opacity-25" /></div>}
+      </div>
+
+      {/* Title + artist */}
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] truncate font-display text-white/85">{t.title}</div>
+        <div className="text-[12px] truncate font-mono text-white/45">{t.artist}{t.recordTitle ? ` · ${t.recordTitle}` : ''}</div>
+      </div>
+
+      {/* Key chip (camelotColor returns hsl/rgb, so colour the text/border, neutral bg) */}
+      {t.key && (
+        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono shrink-0" style={{ background: 'rgba(var(--fg),0.05)', color: keyColor || 'rgba(var(--fg),0.5)', border: '1px solid rgba(var(--fg),0.10)' }}>
+          {t.key}
+        </span>
+      )}
+
+      {/* BPM */}
+      <div className="text-right shrink-0 w-[52px]">
+        {t.bpm != null ? (
+          <><span className="text-[19px] font-display tabular-nums" style={{ color: `rgb(${accentRGB})` }}>{t.bpm}</span><span className="text-[9px] block tracking-[0.14em] uppercase font-mono text-white/30 -mt-0.5">bpm</span></>
+        ) : detecting ? (
+          <div className="w-3.5 h-3.5 ml-auto rounded-full border border-t-transparent animate-spin" style={{ borderColor: `rgba(${accentRGB},0.4)`, borderTopColor: 'transparent' }} />
+        ) : (
+          <span className="text-[11px] font-mono text-white/25">{t.previewUrl ? '–' : 'no audio'}</span>
+        )}
+      </div>
+
+      {/* Play */}
+      {t.previewUrl ? (
+        <button onClick={() => onPlay(t.previewUrl)} className="rounded-full flex items-center justify-center transition-all shrink-0" style={{ width: 30, height: 30, background: isPlaying ? `rgba(${accentRGB},0.18)` : 'transparent', border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : '1px solid rgba(var(--fg),0.13)', color: isPlaying ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.5)' }}>
+          {isPlaying ? <Pause size={11} weight="fill" /> : <Play size={11} weight="fill" />}
+        </button>
+      ) : <div className="w-[30px] shrink-0" />}
     </div>
   );
 }

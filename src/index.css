@@ -135,3 +135,42 @@ body {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
 }
+
+/* Dual-thumb BPM range slider (Tracks view). Two range inputs are overlaid on
+   the histogram; only the thumbs receive pointer events so both stay draggable. */
+.bpm-range {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+}
+.bpm-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.bpm-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0,0,0,0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.bpm-range::-webkit-slider-runnable-track { background: transparent; border: none; }
+.bpm-range::-moz-range-track { background: transparent; border: none; }
