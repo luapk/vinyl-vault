@@ -487,6 +487,8 @@ export default function VinylVault() {
   const [batchProcessing, setBatchProcessing] = useState(false);
   // Always-fresh ref so async callbacks never read stale queue state
   const batchQueueRef = useRef([]);
+  // Aborts the in-flight single scan when the user cancels mid-search
+  const scanAbortRef = useRef(null);
 
   const displayName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || 'there';
   // Regenerate greeting when the display name changes (e.g. after saving account settings)
@@ -636,6 +638,8 @@ export default function VinylVault() {
   }
 
   const processImage = async (file, forBatch = false) => {
+    const controller = forBatch ? null : new AbortController();
+    if (controller) scanAbortRef.current = controller;
     if (!forBatch) {
       setPhase("processing");
       setStatus("Reading sleeve");
@@ -658,6 +662,7 @@ export default function VinylVault() {
         method: "POST",
         headers: scanAuthHeaders,
         body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
+        signal: controller?.signal,
       });
       if (response.status === 402) {
         setPhase("idle");
@@ -670,6 +675,7 @@ export default function VinylVault() {
       }
       const data = await response.json();
       if (forBatch) return { dataUrl, data };
+      if (controller?.signal.aborted) return null;
       if (data.status === "disambiguation") {
         setCandidates(data.candidates);
         setVisionData(data.vision);
@@ -685,13 +691,24 @@ export default function VinylVault() {
       }
     } catch (err) {
       if (forBatch) throw err;
+      if (err.name === "AbortError") return null; // user cancelled; cancelScan already reset the UI
       console.error(err);
       setErrorMsg(err.message || "Identification failed");
       setPhase("error");
+    } finally {
+      if (controller && scanAbortRef.current === controller) scanAbortRef.current = null;
     }
   };
 
+  const cancelScan = () => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    reset();
+  };
+
   const pickCandidate = async (candidate) => {
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
     setPhase("processing");
     setStatus("Pulling release data");
     setErrorMsg("");
@@ -702,9 +719,11 @@ export default function VinylVault() {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_pickSess?.access_token}` },
         body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
+      if (controller.signal.aborted) return;
       if (data.status === "complete") {
         setRelease(data.release);
         setPendingCrates([]);
@@ -714,9 +733,12 @@ export default function VinylVault() {
         throw new Error(data.error || "Unexpected response");
       }
     } catch (err) {
+      if (err.name === "AbortError") return; // user cancelled; cancelScan already reset the UI
       console.error(err);
       setErrorMsg(err.message || "Enrichment failed");
       setPhase("error");
+    } finally {
+      if (scanAbortRef.current === controller) scanAbortRef.current = null;
     }
   };
 
@@ -916,7 +938,7 @@ export default function VinylVault() {
         {appView === "scan" && (
           <>
             {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
-            {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
+            {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
             )}
@@ -1249,7 +1271,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
 
 // ----- ProcessingView --------------------------------------------------------
 
-function ProcessingView({ imageUrl, status, accentRGB }) {
+function ProcessingView({ imageUrl, status, accentRGB, onCancel }) {
   return (
     <div className="pt-16 flex flex-col items-center">
       <div className="relative w-full max-w-[380px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(var(--fg),0.07)` }}>
@@ -1262,6 +1284,12 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: `rgb(${accentRGB})`, animation: "pulse 1.4s ease-in-out infinite" }} />
         {status}
       </div>
+      {onCancel && (
+        <button onClick={onCancel} className="mt-5 inline-flex items-center gap-1.5 px-5 py-2 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all hover:opacity-80"
+          style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.5)", background: "rgba(var(--fg),0.03)" }}>
+          <X size={12} />Cancel
+        </button>
+      )}
     </div>
   );
 }
