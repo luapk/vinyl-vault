@@ -4411,7 +4411,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
 
   // Auto-detect on entry, in two passes:
   //  1. GetSongBPM metadata lookup (works without preview audio) -- the primary
-  //     source. Each track is tried once; bpmGsbTried makes the miss durable so
+  //     source. Each track is tried once; bpmGsb2Tried makes the miss durable so
   //     we do not re-query a song that has no published BPM.
   //  2. Waveform analysis for any track still missing a BPM that has a preview.
   // Pass 2 runs only after pass 1 finishes, so GetSongBPM is always first.
@@ -4431,7 +4431,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
         const indices = [];
         for (let i = 0; i < tl.length; i++) {
           const t = tl[i];
-          if (t && (t.title || t.position) && t.bpm == null && !t.bpmGsbTried) indices.push(i);
+          if (t && (t.title || t.position) && t.bpm == null && !t.bpmGsb2Tried) indices.push(i);
         }
         if (indices.length) jobs.push({ recordId: rec.id, artist: rec.artist || '', indices });
       }
@@ -4462,7 +4462,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           const patchByIndex = {};
           job.indices.forEach((origIdx, k) => {
             const e = enriched[k] || {};
-            const patch = { bpmGsbTried: true };
+            const patch = { bpmGsb2Tried: true };
             if (typeof e.bpm === 'number') { patch.bpm = e.bpm; patch.bpmSource = 'getsongbpm'; }
             patchByIndex[origIdx] = patch;
           });

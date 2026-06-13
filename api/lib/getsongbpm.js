@@ -40,8 +40,9 @@ async function fetchSongTempo(apiKey, songId) {
 // Look up the BPM for one track. Returns an integer BPM or null.
 export async function lookupBpm(apiKey, artist, title) {
   if (!title) return null;
-  const lookup = artist ? `song:${title} artist:${artist}` : `song:${title}`;
-  const url = `${BASE}/search/?api_key=${apiKey}&type=both&lookup=${encodeURIComponent(lookup)}`;
+  // GetSongBPM search: type=song with the plain title as lookup value.
+  // Artist filtering is applied post-results via the scoring pass below.
+  const url = `${BASE}/search/?api_key=${apiKey}&type=song&lookup=${encodeURIComponent(title)}`;
 
   let data;
   try {
@@ -95,7 +96,7 @@ export async function lookupBpm(apiKey, artist, title) {
 
 // Fill bpm for any track still missing one, using a small concurrency pool to
 // stay gentle on the free-tier rate limit. Tracks that already have a bpm, or
-// were already tried (bpmGsbTried), are left untouched. Marks every attempted
+// were already tried (bpmGsb2Tried), are left untouched. Marks every attempted
 // track so callers can persist a durable "do not retry" flag.
 export async function enrichBpm(tracks, artist, { concurrency = 2 } = {}) {
   const apiKey = process.env.GETSONGBPM_API_KEY;
@@ -105,7 +106,7 @@ export async function enrichBpm(tracks, artist, { concurrency = 2 } = {}) {
   const queue = [];
   for (let i = 0; i < out.length; i++) {
     const t = out[i];
-    if (t && t.bpm == null && !t.bpmGsbTried) queue.push(i);
+    if (t && t.bpm == null && !t.bpmGsb2Tried) queue.push(i);
   }
   if (!queue.length) return out;
 
@@ -116,8 +117,8 @@ export async function enrichBpm(tracks, artist, { concurrency = 2 } = {}) {
       const t = out[idx];
       const bpm = await lookupBpm(apiKey, artist, t.title).catch(() => null);
       out[idx] = bpm != null
-        ? { ...t, bpm, bpmSource: 'getsongbpm', bpmGsbTried: true }
-        : { ...t, bpmGsbTried: true };
+        ? { ...t, bpm, bpmSource: 'getsongbpm', bpmGsb2Tried: true }
+        : { ...t, bpmGsb2Tried: true };
     }
   };
 
