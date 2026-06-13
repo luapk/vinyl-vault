@@ -130,6 +130,45 @@ function normalizeKey(artist, title) {
   return `${artist}${title}`.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Rank crate names by how well they fit a release so the scan result suggests
+// only the few most relevant crates rather than every crate the user owns.
+// Scores by word overlap with the release genres and AI crate-name
+// suggestions, with bonuses for exact genre/suggestion and decade matches.
+function rankCratesForRelease(crateNames, release, limit = 3) {
+  const unique = [...new Set((crateNames || []).filter(Boolean))];
+  if (unique.length <= limit) return unique;
+
+  const tokenize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+
+  const weights = new Map();
+  const bump = (tokens, w) => tokens.forEach((t) => weights.set(t, (weights.get(t) || 0) + w));
+  bump((release.genres || []).flatMap(tokenize), 3);
+  bump((release.suggestedBoxes || []).flatMap(tokenize), 2);
+  bump(tokenize(release.artist), 1);
+
+  // Decade tokens: 1994 -> "1990s" and "90s"
+  const year = parseInt(release.year, 10);
+  if (!Number.isNaN(year)) {
+    const dec = Math.floor(year / 10) * 10;
+    bump([`${dec}s`, `${String(dec).slice(2)}s`], 2);
+  }
+
+  const genreSet = new Set((release.genres || []).map((g) => g.toLowerCase().trim()));
+  const boxSet = new Set((release.suggestedBoxes || []).map((b) => b.toLowerCase().trim()));
+
+  return unique
+    .map((name, i) => {
+      const lname = name.toLowerCase().trim();
+      let score = tokenize(name).reduce((sum, t) => sum + (weights.get(t) || 0), 0);
+      if (boxSet.has(lname)) score += 6;   // AI named this exact crate for this release
+      if (genreSet.has(lname)) score += 5;
+      return { name, score, i };
+    })
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .slice(0, limit)
+    .map((s) => s.name);
+}
+
 // ----- Helpers ---------------------------------------------------------------
 
 const resizeImage = (file, maxDim = 1500, quality = 0.85) =>
@@ -1295,12 +1334,18 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     ...(release.genres || []),
   ].filter((t, i, arr) => arr.indexOf(t) === i);
 
-  // If smart crates has run, use those as suggestions (alphabetical); otherwise fall back to per-scan AI suggestions + existing custom crates
-  const smartSuggestions = smartCrateNames.length > 0
-    ? [...smartCrateNames].filter(c => !pendingCrates.includes(c)).sort()
-    : null;
-  const suggestedCrates = smartSuggestions ?? (release.suggestedBoxes || []).filter(c => !pendingCrates.includes(c)).slice(0, 3);
-  const existingCustom = smartSuggestions !== null ? [] : allCrates.filter(c => !pendingCrates.includes(c) && !GENRE_CRATES.includes(c) && !(release.suggestedBoxes || []).includes(c));
+  // Suggest only the three most apt crates for this release, not every crate
+  // the user owns. Smart-crate users rank against their fixed taxonomy;
+  // everyone else ranks the AI per-release names plus their own custom crates.
+  const usingSmartCrates = smartCrateNames.length > 0;
+  const cratePool = usingSmartCrates
+    ? smartCrateNames
+    : [...(release.suggestedBoxes || []), ...allCrates.filter(c => !GENRE_CRATES.includes(c))];
+  const suggestedCrates = rankCratesForRelease(
+    cratePool.filter(c => !pendingCrates.includes(c)),
+    release,
+    3,
+  );
 
   const duplicate = release && collection.find(r =>
     (release.id && r.discogsId && String(r.discogsId) === String(release.id)) ||
@@ -1417,10 +1462,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             </div>
           )}
 
-          {/* Crate suggestions */}
+          {/* Crate suggestions: only the three most apt for this release */}
           {suggestedCrates.length > 0 && (
             <div>
-              <div className="text-[11px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>{smartSuggestions !== null ? 'Your crates' : 'Suggested'}</div>
+              <div className="text-[11px] tracking-[0.25em] uppercase font-mono mb-1.5" style={{ color: 'rgba(var(--fg),0.28)' }}>{usingSmartCrates ? 'Your crates' : 'Suggested'}</div>
               <div className="flex flex-wrap gap-1.5">
                 {suggestedCrates.map((name) => (
                   <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.38)" }}>
@@ -1428,17 +1473,6 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Custom crates from existing collection */}
-          {existingCustom.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {existingCustom.map((name) => (
-                <button key={name} onClick={() => toggleCrate(name)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-mono transition-all hover:border-white/20 hover:text-white/55" style={{ background: "transparent", border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.32)" }}>
-                  <Plus size={9} />{name}
-                </button>
-              ))}
             </div>
           )}
 
