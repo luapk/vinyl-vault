@@ -11,10 +11,24 @@ function authHeaders() {
   };
 }
 
-async function fetchWithRetry(url, opts, maxRetries = 3) {
+// Per-request read timeout. Without this, a Discogs response that is slow but
+// never errors (no 429, just hanging) blocks indefinitely -- the main cause of
+// the "pulling release data" hang, since fetchWithRetry only retried on 429 and
+// had no ceiling on a slow-but-200 response.
+async function fetchWithRetry(url, opts, maxRetries = 3, timeoutMs = 6000) {
   let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url, opts);
+    let res;
+    try {
+      res = await fetch(url, { ...opts, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err) {
+      // Timeout/abort: don't keep waiting -- on the last attempt surface it,
+      // otherwise fall through to the backoff and retry.
+      if (attempt === maxRetries) throw err;
+      await new Promise(r => setTimeout(r, delay));
+      delay *= 2;
+      continue;
+    }
     if (res.status !== 429 || attempt === maxRetries) return res;
     await new Promise(r => setTimeout(r, delay));
     delay *= 2;

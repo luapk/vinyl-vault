@@ -68,7 +68,8 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
 
   const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
 
-  // 7s ceiling on Spotify + crate suggestions combined -- neither blocks the user indefinitely
+  // 5s ceiling on Spotify + crate suggestions combined. Per-request timeouts in
+  // spotify.js (2.5s each) keep one slow call from eating the whole budget.
   const [enrichedTracks, suggestedBoxes] = await raceTimeout(
     Promise.all([
       (hasSpotify && tracklist.length > 0)
@@ -78,14 +79,15 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
         ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
         : Promise.resolve(vision?.suggestedBoxes || []),
     ]),
-    7000,
+    5000,
     [tracklist.map(nullTrack), vision?.suggestedBoxes || []],
   );
 
-  // iTunes fallback: fill any still-missing preview URLs (3s ceiling per-track already enforced by AbortSignal.timeout)
+  // iTunes fallback: fill any still-missing preview URLs (2.5s per-request timeout
+  // already enforced by AbortSignal.timeout); 3s overall ceiling.
   const finalTracks = await raceTimeout(
     fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks),
-    4000,
+    3000,
     enrichedTracks,
   );
 

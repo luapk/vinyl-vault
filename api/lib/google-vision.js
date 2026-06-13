@@ -29,6 +29,7 @@ export async function analyzeImage(imageBase64, apiKey) {
           ],
         }],
       }),
+      signal: AbortSignal.timeout(12000),
     }
   );
 

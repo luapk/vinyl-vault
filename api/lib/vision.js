@@ -39,15 +39,27 @@ Return ONLY the JSON object, nothing else.`;
 async function callClaude(body, apiKey, maxRetries = 2) {
   let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(25000),
+      });
+    } catch (err) {
+      // Network/timeout: retry transient failures with backoff, else surface.
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+        continue;
+      }
+      throw err;
+    }
 
     if (response.ok) return response.json();
 
@@ -181,6 +193,7 @@ Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
         max_tokens: 100,
         messages: [{ role: 'user', content: prompt }],
       }),
+      signal: AbortSignal.timeout(4000),
     });
 
     if (!response.ok) return [];

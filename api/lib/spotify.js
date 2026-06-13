@@ -17,6 +17,7 @@ async function getToken() {
       Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}`,
     },
     body: 'grant_type=client_credentials',
+    signal: AbortSignal.timeout(3000),
   });
 
   if (!res.ok) {
@@ -62,7 +63,7 @@ function titleSim(a, b) {
 async function searchTrack(token, artist, trackTitle, releaseYear, discogsDuration) {
   const q = artist ? `track:${trackTitle} artist:${artist}` : `track:${trackTitle}`;
   const url = `https://api.spotify.com/v1/search?type=track&q=${encodeURIComponent(q)}&limit=8`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(2500) });
   if (!res.ok) {
     console.log(`[spotify] search ${res.status} for "${q}"`);
     return null;
@@ -140,7 +141,7 @@ async function fetchAudioFeatures(token, trackId) {
   if (featuresDisabled) return null;
   const res = await fetch(
     `https://api.spotify.com/v1/audio-features/${trackId}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(2500) }
   );
   if (!res.ok) {
     if (res.status === 403 || res.status === 401) {
