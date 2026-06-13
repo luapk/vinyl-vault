@@ -2,6 +2,7 @@ import { identifyFromImage, identifyFromText, generateCrateSuggestions } from '.
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
+import { enrichBpm } from './lib/getsongbpm.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
@@ -85,10 +86,20 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
 
   // iTunes fallback: fill any still-missing preview URLs (2.5s per-request timeout
   // already enforced by AbortSignal.timeout); 3s overall ceiling.
-  const finalTracks = await raceTimeout(
+  const withPreviews = await raceTimeout(
     fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks),
     3000,
     enrichedTracks,
+  );
+
+  // First-pass BPM: GetSongBPM is a metadata lookup, so it fills bpm even for
+  // tracks with no preview audio (which the client waveform analyser cannot do).
+  // Spotify audio-features is mostly disabled, so this is the primary bpm source.
+  // 4s overall ceiling; per-request timeouts in the lib bound each call.
+  const finalTracks = await raceTimeout(
+    enrichBpm(withPreviews, release.artist).catch(() => withPreviews),
+    4000,
+    withPreviews,
   );
 
   release.tracklist = finalTracks;

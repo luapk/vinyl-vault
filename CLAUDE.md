@@ -59,6 +59,7 @@ supabase/
 - `ANTHROPIC_API_KEY` -- Claude vision for record identification
 - `DISCOGS_TOKEN` -- Discogs API
 - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` -- Spotify BPM/key lookup
+- `GETSONGBPM_API_KEY` -- GetSongBPM (first-pass BPM by artist + title). Free key from getsongbpm.com/api. Requires a visible dofollow backlink to getsongbpm.com (rendered in the Tracks view) or the account is suspended.
 
 ### Vercel (client-side, exposed to browser)
 - `VITE_SUPABASE_URL` -- Supabase project URL

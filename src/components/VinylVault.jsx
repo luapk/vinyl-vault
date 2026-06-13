@@ -4356,6 +4356,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const [range, setRange] = useState(null); // null = follow data bounds until touched
   const [showUnanalyzed, setShowUnanalyzed] = useState(false);
   const [detecting, setDetecting] = useState(() => new Set()); // previewUrls in flight
+  const [gsbBusy, setGsbBusy] = useState(false); // GetSongBPM metadata pass running
   const triedRef = useRef(new Set());
   const mountedRef = useRef(true);
 
@@ -4395,45 +4396,123 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const persistBpm = useCallback((recordId, trackIndex, bpm) => {
     const rec = collectionRef.current.find(r => r.id === recordId);
     if (!rec) return;
-    const next = (rec.tracklist || []).map((t, i) => i === trackIndex ? { ...t, bpm } : t);
+    const next = (rec.tracklist || []).map((t, i) => i === trackIndex ? { ...t, bpm, bpmSource: 'waveform' } : t);
     onUpdate?.(recordId, { tracklist: next });
   }, [onUpdate]);
 
-  // Auto-detect on entry: waveform-analyse previewable tracks missing a BPM,
-  // two at a time, reading remaining work fresh each iteration. Runs once.
+  // Apply several track patches to one record in a single write (one Supabase
+  // round-trip per record rather than per track).
+  const persistTrackPatches = useCallback((recordId, patchByIndex) => {
+    const rec = collectionRef.current.find(r => r.id === recordId);
+    if (!rec) return;
+    const next = (rec.tracklist || []).map((t, i) => patchByIndex[i] ? { ...t, ...patchByIndex[i] } : t);
+    onUpdate?.(recordId, { tracklist: next });
+  }, [onUpdate]);
+
+  // Auto-detect on entry, in two passes:
+  //  1. GetSongBPM metadata lookup (works without preview audio) -- the primary
+  //     source. Each track is tried once; bpmGsbTried makes the miss durable so
+  //     we do not re-query a song that has no published BPM.
+  //  2. Waveform analysis for any track still missing a BPM that has a preview.
+  // Pass 2 runs only after pass 1 finishes, so GetSongBPM is always first.
   useEffect(() => {
     let active = true;
-    const CONCURRENCY = 2;
 
-    const nextJob = () => {
+    const runGetSongBpmPass = async () => {
+      const { supabase } = await import('../lib/supabase.js');
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+
+      // One job per record with tracks still needing a GetSongBPM attempt.
+      const jobs = [];
       for (const rec of collectionRef.current) {
         const tl = rec.tracklist || [];
+        const indices = [];
         for (let i = 0; i < tl.length; i++) {
           const t = tl[i];
-          if (t?.previewUrl && t.bpm == null && !triedRef.current.has(t.previewUrl)) {
-            return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl };
+          if (t && (t.title || t.position) && t.bpm == null && !t.bpmGsbTried) indices.push(i);
+        }
+        if (indices.length) jobs.push({ recordId: rec.id, artist: rec.artist || '', indices });
+      }
+      if (!jobs.length) return;
+
+      if (mountedRef.current) setGsbBusy(true);
+      try {
+        for (const job of jobs) {
+          if (!active) return;
+          const rec = collectionRef.current.find(r => r.id === job.recordId);
+          if (!rec) continue;
+          const tl = rec.tracklist || [];
+          const payload = job.indices.map(i => ({ title: tl[i].title || '' }));
+
+          let enriched = null;
+          try {
+            const res = await fetch('/api/getsongbpm', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ tracks: payload, artist: job.artist }),
+            });
+            if (res.status === 503) return; // not configured: skip to waveform pass
+            if (res.ok) enriched = (await res.json()).tracks;
+          } catch { /* network error: leave untried, waveform may still cover it */ }
+          if (!active) return;
+          if (!enriched) continue;
+
+          const patchByIndex = {};
+          job.indices.forEach((origIdx, k) => {
+            const e = enriched[k] || {};
+            const patch = { bpmGsbTried: true };
+            if (typeof e.bpm === 'number') { patch.bpm = e.bpm; patch.bpmSource = 'getsongbpm'; }
+            patchByIndex[origIdx] = patch;
+          });
+          persistTrackPatches(job.recordId, patchByIndex);
+          await new Promise(r => setTimeout(r, 150)); // gentle on the free-tier rate limit
+        }
+      } finally {
+        if (mountedRef.current) setGsbBusy(false);
+      }
+    };
+
+    const runWaveformPass = async () => {
+      const CONCURRENCY = 2;
+      const nextJob = () => {
+        for (const rec of collectionRef.current) {
+          const tl = rec.tracklist || [];
+          for (let i = 0; i < tl.length; i++) {
+            const t = tl[i];
+            if (t?.previewUrl && t.bpm == null && !triedRef.current.has(t.previewUrl)) {
+              return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl };
+            }
           }
         }
-      }
-      return null;
+        return null;
+      };
+
+      const worker = async () => {
+        while (active) {
+          const job = nextJob();
+          if (!job) return;
+          triedRef.current.add(job.previewUrl);
+          if (mountedRef.current) setDetecting(prev => new Set(prev).add(job.previewUrl));
+          let bpm = null;
+          try { bpm = await detectBPM(job.previewUrl); } catch { /* ignore */ }
+          if (bpm != null) persistBpm(job.recordId, job.trackIndex, bpm);
+          if (mountedRef.current) setDetecting(prev => { const s = new Set(prev); s.delete(job.previewUrl); return s; });
+        }
+      };
+
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     };
 
-    const worker = async () => {
-      while (active) {
-        const job = nextJob();
-        if (!job) return;
-        triedRef.current.add(job.previewUrl);
-        if (mountedRef.current) setDetecting(prev => new Set(prev).add(job.previewUrl));
-        let bpm = null;
-        try { bpm = await detectBPM(job.previewUrl); } catch { /* ignore */ }
-        if (bpm != null) persistBpm(job.recordId, job.trackIndex, bpm);
-        if (mountedRef.current) setDetecting(prev => { const s = new Set(prev); s.delete(job.previewUrl); return s; });
-      }
-    };
+    (async () => {
+      try { await runGetSongBpmPass(); } catch { /* ignore */ }
+      if (!active) return;
+      await runWaveformPass();
+    })();
 
-    for (let i = 0; i < CONCURRENCY; i++) worker();
     return () => { active = false; };
-  }, [persistBpm]);
+  }, [persistBpm, persistTrackPatches]);
 
   useEffect(() => () => audioRef.current?.pause(), []);
 
@@ -4518,6 +4597,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
         </div>
         <div className="text-[12px] tracking-[0.12em] uppercase font-mono text-white/35">
           {analyzed.length} analyzed · {unanalyzed.length} pending
+          {gsbBusy && <span style={{ color: `rgb(${accentRGB})` }}> · looking up BPM</span>}
           {detectingCount > 0 && <span style={{ color: `rgb(${accentRGB})` }}> · detecting {detectingCount}</span>}
         </div>
       </div>
@@ -4614,6 +4694,14 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           )}
         </div>
       )}
+
+      {/* GetSongBPM requires a visible attribution link wherever its data appears. */}
+      <div className="mt-8 pt-4 text-center text-[11px] font-mono text-white/30" style={{ borderTop: '1px solid rgba(var(--fg),0.06)' }}>
+        BPM data by{' '}
+        <a href="https://getsongbpm.com" target="_blank" rel="noopener" className="underline transition-colors hover:text-white/60" style={{ color: 'rgba(var(--fg),0.45)' }}>
+          GetSongBPM
+        </a>
+      </div>
     </div>
   );
 }
