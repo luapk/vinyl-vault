@@ -3788,7 +3788,7 @@ function AboutView({ accentRGB }) {
 
 // ----- DisambiguationView ----------------------------------------------------
 
-function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick }) {
+function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick, onManual }) {
   return (
     <div className="pt-8 md:pt-12" style={{ animation: "fadeUp 0.5s ease-out" }}>
       <div className="mb-10">
