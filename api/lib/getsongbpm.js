@@ -46,15 +46,23 @@ export async function lookupBpm(apiKey, artist, title) {
   let data;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return null;
+    console.log(`[getsongbpm] search status=${res.status} title="${title}" artist="${artist}"`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.log(`[getsongbpm] error body:`, text.slice(0, 200));
+      return null;
+    }
     data = await res.json();
-  } catch {
+    console.log(`[getsongbpm] response:`, JSON.stringify(data).slice(0, 300));
+  } catch (err) {
+    console.log(`[getsongbpm] fetch error:`, err.message);
     return null;
   }
 
   // The API returns { search: [...] } on a hit, or { search: { error: ... } }
   // when nothing matches. Guard for both shapes.
   const items = Array.isArray(data?.search) ? data.search : [];
+  console.log(`[getsongbpm] items:`, items.length, items[0] ? JSON.stringify(items[0]).slice(0, 150) : 'none');
   if (!items.length) return null;
 
   const artistWords = norm(artist || '').split(' ').filter(w => w.length > 2);
