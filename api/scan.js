@@ -46,6 +46,13 @@ async function checkAndIncrementScanLimit(userId) {
 }
 
 
+function raceTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const release = { ...discogsRelease };
 
@@ -61,17 +68,26 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
 
   const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
 
-  const [enrichedTracks, suggestedBoxes] = await Promise.all([
-    (hasSpotify && tracklist.length > 0)
-      ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => tracklist.map(nullTrack))
-      : Promise.resolve(tracklist.map(nullTrack)),
-    apiKey
-      ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
-      : Promise.resolve(vision?.suggestedBoxes || []),
-  ]);
+  // 7s ceiling on Spotify + crate suggestions combined -- neither blocks the user indefinitely
+  const [enrichedTracks, suggestedBoxes] = await raceTimeout(
+    Promise.all([
+      (hasSpotify && tracklist.length > 0)
+        ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => tracklist.map(nullTrack))
+        : Promise.resolve(tracklist.map(nullTrack)),
+      apiKey
+        ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
+        : Promise.resolve(vision?.suggestedBoxes || []),
+    ]),
+    7000,
+    [tracklist.map(nullTrack), vision?.suggestedBoxes || []],
+  );
 
-  // iTunes fallback: fill any still-missing preview URLs (no API key, always runs)
-  const finalTracks = await fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks);
+  // iTunes fallback: fill any still-missing preview URLs (3s ceiling per-track already enforced by AbortSignal.timeout)
+  const finalTracks = await raceTimeout(
+    fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks),
+    4000,
+    enrichedTracks,
+  );
 
   release.tracklist = finalTracks;
   release.suggestedBoxes = suggestedBoxes;

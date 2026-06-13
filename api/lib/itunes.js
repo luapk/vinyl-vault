@@ -117,7 +117,8 @@ async function searchTrackPreview(artist, trackTitle, discogsDuration, releaseYe
   for (const q of strategies) {
     try {
       const res = await fetch(
-        `${BASE}/search?term=${encodeURIComponent(q)}&entity=song&media=music&limit=10`
+        `${BASE}/search?term=${encodeURIComponent(q)}&entity=song&media=music&limit=10`,
+        { signal: AbortSignal.timeout(2500) }
       );
       if (!res.ok) continue;
       const data = await res.json();
