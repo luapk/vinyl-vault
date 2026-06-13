@@ -876,8 +876,11 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} />}
+            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} />}
+            {phase === "manual" && (
+              <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
+            )}
             {phase === "disambiguation" && (
               <>
                 <div className="flex justify-center pt-4 pb-1">
@@ -885,13 +888,13 @@ export default function VinylVault() {
                     New scan
                   </button>
                 </div>
-                <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} />
+                <DisambiguationView candidates={candidates} vision={visionData} imageUrl={imageUrl} accentRGB={accentRGB} onPick={pickCandidate} onManual={() => setPhase("manual")} />
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} collection={collection} smartCrateNames={smartCrateNames} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
             )}
-            {phase === "error" && <ErrorView message={errorMsg} onReset={reset} />}
+            {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} />}
           </>
         )}
         {appView === "collection" && (
@@ -1019,7 +1022,7 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
+function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onManual }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const [showCamera, setShowCamera] = useState(false);
   const [recs, setRecs] = useState([]);
@@ -1140,12 +1143,18 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [] }) {
       </div>{/* end relative wrapper */}
 
       {/* "or choose from library" centred below the grid */}
-      <div className="mt-4 flex justify-center">
+      <div className="mt-4 flex flex-col items-center gap-2">
         <label className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
           <Upload size={11} />
           or choose a photo from library
           <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
         </label>
+        {onManual && (
+          <button onClick={onManual} className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors">
+            <MagnifyingGlass size={11} />
+            or type artist & title to search
+          </button>
+        )}
       </div>
 
       {showCamera && <CameraModal onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
@@ -1220,7 +1229,7 @@ function ProcessingView({ imageUrl, status, accentRGB }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, collection = [], smartCrateNames = [] }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onManual, collection = [], smartCrateNames = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -1310,10 +1319,18 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
         </div>
       )}
       {/* Top bar */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-2 flex-wrap">
         <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
           <CaretLeft size={12} />New scan
         </button>
+        {onManual && (
+          <button onClick={onManual} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
+            style={release.identified
+              ? { border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "rgba(var(--fg),0.03)" }
+              : { border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.12)` }}>
+            <MagnifyingGlass size={12} />{release.identified ? "Not right?" : "Search manually"}
+          </button>
+        )}
       </div>
       {/* Meta bar */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -3786,31 +3803,136 @@ function DisambiguationView({ candidates, vision, imageUrl, accentRGB, onPick })
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {candidates.map((candidate, i) => (
-          <button key={candidate.id} onClick={() => onPick(candidate)} className="text-left rounded-2xl overflow-hidden transition-all group relative" style={{ ...glassSubtle(), animation: `fadeUp 0.35s ease-out ${i * 0.06}s both` }}>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.08), transparent)` }} />
-            <div className="relative aspect-square overflow-hidden">
-              {candidate.coverUrl ? (
-                <img src={candidate.coverUrl} alt={candidate.recordTitle || candidate.artist} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.05)` }}><VinylRecord size={40} weight="thin" className="opacity-15" /></div>
-              )}
-              <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)" }} />
-            </div>
-            <div className="relative p-4">
-              <div className="text-[13px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
-              <div className="text-sm leading-snug mb-2 font-display">
-                {candidate.artist && <span className="italic text-white/80">{candidate.artist}</span>}
-                {candidate.artist && candidate.recordTitle && <span className="text-white/25"> / </span>}
-                <span className="text-white/60">{candidate.recordTitle || candidate.artist}</span>
-              </div>
-              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-                {candidate.label && <span className="text-[13px] text-white/40 font-mono">{candidate.label}</span>}
-                {candidate.catalogNumber && <span className="text-[13px] text-white/25 font-mono">{candidate.catalogNumber}</span>}
-              </div>
-            </div>
-          </button>
+          <CandidateCard key={candidate.id} candidate={candidate} index={i} accentRGB={accentRGB} onPick={onPick} />
         ))}
       </div>
+      {onManual && (
+        <div className="flex justify-center mt-10">
+          <button onClick={onManual} className="inline-flex items-center gap-2 text-[14px] font-mono px-5 py-2.5 rounded-full transition-all hover:opacity-80"
+            style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.03)" }}>
+            <MagnifyingGlass size={13} />None of these? Search manually
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Single pressing/result card, shared by disambiguation and manual search.
+function CandidateCard({ candidate, index = 0, accentRGB, onPick }) {
+  return (
+    <button onClick={() => onPick(candidate)} className="text-left rounded-2xl overflow-hidden transition-all group relative" style={{ ...glassSubtle(), animation: `fadeUp 0.35s ease-out ${index * 0.06}s both` }}>
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.08), transparent)` }} />
+      <div className="relative aspect-square overflow-hidden">
+        {candidate.coverUrl ? (
+          <img src={candidate.coverUrl} alt={candidate.recordTitle || candidate.artist} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(${accentRGB},0.05)` }}><VinylRecord size={40} weight="thin" className="opacity-15" /></div>
+        )}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)" }} />
+      </div>
+      <div className="relative p-4">
+        <div className="text-[13px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
+        <div className="text-sm leading-snug mb-2 font-display">
+          {candidate.artist && <span className="italic text-white/80">{candidate.artist}</span>}
+          {candidate.artist && candidate.recordTitle && <span className="text-white/25"> / </span>}
+          <span className="text-white/60">{candidate.recordTitle || candidate.artist}</span>
+        </div>
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+          {candidate.label && <span className="text-[13px] text-white/40 font-mono">{candidate.label}</span>}
+          {candidate.catalogNumber && <span className="text-[13px] text-white/25 font-mono">{candidate.catalogNumber}</span>}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Manual fallback when a scan can't be read or none of the pressings match:
+// the user types whatever they can read off the label and we search Discogs.
+function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
+  const [artist, setArtist] = useState(initial?.artist || "");
+  const [title, setTitle] = useState(initial?.title || "");
+  const [catno, setCatno] = useState(initial?.catalogNumber || "");
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const canSearch = !!(artist.trim() || title.trim() || catno.trim());
+
+  const runSearch = async (e) => {
+    e?.preventDefault();
+    if (!canSearch || loading) return;
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      const res = await fetch('/api/discogs-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist: artist.trim(), title: title.trim(), catalogNumber: catno.trim() }),
+      });
+      const data = await res.json();
+      setResults(data.matches || []);
+    } catch {
+      setError('Search failed. Check your connection and try again.');
+    }
+    setLoading(false);
+  };
+
+  const fieldStyle = { background: "rgba(var(--fg),0.04)", border: "1px solid rgba(var(--fg),0.10)" };
+
+  return (
+    <div className="pt-8 md:pt-12 max-w-2xl mx-auto" style={{ animation: "fadeUp 0.4s ease-out" }}>
+      <div className="mb-8">
+        <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Manual search</div>
+        <h2 className="text-4xl md:text-5xl leading-[1.02] mb-3 font-display tracking-tight"><span className="italic">Type what you can read</span></h2>
+        <p className="text-white/35 text-sm font-mono">Fill in any field (artist, release title, or catalogue number) and we'll search Discogs.</p>
+      </div>
+
+      <form onSubmit={runSearch} className="flex flex-col gap-3 mb-8">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Artist</label>
+          <input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="e.g. Nelly Furtado" autoFocus
+            className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Release / track title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Only Human"
+            className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Catalogue number <span className="text-white/20">(optional)</span></label>
+          <input value={catno} onChange={(e) => setCatno(e.target.value)} placeholder="e.g. RACCIDENT 004"
+            className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+          <button type="submit" disabled={!canSearch || loading}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] tracking-[0.1em] uppercase font-mono transition-all disabled:opacity-40"
+            style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})` }}>
+            <MagnifyingGlass size={14} weight="bold" />{loading ? "Searching..." : "Search Discogs"}
+          </button>
+          <button type="button" onClick={onCancel} className="text-[14px] font-mono text-white/35 hover:text-white/60 transition-colors px-3 py-2">
+            Cancel
+          </button>
+        </div>
+      </form>
+
+      {error && <p className="text-[14px] font-mono text-red-300/80 mb-6">{error}</p>}
+
+      {results && results.length === 0 && !loading && (
+        <p className="text-[14px] font-mono text-white/35">No matches found. Try fewer words, a different spelling, or just the catalogue number.</p>
+      )}
+
+      {results && results.length > 0 && (
+        <>
+          <div className="text-[13px] tracking-[0.2em] uppercase text-white/30 mb-4 font-mono">{results.length} match{results.length !== 1 ? "es" : ""} found. Pick the right one</div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {results.map((candidate, i) => (
+              <CandidateCard key={candidate.id} candidate={candidate} index={i} accentRGB={accentRGB} onPick={onPick} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -4029,7 +4151,7 @@ function ConfidenceBadge({ confidence, identified, accentRGB }) {
   );
 }
 
-function ErrorView({ message, onReset }) {
+function ErrorView({ message, onReset, onManual }) {
   return (
     <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "rgba(220,80,80,0.08)", border: "1px solid rgba(220,80,80,0.22)" }}>
@@ -4037,7 +4159,14 @@ function ErrorView({ message, onReset }) {
       </div>
       <h2 className="text-2xl mb-2 font-display"><span className="italic">Couldn't read</span> that one</h2>
       <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">{message}</p>
-      <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.03)" }}>Try again</button>
+      <div className="flex items-center gap-2.5 flex-wrap justify-center">
+        <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.03)" }}>Try again</button>
+        {onManual && (
+          <button onClick={onManual} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: `1px solid rgba(var(--fg),0.12)`, color: "rgba(var(--fg),0.7)", background: "rgba(var(--fg),0.06)" }}>
+            <MagnifyingGlass size={13} />Enter details manually
+          </button>
+        )}
+      </div>
     </div>
   );
 }
