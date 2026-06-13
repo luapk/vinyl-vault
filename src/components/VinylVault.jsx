@@ -5,7 +5,7 @@ import {
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
-  MusicNotes, Waveform,
+  MusicNotes, Waveform, Export, DeviceMobile,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -319,6 +319,32 @@ function playSaveChime() {
 // Module-level cache so reopening a record doesn't re-fetch + re-analyse
 const bpmCache = new Map();
 
+// ----- Shared camera stream --------------------------------------------------
+// One MediaStream reused across camera opens within a session. Calling
+// getUserMedia fresh on every open re-triggers the OS permission prompt on iOS
+// Safari (the per-tab grant is dropped once tracks are stopped). Keeping a single
+// live stream and reusing it means the prompt fires once per session at most.
+// The stream is released when leaving the scan flow, on tab-hide, and on unload.
+let _sharedCamStream = null;
+
+function streamIsLive(s) {
+  return !!s && s.getVideoTracks().some(t => t.readyState === 'live');
+}
+
+async function acquireCameraStream() {
+  if (streamIsLive(_sharedCamStream)) return _sharedCamStream;
+  _sharedCamStream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false,
+  });
+  return _sharedCamStream;
+}
+
+function releaseCameraStream() {
+  _sharedCamStream?.getTracks().forEach(t => t.stop());
+  _sharedCamStream = null;
+}
+
 async function detectBPM(previewUrl) {
   if (bpmCache.has(previewUrl)) return bpmCache.get(previewUrl);
   try {
@@ -522,6 +548,22 @@ export default function VinylVault() {
   const batchQueueRef = useRef([]);
   // Aborts the in-flight single scan when the user cancels mid-search
   const scanAbortRef = useRef(null);
+
+  // Release the shared camera stream when the user leaves the scan flow or the
+  // page unloads. The stream is kept alive across camera opens within the scan
+  // flow (so repeated scans don't re-prompt), so this is where it's stopped.
+  // Note: deliberately NOT released on tab-hide -- iOS backgrounds the tab while
+  // the permission sheet is up, and killing the stream there would break the grant.
+  useEffect(() => {
+    if (appView !== 'scan') releaseCameraStream();
+  }, [appView]);
+  useEffect(() => {
+    window.addEventListener('pagehide', releaseCameraStream);
+    return () => {
+      window.removeEventListener('pagehide', releaseCameraStream);
+      releaseCameraStream();
+    };
+  }, []);
 
   const displayName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || 'there';
   // Regenerate greeting when the display name changes (e.g. after saving account settings)
@@ -1076,6 +1118,124 @@ export default function VinylVault() {
           </div>
         </div>
       )}
+
+      <PWAInstallBanner accentRGB={accentRGB} />
+    </div>
+  );
+}
+
+// ----- PWA install -----------------------------------------------------------
+
+// Detects install eligibility across platforms. Android/desktop Chromium fires
+// `beforeinstallprompt`, which we capture for a custom button. iOS Safari has no
+// such event -- the only path is the Share sheet -> "Add to Home Screen", so we
+// surface instructions there instead. Hidden once the app runs standalone.
+function usePwaInstall() {
+  const isStandalone = () =>
+    (typeof window !== 'undefined' &&
+      ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        window.navigator.standalone === true));
+
+  const [deferred, setDeferred] = useState(null);
+  const [installed, setInstalled] = useState(isStandalone);
+
+  useEffect(() => {
+    const onBIP = (e) => { e.preventDefault(); setDeferred(e); };
+    const onInstalled = () => { setInstalled(true); setDeferred(null); };
+    window.addEventListener('beforeinstallprompt', onBIP);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBIP);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isIOS = /iphone|ipad|ipod/i.test(ua) && !window.MSStream;
+
+  const promptInstall = async () => {
+    if (!deferred) return false;
+    deferred.prompt();
+    const choice = await deferred.userChoice.catch(() => ({ outcome: 'dismissed' }));
+    if (choice.outcome === 'accepted') setInstalled(true);
+    setDeferred(null);
+    return choice.outcome === 'accepted';
+  };
+
+  return { installed, isIOS, canInstall: !!deferred, promptInstall };
+}
+
+const PWA_DISMISS_KEY = 'vv_pwa_install_dismissed';
+
+function PWAInstallBanner({ accentRGB }) {
+  const { installed, isIOS, canInstall, promptInstall } = usePwaInstall();
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(PWA_DISMISS_KEY) === '1'; } catch { return false; }
+  });
+  const [showIosSteps, setShowIosSteps] = useState(false);
+
+  const dismiss = () => {
+    setDismissed(true);
+    try { localStorage.setItem(PWA_DISMISS_KEY, '1'); } catch { /* private mode */ }
+  };
+
+  // Nothing to offer: already installed, dismissed, or a browser with neither
+  // the install event (Chromium) nor iOS's Add-to-Home-Screen path.
+  if (installed || dismissed) return null;
+  if (!canInstall && !isIOS) return null;
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-none">
+      <div className="mx-auto max-w-md rounded-2xl p-4 pointer-events-auto"
+        style={{ background: 'rgba(20,20,24,0.94)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)', animation: 'fadeUp 0.4s ease-out both' }}>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.3)` }}>
+            <DeviceMobile size={20} style={{ color: `rgb(${accentRGB})` }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-display text-white/90 mb-0.5">Install Vinyl Vault</div>
+            <div className="text-[12.5px] font-mono leading-relaxed text-white/45">
+              Add it to your home screen for full-screen scanning and a camera that only asks permission once.
+            </div>
+
+            {!showIosSteps && (
+              <div className="flex items-center gap-2 mt-3">
+                {canInstall ? (
+                  <button onClick={async () => { const ok = await promptInstall(); if (ok) dismiss(); }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={{ background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }}>
+                    <DownloadSimple size={14} weight="bold" />Install
+                  </button>
+                ) : (
+                  <button onClick={() => setShowIosSteps(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[12px] tracking-[0.12em] uppercase font-mono transition-all"
+                    style={{ background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }}>
+                    <Export size={14} weight="bold" />How to add
+                  </button>
+                )}
+                <button onClick={dismiss}
+                  className="px-3 py-2 rounded-full text-[12px] tracking-[0.12em] uppercase font-mono transition-all"
+                  style={{ color: 'rgba(var(--fg),0.45)' }}>
+                  Not now
+                </button>
+              </div>
+            )}
+
+            {showIosSteps && (
+              <div className="mt-3 text-[12.5px] font-mono text-white/55 space-y-1.5">
+                <div className="flex items-center gap-2"><span style={{ color: `rgb(${accentRGB})` }}>1.</span> Tap the Share button <Export size={14} className="inline -mt-0.5" /> in Safari's toolbar</div>
+                <div className="flex items-center gap-2"><span style={{ color: `rgb(${accentRGB})` }}>2.</span> Scroll down and tap <span className="text-white/80">Add to Home Screen</span></div>
+                <div className="flex items-center gap-2"><span style={{ color: `rgb(${accentRGB})` }}>3.</span> Tap <span className="text-white/80">Add</span> — done</div>
+                <button onClick={dismiss} className="mt-1 px-3 py-1.5 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.45)', border: '1px solid rgba(var(--fg),0.12)' }}>Got it</button>
+              </div>
+            )}
+          </div>
+
+          <button onClick={dismiss} className="shrink-0 -mr-1 -mt-1 p-1 transition-opacity hover:opacity-70" aria-label="Dismiss">
+            <X size={15} className="text-white/40" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4724,28 +4884,26 @@ function CameraModal({ onCapture, onClose }) {
   const [error, setError] = useState('');
   const [flash, setFlash] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const streamRef = useRef(null);
-
-  const stopStream = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-  };
+  const startedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
 
     const start = async () => {
+      // Guard: only ever request once per mount (defends against any double
+      // invocation, which would surface a second permission prompt).
+      if (startedRef.current) return;
+      startedRef.current = true;
+
       if (!navigator.mediaDevices?.getUserMedia) {
         if (mounted) setError('Camera not supported on this browser');
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false,
-        });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
+        // Reuse the shared session stream when it's already live -- this is what
+        // keeps the permission prompt to once per session rather than once per scan.
+        const stream = await acquireCameraStream();
+        if (!mounted) return; // leave the shared stream alive for the next open
         const v = videoRef.current;
         if (!v) return;
         v.srcObject = stream;
@@ -4773,7 +4931,10 @@ function CameraModal({ onCapture, onClose }) {
     return () => {
       mounted = false;
       document.removeEventListener('visibilitychange', onVisible);
-      stopStream();
+      // Detach the feed but keep the shared stream alive so the next open
+      // reuses the existing grant without re-prompting. The stream is released
+      // by VinylVault when the scan flow is exited (and on tab-hide / unload).
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, []);
 
@@ -4794,7 +4955,9 @@ function CameraModal({ onCapture, onClose }) {
     canvas.width = Math.round(v.videoWidth * scale);
     canvas.height = Math.round(v.videoHeight * scale);
     canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
-    stopStream();
+    // Keep the shared stream alive (don't stop tracks) so batch-scanning the next
+    // record reopens the camera instantly without another permission prompt.
+    if (v) v.srcObject = null;
     canvas.toBlob(blob => {
       canvas.width = 0; canvas.height = 0;
       if (blob) onCapture(new File([blob], 'scan.jpg', { type: 'image/jpeg' }));
