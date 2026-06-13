@@ -438,25 +438,57 @@ async function detectBPM(previewUrl) {
 function getGreeting(name) {
   const hour = new Date().getHours();
   let pool;
-  if (hour >= 5 && hour < 12) {
+  if (hour >= 3 && hour < 5) {
     pool = [
+      `It's 3am, ${name}. The records aren't going anywhere. Neither, clearly, are you.`,
+      `Still up, ${name}. This is precisely how a collection becomes a problem. Carry on.`,
+    ];
+  } else if (hour >= 5 && hour < 8) {
+    pool = [
+      `Morning, ${name}. The records survived the night. Did you?`,
+      `Up early, ${name}. Nobody files at this hour for the joy of it.`,
+      `Dawn, ${name}. Still smells of last night's club in here.`,
+      `Early start, ${name}. The wantlist never went to bed either.`,
       `Early start, ${name}. Coffee and crates?`,
       `Rise and spin, ${name}.`,
     ];
-  } else if (hour >= 12 && hour < 18) {
+  } else if (hour >= 8 && hour < 12) {
     pool = [
+      `Morning, ${name}. The stack's exactly where you left it. Still judging you.`,
+      `Morning, ${name}. Yesterday's haul is still in the bag. It knows you forgot.`,
+      `Morning, ${name}. Alphabetical order was a beautiful dream, once.`,
+      `Morning, ${name}. Coffee, then the duplicates. In that order, for everyone's sake.`,
+    ];
+  } else if (hour >= 12 && hour < 14) {
+    pool = [
+      `Midday, ${name}. The collection grew again while you slept. It does that.`,
+      `Afternoon, ${name}. Stack's not going to sort itself.`,
+      `Back at it, ${name}?`,
+    ];
+  } else if (hour >= 14 && hour < 17) {
+    pool = [
+      `Afternoon, ${name}. In here somewhere is the record you swore you didn't own. Twice.`,
+      `Afternoon, ${name}. The shelf is at capacity. The shelf is always at capacity.`,
+      `Afternoon, ${name}. File three, buy none. We both know how this goes.`,
+      `Afternoon, ${name}. That white label's been a mystery two years. Today won't crack it either.`,
       `Afternoon, ${name}. Stack's not going to sort itself.`,
       `Back at it, ${name}?`,
       `Good afternoon, ${name}. Ready to dig?`,
     ];
-  } else if (hour >= 18 && hour < 22) {
+  } else if (hour >= 17 && hour < 21) {
     pool = [
+      `Evening, ${name}. Pull a set, or stare at the spines. Dealer's choice.`,
+      `Evening, ${name}. The gig bag's empty and hopeful. See to it.`,
+      `Evening, ${name}. You'll find the one you need at 2am. You always do.`,
       `Evening, ${name}. Time to spin something.`,
       `Hey ${name}, what's going in tonight?`,
       `Good evening, ${name}. The vault awaits.`,
     ];
   } else {
     pool = [
+      `Late, ${name}. The wantlist's open in the other tab. We saw.`,
+      `Night, ${name}. Nothing good gets ordered after midnight. Order it anyway.`,
+      `Night, ${name}. The needle's earned a rest. You, apparently, have not.`,
       `Late night crate-digging, ${name}?`,
       `Still at it, ${name}. Respect.`,
       `Night owl mode, ${name}.`,
