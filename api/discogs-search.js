@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   const { artist, title, catalogNumber } = req.body || {};
 
   try {
-    const matches = await searchDiscogs({ artist, title, catalogNumber });
+    const matches = await searchDiscogs({ artist, title, catalogNumber, manual: true });
     return res.status(200).json({ matches });
   } catch (err) {
     return res.status(500).json({ error: err.message, matches: [] });

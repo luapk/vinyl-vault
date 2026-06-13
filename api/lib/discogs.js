@@ -31,11 +31,13 @@ function buildSearchUrl(params) {
   return `${BASE}/database/search?${new URLSearchParams({ type: 'release', per_page: '5', ...params })}`;
 }
 
-export async function searchDiscogs({ catalogNumber, artist, title, label, rawText }) {
+export async function searchDiscogs({ catalogNumber, artist, title, label, rawText, manual = false }) {
   const headers = authHeaders();
 
-  // Run every plausible strategy in parallel. Vision sometimes misassigns fields
-  // (e.g. track title read as label name), so we try multiple interpretations.
+  // Run search strategies in parallel. Vision sometimes misassigns fields
+  // (e.g. track title read as label name), so image scans try multiple interpretations.
+  // Manual searches (user-typed fields) use a smaller targeted set to preserve
+  // Discogs rate-limit quota for the subsequent fetchDiscogsRelease detail fetch.
   const urls = new Set();
 
   if (catalogNumber) {
@@ -57,49 +59,50 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
   if (artist && title) {
     urls.add(buildSearchUrl({ artist, release_title: title }));
   }
-  if (title) {
-    // Title-only: catches cases where artist is empty (mix credit misread as artist)
-    // or when artist field is wrong but title is correct.
-    urls.add(buildSearchUrl({ release_title: title }));
-  }
-  if (label && title) {
-    urls.add(buildSearchUrl({ label, release_title: title }));
-  }
-  if (artist && title && artist !== label) {
-    // Treat Vision's "artist" as a label — catches label/artist/title confusion
-    urls.add(buildSearchUrl({ label: artist, release_title: title }));
-  }
-  // Mine rawText for catno-like patterns as independent catno searches, but only
-  // when no structured catalogue number was read -- a confident structured catno
-  // (plus its variants above) already covers that case, and dense OCR text can
-  // otherwise yield a dozen-plus false catno tokens (publisher codes, years),
-  // each firing its own Discogs query and tripping the rate limiter. Cap the
-  // remaining candidates so the request fan-out stays small.
-  if (rawText && !catalogNumber) {
-    const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
-    const rawCatnos = [...new Set([...rawText.matchAll(catnoPattern)].map(m => m[1]))].slice(0, 3);
-    for (const c of rawCatnos) {
-      urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
-      const stripped = c.replace(/[\s\-]/g, '');
-      if (stripped !== c) {
-        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
+  // Loose fallbacks: only needed for image scans where Vision may misidentify fields.
+  // Skip for manual searches -- the user typed explicit values, so field confusion
+  // doesn't apply, and the extra requests needlessly eat rate-limit quota.
+  if (!manual) {
+    if (title) {
+      urls.add(buildSearchUrl({ release_title: title }));
+    }
+    if (label && title) {
+      urls.add(buildSearchUrl({ label, release_title: title }));
+    }
+    if (artist && title && artist !== label) {
+      // Treat Vision's "artist" as a label — catches label/artist/title confusion
+      urls.add(buildSearchUrl({ label: artist, release_title: title }));
+    }
+    // Mine rawText for catno-like patterns as independent catno searches, but only
+    // when no structured catalogue number was read -- a confident structured catno
+    // (plus its variants above) already covers that case, and dense OCR text can
+    // otherwise yield a dozen-plus false catno tokens (publisher codes, years),
+    // each firing its own Discogs query and tripping the rate limiter. Cap the
+    // remaining candidates so the request fan-out stays small.
+    if (rawText && !catalogNumber) {
+      const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
+      const rawCatnos = [...new Set([...rawText.matchAll(catnoPattern)].map(m => m[1]))].slice(0, 3);
+      for (const c of rawCatnos) {
+        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
+        const stripped = c.replace(/[\s\-]/g, '');
+        if (stripped !== c) {
+          urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
+        }
       }
     }
   }
 
-  // Fuzzy: rawText is the exact transcription of visible text — more reliable than
-  // reassembling structured fields Vision may have misassigned. Trim it though:
-  // DOCUMENT_TEXT_DETECTION returns the whole label, and a query that long is slow
-  // and noisy. The first ~80 chars cover artist/title/catno on nearly every sleeve.
+  // Fuzzy: for image scans, rawText is the verbatim OCR -- more reliable than
+  // reassembled fields Vision may have misidentified. Trim to 80 chars to keep
+  // the query focused. For manual searches, fall back to joined fields only when
+  // no catno is present (catno searches already cover the targeted case).
   const fuzzyQ = (rawText ? rawText.slice(0, 80).trim() : '') || [artist, title, label].filter(Boolean).join(' ');
-  if (fuzzyQ) {
+  if (fuzzyQ && (!manual || !catalogNumber)) {
     urls.add(buildSearchUrl({ q: fuzzyQ }));
   }
 
-  // Title-keyword fallback: when rawText contains remix suffixes like "c.craig's mind mix",
-  // the fuzzy search may bias toward wrong releases. A clean title-only keyword search
-  // cuts through that noise.
-  if (title && (!artist || artist === label)) {
+  // Title-keyword fallback: only for image scans where artist field may be unreliable.
+  if (!manual && title && (!artist || artist === label)) {
     urls.add(buildSearchUrl({ q: title }));
   }
 
@@ -149,7 +152,9 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
 
 export async function fetchDiscogsRelease(id) {
   const headers = authHeaders();
-  const res = await fetchWithRetry(`${BASE}/releases/${id}`, { headers });
+  // 1 retry max: the search fan-out already uses quota, so limit backoff to 1s
+  // rather than the default 7s (1+2+4) which is the main cause of "pulling data" hangs.
+  const res = await fetchWithRetry(`${BASE}/releases/${id}`, { headers }, 1);
   if (!res.ok) throw new Error(`Discogs release fetch ${res.status}`);
 
   const r = await res.json();
