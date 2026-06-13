@@ -69,26 +69,29 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     // Treat Vision's "artist" as a label — catches label/artist/title confusion
     urls.add(buildSearchUrl({ label: artist, release_title: title }));
   }
-  // Extract every catno-like pattern from rawText as independent catno searches.
-  // This catches cases where Vision OCR'd the catalogue number wrong in the
-  // catalogNumber field but transcribed it correctly (or differently) in rawText.
-  if (rawText) {
+  // Mine rawText for catno-like patterns as independent catno searches, but only
+  // when no structured catalogue number was read -- a confident structured catno
+  // (plus its variants above) already covers that case, and dense OCR text can
+  // otherwise yield a dozen-plus false catno tokens (publisher codes, years),
+  // each firing its own Discogs query and tripping the rate limiter. Cap the
+  // remaining candidates so the request fan-out stays small.
+  if (rawText && !catalogNumber) {
     const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
-    const rawCatnos = [...rawText.matchAll(catnoPattern)].map(m => m[1]);
+    const rawCatnos = [...new Set([...rawText.matchAll(catnoPattern)].map(m => m[1]))].slice(0, 3);
     for (const c of rawCatnos) {
-      if (c !== catalogNumber) {
-        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
-        const stripped = c.replace(/[\s\-]/g, '');
-        if (stripped !== c) {
-          urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
-        }
+      urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
+      const stripped = c.replace(/[\s\-]/g, '');
+      if (stripped !== c) {
+        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
       }
     }
   }
 
   // Fuzzy: rawText is the exact transcription of visible text — more reliable than
-  // reassembling structured fields that Vision may have misassigned
-  const fuzzyQ = rawText || [artist, title, label].filter(Boolean).join(' ');
+  // reassembling structured fields Vision may have misassigned. Trim it though:
+  // DOCUMENT_TEXT_DETECTION returns the whole label, and a query that long is slow
+  // and noisy. The first ~80 chars cover artist/title/catno on nearly every sleeve.
+  const fuzzyQ = (rawText ? rawText.slice(0, 80).trim() : '') || [artist, title, label].filter(Boolean).join(' ');
   if (fuzzyQ) {
     urls.add(buildSearchUrl({ q: fuzzyQ }));
   }
