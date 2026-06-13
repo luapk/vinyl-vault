@@ -36,14 +36,20 @@ function relativeTime(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
-function Avatar({ profile, size = 40 }) {
+function Avatar({ profile, size = 40, isOnline = false }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const dotSize = Math.max(8, Math.round(size * 0.24));
   return (
-    <div className="rounded-full overflow-hidden flex items-center justify-center shrink-0"
-      style={{ width: size, height: size, border: '1px solid rgba(var(--fg),0.15)', background: 'rgba(var(--fg),0.06)' }}>
-      {profile?.avatar_url && !imgFailed
-        ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
-        : <span style={{ fontSize: size * 0.4, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)' }}>{initials(profile)}</span>}
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <div className="rounded-full overflow-hidden flex items-center justify-center w-full h-full"
+        style={{ border: '1px solid rgba(var(--fg),0.15)', background: 'rgba(var(--fg),0.06)' }}>
+        {profile?.avatar_url && !imgFailed
+          ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
+          : <span style={{ fontSize: size * 0.4, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)' }}>{initials(profile)}</span>}
+      </div>
+      {isOnline && (
+        <span style={{ position: 'absolute', bottom: 0, right: 0, width: dotSize, height: dotSize, borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-hex)', boxSizing: 'border-box' }} />
+      )}
     </div>
   );
 }
@@ -309,7 +315,7 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
 
 // ─── Follow list modal ────────────────────────────────────────────────────────
 
-function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB }) {
+function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB, onlineUsers }) {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -349,7 +355,7 @@ function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB }) {
                   style={{ background: 'transparent' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--fg),0.04)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <Avatar profile={p} size={36} />
+                  <Avatar profile={p} size={36} isOnline={onlineUsers?.has(p.id)} />
                   <div className="flex-1 min-w-0 text-left">
                     <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(p)}</div>
                     {p.username && <div className="text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>@{p.username}</div>}
@@ -368,7 +374,7 @@ function FollowListModal({ userId, mode, onOpenProfile, onClose, accentRGB }) {
 
 const PAGE = 60;
 
-function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenProfile, onShare, onOpenChat }) {
+function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenProfile, onShare, onOpenChat, onlineUsers }) {
   const [profile, setProfile] = useState(null);
   const [state, setState] = useState('loading'); // loading | ready | notfound | private
   const [records, setRecords] = useState([]);
@@ -467,7 +473,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-5 mb-8">
-        <Avatar profile={profile} size={88} />
+        <Avatar profile={profile} size={88} isOnline={onlineUsers?.has(profile?.id)} />
         <div className="flex-1 min-w-0">
           <h1 className="text-[26px] md:text-[31px] font-display leading-tight" style={{ color: 'rgba(var(--fg),0.92)' }}>{nameFor(profile)}</h1>
           {profile.username && <div className="text-xs font-mono text-white/40">@{profile.username}</div>}
@@ -530,7 +536,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
       )}
 
       {showFollowModal && (
-        <FollowListModal userId={profile.id} mode={showFollowModal} onOpenProfile={onOpenProfile} onClose={() => setShowFollowModal(null)} accentRGB={accentRGB} />
+        <FollowListModal userId={profile.id} mode={showFollowModal} onOpenProfile={onOpenProfile} onClose={() => setShowFollowModal(null)} accentRGB={accentRGB} onlineUsers={onlineUsers} />
       )}
     </div>
   );
@@ -549,7 +555,7 @@ function ProfileMessage({ title, body, onBack, profile }) {
 
 // ─── Community home (feed + search + your profile) ────────────────────────────
 
-function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection, onOpenChat }) {
+function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection, onOpenChat, onlineUsers }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -597,7 +603,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
       {/* Your profile card */}
       <div className="rounded-2xl p-4 mb-4 flex items-center gap-3" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
-        <Avatar profile={currentProfile} size={44} />
+        <Avatar profile={currentProfile} size={44} isOnline={onlineUsers?.has(currentUser?.id)} />
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.85)' }}>{nameFor(currentProfile)}</div>
           {hasUsername
@@ -625,7 +631,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
               <button key={p.id} onClick={() => p.username && onOpenProfile(p.username)}
                 className="flex flex-col items-center gap-2 shrink-0 px-3 py-3 rounded-xl transition-all hover:opacity-80"
                 style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.07)', minWidth: 72 }}>
-                <Avatar profile={p} size={44} />
+                <Avatar profile={p} size={44} isOnline={onlineUsers?.has(p.id)} />
                 <span className="text-[11px] font-mono text-white/55 max-w-[64px] truncate leading-tight">
                   {p.display_name || p.username || 'User'}
                 </span>
@@ -655,7 +661,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
             <div className="space-y-1.5">
               {results.map(p => (
                 <button key={p.id} onClick={() => onOpenProfile(p.username)} className="w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left" style={{ background: 'rgba(var(--fg),0.03)', border: '1px solid rgba(var(--fg),0.06)' }}>
-                  <Avatar profile={p} size={36} />
+                  <Avatar profile={p} size={36} isOnline={onlineUsers?.has(p.id)} />
                   <div className="min-w-0">
                     <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{nameFor(p)}</div>
                     <div className="text-[12px] font-mono text-white/35 truncate">@{p.username}{p.bio ? ` · ${p.bio}` : ''}</div>
@@ -680,7 +686,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                 <button key={notif.id} onClick={() => record && setSelectedNotifRecord(record)}
                   className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
                   style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', cursor: record ? 'pointer' : 'default' }}>
-                  <Avatar profile={notif.actor} size={30} />
+                  <Avatar profile={notif.actor} size={30} isOnline={onlineUsers?.has(notif.actor?.id)} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] leading-snug" style={{ color: 'rgba(var(--fg),0.8)' }}>
                       <span className="font-medium">{nameFor(notif.actor)}</span>
@@ -741,7 +747,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
                 <div className="flex items-center gap-3 px-4 pt-4 pb-3">
                   <button onClick={() => group.owner.username && onOpenProfile(group.owner.username)}
                     className="shrink-0 transition-opacity hover:opacity-80">
-                    <Avatar profile={group.owner} size={38} />
+                    <Avatar profile={group.owner} size={38} isOnline={onlineUsers?.has(group.owner?.id)} />
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.88)' }}>
@@ -806,7 +812,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
 // ─── Top-level Community view ─────────────────────────────────────────────────
 
-export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection, onOpenChat }) {
+export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection, onOpenChat, onlineUsers }) {
   const [toast, setToast] = useState('');
 
   const share = useCallback((username) => {
@@ -832,6 +838,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onOpenProfile={onOpenProfile}
           onShare={share}
           onOpenChat={onOpenChat}
+          onlineUsers={onlineUsers}
         />
       ) : (
         <CommunityHome
@@ -843,6 +850,7 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onOpenAccount={onOpenAccount}
           collection={collection}
           onOpenChat={onOpenChat}
+          onlineUsers={onlineUsers}
         />
       )}
 

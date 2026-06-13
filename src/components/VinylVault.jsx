@@ -590,6 +590,7 @@ export default function VinylVault() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatRecipient, setChatRecipient] = useState(null); // profile object
   const [msgUnread, setMsgUnread] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState(() => new Set());
 
   // When returning from Stripe Checkout, re-fetch the profile after a short
   // delay so the webhook has time to update Supabase, then clear the URL param.
@@ -646,6 +647,24 @@ export default function VinylVault() {
   useEffect(() => {
     if (!user?.id || !isSupabaseEnabled) { setMsgUnread(0); return; }
     getUnreadMessageCount(user.id).then(setMsgUnread).catch(() => {});
+  }, [user?.id, isSupabaseEnabled]);
+
+  // Realtime presence: track who is currently online.
+  useEffect(() => {
+    if (!user?.id || !isSupabaseEnabled) { setOnlineUsers(new Set()); return; }
+    let channel;
+    (async () => {
+      const { supabase } = await import('../lib/supabase.js');
+      channel = supabase.channel('online', { config: { presence: { key: user.id } } });
+      channel.on('presence', { event: 'sync' }, () => {
+        const ids = new Set(Object.keys(channel.presenceState()));
+        setOnlineUsers(ids);
+      });
+      await channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') await channel.track({ t: Date.now() });
+      });
+    })();
+    return () => { channel?.unsubscribe(); setOnlineUsers(new Set()); };
   }, [user?.id, isSupabaseEnabled]);
 
   useEffect(() => {
@@ -1054,6 +1073,7 @@ export default function VinylVault() {
             onOpenAccount={() => setShowAccount(true)}
             collection={collection}
             onOpenChat={(recipient) => { setChatRecipient(recipient); setChatOpen(true); }}
+            onlineUsers={onlineUsers}
           />
         )}
 
@@ -1068,6 +1088,7 @@ export default function VinylVault() {
           initialRecipient={chatRecipient}
           onClose={() => { setChatOpen(false); setChatRecipient(null); }}
           onUnreadChange={setMsgUnread}
+          onlineUsers={onlineUsers}
         />
       )}
 

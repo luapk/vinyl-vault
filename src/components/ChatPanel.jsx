@@ -5,14 +5,24 @@ import { getConversations, getMessages, sendMessage, markMessagesRead, getFollow
 
 const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
-function ChatAvatar({ profile, size = 32 }) {
+function ChatAvatar({ profile, size = 32, isOnline = false }) {
   const letter = (profile?.display_name || profile?.username || '?')[0].toUpperCase();
+  const dotSize = Math.max(8, Math.round(size * 0.25));
+  const dot = isOnline && (
+    <span style={{ position: 'absolute', bottom: 0, right: 0, width: dotSize, height: dotSize, borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-hex)', boxSizing: 'border-box' }} />
+  );
   if (profile?.avatar_url) {
-    return <img src={profile.avatar_url} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
+    return (
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <img src={profile.avatar_url} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+        {dot}
+      </div>
+    );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: 'rgba(var(--fg),0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.floor(size * 0.38), fontWeight: 600, color: 'rgba(var(--fg),0.55)', flexShrink: 0, fontFamily: 'monospace' }}>
+    <div style={{ position: 'relative', width: size, height: size, borderRadius: '50%', background: 'rgba(var(--fg),0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.floor(size * 0.38), fontWeight: 600, color: 'rgba(var(--fg),0.55)', flexShrink: 0, fontFamily: 'monospace' }}>
       {letter}
+      {dot}
     </div>
   );
 }
@@ -29,7 +39,7 @@ function msgTime(ts) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-export default function ChatPanel({ currentUser, onClose, initialRecipient, accentRGB, isDark, onUnreadChange }) {
+export default function ChatPanel({ currentUser, onClose, initialRecipient, accentRGB, isDark, onUnreadChange, onlineUsers }) {
   const [view, setView] = useState(initialRecipient ? 'thread' : 'list');
   const [conversations, setConversations] = useState([]);
   const [recipient, setRecipient] = useState(initialRecipient || null);
@@ -218,7 +228,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
             ) : followingList.map(p => (
               <button key={p.id} onClick={() => openThread(p)}
                 style={{ width: '100%', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(var(--fg),0.05)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
-                <ChatAvatar profile={p} size={40} />
+                <ChatAvatar profile={p} size={40} isOnline={onlineUsers?.has(p.id)} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.display_name || p.username || 'User'}
@@ -252,7 +262,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
               <button key={conv.userId} onClick={() => openThread(conv.profile)}
                 style={{ width: '100%', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid rgba(var(--fg),0.05)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <ChatAvatar profile={conv.profile} size={40} />
+                  <ChatAvatar profile={conv.profile} size={40} isOnline={onlineUsers?.has(conv.profile?.id)} />
                   {conv.unread > 0 && (
                     <span style={{ position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, background: `rgb(${accentRGB})`, fontSize: 11, fontWeight: 800, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{conv.unread > 9 ? '9+' : conv.unread}</span>
                   )}
@@ -277,7 +287,7 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
           {/* Thread header */}
           <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
             <button onClick={() => setView('list')} style={btnStyle}><ArrowLeft size={13} weight="bold" /></button>
-            {recipient && <ChatAvatar profile={recipient} size={32} />}
+            {recipient && <ChatAvatar profile={recipient} size={32} isOnline={onlineUsers?.has(recipient?.id)} />}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {recipient?.display_name || recipient?.username || 'User'}
