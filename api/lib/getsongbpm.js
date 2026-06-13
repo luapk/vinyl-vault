@@ -70,8 +70,11 @@ export async function lookupBpm(apiKey, artist, title) {
 
   const scored = items
     .map(it => {
-      const sim = titleSim(title, it.song_title || it.title || '');
-      if (sim < 0.5) return null;
+      const candidateTitle = it.song_title || it.title || '';
+      const sim = titleSim(title, candidateTitle);
+      // Log every candidate so we can see what the API is returning.
+      console.log(`[getsongbpm] candidate sim=${sim.toFixed(2)} title="${candidateTitle}" artist="${it.artist?.name || ''}" tempo="${it.tempo || it.bpm || ''}"`);
+      if (sim < 0.35) return null;
       let s = sim;
       // Reward artist overlap so the right recording wins among same-named songs.
       if (artistWords.length) {
@@ -85,12 +88,15 @@ export async function lookupBpm(apiKey, artist, title) {
 
   if (!scored.length) return null;
   const best = scored[0].it;
+  console.log(`[getsongbpm] best match: "${best.song_title || best.title}" tempo="${best.tempo || best.bpm || ''}" song_id="${best.song_id || best.id || ''}"`);
 
-  const inline = parseTempo(best.tempo);
+  // Accept both tempo and bpm field names (API versions differ).
+  const inline = parseTempo(best.tempo || best.bpm);
   if (inline != null) return inline;
 
   // Some search payloads omit tempo; fetch the song detail for the best match.
-  if (best.song_id) return fetchSongTempo(apiKey, best.song_id);
+  const songId = best.song_id || best.id;
+  if (songId) return fetchSongTempo(apiKey, songId);
   return null;
 }
 
