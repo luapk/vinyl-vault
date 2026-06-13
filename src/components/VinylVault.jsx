@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench,
+  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -1637,6 +1637,8 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
   const [crateMenuOpen, setCrateMenuOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('added');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   // Grid renders in pages of GRID_PAGE; an IntersectionObserver sentinel grows
   // the limit as you scroll so large collections don't mount thousands of nodes.
@@ -1700,7 +1702,13 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
     return matchSearch && matchCrate;
   }), [collection, search, filterCrate]);
 
-  useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate]);
+  const sortedFiltered = useMemo(() => {
+    if (sortBy === 'added') return filtered;
+    const col = sortBy === 'artist' ? 'artist' : sortBy === 'title' ? 'title' : 'label';
+    return [...filtered].sort((a, b) => (a[col] || '').localeCompare(b[col] || ''));
+  }, [filtered, sortBy]);
+
+  useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate, sortBy]);
 
   useEffect(() => {
     const el = gridSentinelRef.current;
@@ -1801,9 +1809,41 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           </div>
 
-          {/* Crate filter — dropdown picker (scales to any number of crates) */}
-          {allCrates.length > 0 && (
-            <div className="relative mb-4">
+          {/* Sort + crate filter row */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+
+            {/* Sort dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setSortMenuOpen(o => !o)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+                style={{ background: sortBy !== 'added' ? 'rgba(var(--fg),0.07)' : 'rgba(var(--fg),0.025)', border: '1px solid rgba(var(--fg),0.08)', color: sortBy !== 'added' ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.50)' }}>
+                <ArrowsDownUp size={13} className="opacity-70" />
+                <span>{sortBy === 'added' ? 'Sort' : { artist: 'Artist', title: 'Title', label: 'Label' }[sortBy]}</span>
+                <CaretDown size={11} className="opacity-50" style={{ transform: sortMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+              </button>
+              {sortMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setSortMenuOpen(false)} />
+                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5" style={{ minWidth: 190, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                    {[['added', 'Recently added'], ['artist', 'Artist A–Z'], ['title', 'Title A–Z'], ['label', 'Label A–Z']].map(([key, label]) => (
+                      <button key={key} onClick={() => { setSortBy(key); setSortMenuOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left transition-all"
+                        style={{ background: sortBy === key ? 'rgba(var(--fg),0.07)' : 'transparent' }}
+                        onMouseEnter={e => { if (sortBy !== key) e.currentTarget.style.background = 'rgba(var(--fg),0.04)'; }}
+                        onMouseLeave={e => { if (sortBy !== key) e.currentTarget.style.background = 'transparent'; }}>
+                        <span className="flex-1 text-[12px] tracking-[0.1em] uppercase font-mono" style={{ color: sortBy === key ? 'rgba(var(--fg),0.92)' : 'rgba(var(--fg),0.62)' }}>{label}</span>
+                        {sortBy === key && <Check size={11} weight="bold" style={{ color: 'rgba(var(--fg),0.7)' }} />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Crate filter — dropdown picker (scales to any number of crates) */}
+            {allCrates.length > 0 && (
+            <div className="relative">
               {filterCrate ? (
                 /* Active state: glassmorphic pill that re-opens the menu on tap */
                 <div className="flex items-center gap-2">
@@ -1856,15 +1896,17 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
             </div>
           )}
 
-          {filtered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
+          </div>{/* end sort+filter row */}
 
-          {viewMode === "carousel" && filtered.length > 0 && (
-            <VinylCarousel records={filtered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
+          {sortedFiltered.length === 0 && <div className="text-center py-16 text-white/40 text-sm font-mono">No records match.</div>}
+
+          {viewMode === "carousel" && sortedFiltered.length > 0 && (
+            <VinylCarousel records={sortedFiltered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
           )}
-          {viewMode === "grid" && filtered.length > 0 && (
+          {viewMode === "grid" && sortedFiltered.length > 0 && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filtered.slice(0, gridLimit).map((record) => (
+                {sortedFiltered.slice(0, gridLimit).map((record) => (
                   <RecordCard
                     key={record.id}
                     record={record}
@@ -1878,7 +1920,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
                   />
                 ))}
               </div>
-              {filtered.length > gridLimit && <div ref={gridSentinelRef} style={{ height: 1 }} />}
+              {sortedFiltered.length > gridLimit && <div ref={gridSentinelRef} style={{ height: 1 }} />}
             </>
           )}
         </>
