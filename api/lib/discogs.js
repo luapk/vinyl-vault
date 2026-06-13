@@ -120,10 +120,13 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     urls.add(buildSearchUrl({ q: title }));
   }
 
+  // Short timeout + 1 retry for search: we fire up to 15 URLs in parallel, so
+  // we want fast failure. 3s covers normal Discogs latency; 1 retry handles a
+  // single rate-limit bounce. Worst case per URL: 3+1+3 = 7s (vs 31s before).
   const batches = await Promise.all(
     [...urls].map(async url => {
       try {
-        const res = await fetchWithRetry(url, { headers });
+        const res = await fetchWithRetry(url, { headers }, 1, 3000);
         if (!res.ok) return [];
         const data = await res.json();
         return data.results || [];
@@ -166,9 +169,9 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
 
 export async function fetchDiscogsRelease(id) {
   const headers = authHeaders();
-  // 1 retry max: the search fan-out already uses quota, so limit backoff to 1s
-  // rather than the default 7s (1+2+4) which is the main cause of "pulling data" hangs.
-  const res = await fetchWithRetry(`${BASE}/releases/${id}`, { headers }, 1);
+  // 1 retry, 4s timeout: keeps the "pulling data" screen fast even if Discogs
+  // is slow. The search fan-out already used most quota, so stay conservative.
+  const res = await fetchWithRetry(`${BASE}/releases/${id}`, { headers }, 1, 4000);
   if (!res.ok) throw new Error(`Discogs release fetch ${res.status}`);
 
   const r = await res.json();

@@ -2,7 +2,6 @@ import { identifyFromImage, identifyFromText, generateCrateSuggestions } from '.
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
-import { enrichBpm } from './lib/getsongbpm.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
@@ -68,39 +67,33 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const nullTrack = t => ({ ...t, bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null });
 
   const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
+  const nullTracks = tracklist.map(nullTrack);
 
-  // 5s ceiling on Spotify + crate suggestions combined. Per-request timeouts in
-  // spotify.js (2.5s each) keep one slow call from eating the whole budget.
-  const [enrichedTracks, suggestedBoxes] = await raceTimeout(
+  // Run Spotify, iTunes, and crate suggestions in parallel under a single 6s
+  // ceiling. iTunes runs against the raw Discogs tracklist so it can start
+  // immediately (does not need Spotify output). Spotify preview URLs take
+  // priority; iTunes fills gaps. GetSongBPM is intentionally omitted here --
+  // it runs client-side after the scan completes so it never blocks the UI.
+  const [enrichedTracks, itunesTracks, suggestedBoxes] = await raceTimeout(
     Promise.all([
       (hasSpotify && tracklist.length > 0)
-        ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => tracklist.map(nullTrack))
-        : Promise.resolve(tracklist.map(nullTrack)),
+        ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => nullTracks)
+        : Promise.resolve(nullTracks),
+      fillItunesPreviews(tracklist, release.artist, releaseContext).catch(() => null),
       apiKey
         ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
         : Promise.resolve(vision?.suggestedBoxes || []),
     ]),
-    5000,
-    [tracklist.map(nullTrack), vision?.suggestedBoxes || []],
+    6000,
+    [nullTracks, null, vision?.suggestedBoxes || []],
   );
 
-  // iTunes fallback: fill any still-missing preview URLs (2.5s per-request timeout
-  // already enforced by AbortSignal.timeout); 3s overall ceiling.
-  const withPreviews = await raceTimeout(
-    fillItunesPreviews(enrichedTracks, release.artist, releaseContext).catch(() => enrichedTracks),
-    3000,
-    enrichedTracks,
-  );
-
-  // First-pass BPM: GetSongBPM is a metadata lookup, so it fills bpm even for
-  // tracks with no preview audio (which the client waveform analyser cannot do).
-  // Spotify audio-features is mostly disabled, so this is the primary bpm source.
-  // 4s overall ceiling; per-request timeouts in the lib bound each call.
-  const finalTracks = await raceTimeout(
-    enrichBpm(withPreviews, release.artist).catch(() => withPreviews),
-    4000,
-    withPreviews,
-  );
+  // Merge: keep Spotify preview where found; back-fill with iTunes where not.
+  const finalTracks = enrichedTracks.map((t, i) => {
+    if (t.previewUrl) return t;
+    const ip = itunesTracks?.[i]?.previewUrl;
+    return ip ? { ...t, previewUrl: ip } : t;
+  });
 
   release.tracklist = finalTracks;
   release.suggestedBoxes = suggestedBoxes;
