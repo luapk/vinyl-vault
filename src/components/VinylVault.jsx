@@ -933,14 +933,15 @@ export default function VinylVault() {
           q[i] = { ...q[i], status: "disambiguation", candidates: data.candidates, vision: data.vision };
           syncQueue(q);
         } else {
-          q[i] = { ...q[i], status: "error" };
+          q[i] = { ...q[i], status: "error", errorMsg: "Unexpected server response" };
           syncQueue(q);
         }
       } catch (batchErr) {
         clearTimeout(timeoutId);
-        console.error(`[batch] item ${i} error:`, batchErr?.message || batchErr);
+        const errMsg = batchErr?.name === "AbortError" ? "Timed out" : (batchErr?.message || "Unknown error");
+        console.error(`[batch] item ${i} error:`, errMsg);
         const q = [...batchQueueRef.current];
-        q[i] = { ...q[i], status: "error" };
+        q[i] = { ...q[i], status: "error", errorMsg: errMsg };
         syncQueue(q);
       }
     }
@@ -977,13 +978,14 @@ export default function VinylVault() {
         const disambigRelease = !data.release.coverUrl && disambigScanUrl ? { ...data.release, coverUrl: disambigScanUrl } : data.release;
         addRecord(disambigRelease, []).catch(console.error);
       } else {
-        latest[itemIdx] = { ...latest[itemIdx], status: "error" };
+        latest[itemIdx] = { ...latest[itemIdx], status: "error", errorMsg: data.error || "Unexpected server response" };
       }
       syncQueue(latest);
     } catch (resolveErr) {
-      console.error(`[batch] resolve item ${itemIdx} error:`, resolveErr?.message || resolveErr);
+      const errMsg = resolveErr?.name === "AbortError" ? "Timed out" : (resolveErr?.message || "Unknown error");
+      console.error(`[batch] resolve item ${itemIdx} error:`, errMsg);
       const latest = [...batchQueueRef.current];
-      latest[itemIdx] = { ...latest[itemIdx], status: "error" };
+      latest[itemIdx] = { ...latest[itemIdx], status: "error", errorMsg: errMsg };
       syncQueue(latest);
     }
   };
@@ -3899,6 +3901,8 @@ function BatchView({ queue, processing, onResolve, onBatch, onStop, accentRGB })
                   </>
                 ) : item.status === "disambiguation" ? (
                   <div className="text-sm text-yellow-400/70 font-mono">Multiple pressings found</div>
+                ) : item.status === "error" ? (
+                  <div className="text-sm text-red-400/60 font-mono truncate">{item.errorMsg || "Error"}</div>
                 ) : (
                   <div className="text-sm text-white/35 font-mono capitalize">{item.status}</div>
                 )}
