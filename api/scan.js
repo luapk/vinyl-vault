@@ -10,7 +10,7 @@ import { requireAuth } from './lib/auth.js';
 
 const SCAN_LIMITS = { digger: 50, selector: Infinity, resident: Infinity };
 
-async function checkAndIncrementScanLimit(userId) {
+async function _doCheckAndIncrementScanLimit(userId) {
   if (!userId) return null; // unauthenticated: allow (will be rate-limited separately)
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -46,6 +46,15 @@ async function checkAndIncrementScanLimit(userId) {
   return null;
 }
 
+async function checkAndIncrementScanLimit(userId) {
+  // 5s ceiling: a slow/unresponsive Supabase must not hang the scan pipeline.
+  // On timeout we resolve null (allow the scan) rather than blocking the user.
+  return Promise.race([
+    _doCheckAndIncrementScanLimit(userId),
+    new Promise(resolve => setTimeout(() => resolve(null), 5000)),
+  ]);
+}
+
 
 function raceTimeout(promise, ms, fallback) {
   return Promise.race([
@@ -70,13 +79,8 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
   const nullTracks = tracklist.map(nullTrack);
 
-  // Run Spotify, iTunes, and crate suggestions in parallel under a single 6s
-  // ceiling. iTunes runs against the raw Discogs tracklist so it can start
-  // immediately (does not need Spotify output). Spotify preview URLs take
-  // priority; iTunes fills gaps. GetSongBPM is intentionally omitted here --
-  // it runs client-side after the scan completes so it never blocks the UI.
-  // Spotify, iTunes (release-anchored), Deezer and crate suggestions all run in
-  // parallel under one 7s ceiling. Deezer fills any gaps Spotify and iTunes miss
+  // Spotify, iTunes (release-anchored), Deezer, and crate suggestions all run in
+  // parallel under a 10s ceiling. Deezer fills any gaps Spotify and iTunes miss
   // for both preview URLs and BPM. Running all three concurrently avoids the
   // latency of sequential fallbacks.
   const [enrichedTracks, itunesTracks, deezerTracks, suggestedBoxes] = await raceTimeout(
@@ -90,7 +94,7 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
         ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
         : Promise.resolve(vision?.suggestedBoxes || []),
     ]),
-    7000,
+    10000,
     [nullTracks, null, null, vision?.suggestedBoxes || []],
   );
 
@@ -159,11 +163,15 @@ export default async function handler(req, res) {
   // Post-disambiguation: client has picked a specific Discogs release
   if (discogsId) {
     if (!hasDiscogs) return res.status(503).json({ error: 'Discogs not configured' });
+    const t0 = Date.now();
     try {
       const discogsRelease = await fetchDiscogsRelease(discogsId);
+      console.log(`[scan] discogsId=${discogsId} release fetch: ${Date.now() - t0}ms`);
       const release = await buildRelease(discogsRelease, clientVision, hasSpotify, apiKey);
+      console.log(`[scan] buildRelease: ${Date.now() - t0}ms total`);
       return res.status(200).json({ status: 'complete', release });
     } catch (err) {
+      console.log(`[scan] error in discogsId path: ${err.message} t=${Date.now() - t0}ms`);
       return res.status(500).json({ error: err.message });
     }
   }
@@ -172,45 +180,103 @@ export default async function handler(req, res) {
   if (!image) return res.status(400).json({ error: 'image or discogsId required' });
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
+  const t0 = Date.now();
   try {
-    let vision, trimmedGoogleIds = [], rawOcrText = null;
+    let vision, textMatches = [], trimmedGoogleIds = [], rawOcrText = null;
 
     if (googleVisionKey) {
-      // Google Vision: accurate OCR text + web-match Discogs IDs in one API call.
-      // Use the OCR text with Claude (text-only) to avoid image-based hallucination.
+      // Google Vision: OCR text + web-match Discogs IDs in one call (TEXT_DETECTION: fast).
+      const vt = Date.now();
       const { ocrText, releaseIds } = await analyzeImage(image, googleVisionKey)
         .catch(() => ({ ocrText: null, releaseIds: [] }));
+      console.log(`[scan] t=${Date.now() - t0}ms vision: ${Date.now() - vt}ms ocrLen=${ocrText?.length || 0} webIds=${releaseIds.length}`);
       trimmedGoogleIds = releaseIds;
       rawOcrText = ocrText;
-      console.log('[scan] google ocr:', ocrText?.slice(0, 200), '| ids:', trimmedGoogleIds);
 
-      // Claude interprets clean OCR text — no image confusion possible
-      vision = ocrText
-        ? await identifyFromText(ocrText, apiKey)
-        : await identifyFromImage(image, mediaType, apiKey);
+      if (ocrText) {
+        if (!hasDiscogs) {
+          vision = await identifyFromText(ocrText, apiKey);
+          return res.status(200).json({
+            status: 'complete',
+            release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
+          });
+        }
+
+        // Claude interprets OCR text and a preliminary Discogs search (catno patterns
+        // extracted from raw OCR) run in parallel. This saves Claude's ~5s latency
+        // from the Discogs critical path. After both complete, a targeted supplement
+        // with Claude's structured fields fills queries that rawText patterns miss.
+        const ct = Date.now();
+        const [visionResult, prelimMatches] = await Promise.all([
+          identifyFromText(ocrText, apiKey),
+          searchDiscogs({ rawText: rawOcrText }),
+        ]);
+        vision = visionResult;
+        console.log(`[scan] t=${Date.now() - t0}ms claude+prelim: ${Date.now() - ct}ms artist="${vision.artist}" catno="${vision.catalogNumber}" prelim=${prelimMatches.length}`);
+
+        // Targeted supplement: catno+artist, artist+title, label+title -- queries
+        // that need Claude's interpreted fields and weren't in the raw-text pass.
+        // Skip rawText here to avoid re-firing catno pattern URLs already run above.
+        const st = Date.now();
+        const refinedMatches = (vision.catalogNumber || vision.artist || vision.title)
+          ? await searchDiscogs({
+              catalogNumber: vision.catalogNumber,
+              artist: vision.artist,
+              title: vision.title,
+              label: vision.label,
+            }).catch(() => [])
+          : [];
+        const prelimIds = new Set(prelimMatches.map(m => m.id));
+        const newFromRefined = refinedMatches.filter(m => !prelimIds.has(m.id));
+        textMatches = [...prelimMatches, ...newFromRefined].slice(0, 15);
+        console.log(`[scan] t=${Date.now() - t0}ms refined: ${Date.now() - st}ms +${newFromRefined.length} new total=${textMatches.length}`);
+      } else {
+        // No OCR text -- Claude reads the image directly
+        vision = await identifyFromImage(image, mediaType, apiKey);
+        console.log(`[scan] t=${Date.now() - t0}ms image claude (no ocr)`);
+
+        if (!hasDiscogs) {
+          return res.status(200).json({
+            status: 'complete',
+            release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
+          });
+        }
+
+        const dt = Date.now();
+        textMatches = await searchDiscogs({
+          catalogNumber: vision.catalogNumber,
+          artist: vision.artist,
+          title: vision.title,
+          label: vision.label,
+          rawText: vision.rawText,
+        });
+        console.log(`[scan] t=${Date.now() - t0}ms discogs (from image): ${Date.now() - dt}ms matches=${textMatches.length}`);
+      }
     } else {
+      // No Google Vision -- Claude reads the image directly
+      const ct = Date.now();
       vision = await identifyFromImage(image, mediaType, apiKey);
+      console.log(`[scan] t=${Date.now() - t0}ms claude image: ${Date.now() - ct}ms`);
+
+      if (!hasDiscogs) {
+        return res.status(200).json({
+          status: 'complete',
+          release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
+        });
+      }
+
+      const dt = Date.now();
+      textMatches = await searchDiscogs({
+        catalogNumber: vision.catalogNumber,
+        artist: vision.artist,
+        title: vision.title,
+        label: vision.label,
+        rawText: vision.rawText,
+      });
+      console.log(`[scan] t=${Date.now() - t0}ms discogs: ${Date.now() - dt}ms matches=${textMatches.length}`);
     }
 
     console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber }));
-
-    if (!hasDiscogs) {
-      return res.status(200).json({
-        status: 'complete',
-        release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
-      });
-    }
-
-    // Use raw Google OCR text (not Claude's interpreted rawText) for Discogs search —
-    // Claude may alter or misread the catno when copying it into rawText, but the
-    // OCR string is verbatim from Google and more likely to contain the correct catno.
-    const textMatches = await searchDiscogs({
-      catalogNumber: vision.catalogNumber,
-      artist: vision.artist,
-      title: vision.title,
-      label: vision.label,
-      rawText: rawOcrText || vision.rawText,
-    });
 
     trimmedGoogleIds = trimmedGoogleIds.slice(0, 3).map(String);
     console.log('[scan] text matches:', textMatches.length, textMatches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));
@@ -222,8 +288,10 @@ export default async function handler(req, res) {
 
     if (confirmedIds.length === 1) {
       // Both sources agree on exactly one release: auto-select with high confidence
+      const rt = Date.now();
       const discogsRelease = await fetchDiscogsRelease(confirmedIds[0]);
       const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
+      console.log(`[scan] confirmed single: release fetch+build ${Date.now() - rt}ms total=${Date.now() - t0}ms`);
       return res.status(200).json({ status: 'complete', release });
     }
 
@@ -233,15 +301,20 @@ export default async function handler(req, res) {
         textMatches.filter(m => confirmedIds.includes(String(m.id))),
         vision
       );
+      console.log(`[scan] disambiguation (confirmed ${confirmedIds.length}): t=${Date.now() - t0}ms`);
       return res.status(200).json({ status: 'disambiguation', vision, candidates });
     }
 
     // No overlap between sources. Build a merged candidate pool.
     // Google-only IDs need to be fetched; text-search IDs are already summarised.
     const googleOnlyIds = trimmedGoogleIds.filter(id => !textIdSet.has(id));
+    const gt = Date.now();
     const googleOnlyReleases = googleOnlyIds.length > 0
       ? (await Promise.all(googleOnlyIds.map(id => fetchDiscogsRelease(id).catch(() => null)))).filter(Boolean)
       : [];
+    if (googleOnlyIds.length > 0) {
+      console.log(`[scan] google-only fetches (${googleOnlyIds.length}): ${Date.now() - gt}ms`);
+    }
 
     // Merge: text matches first, then any Google-only releases not already present
     const seenIds = new Set(textMatches.map(m => String(m.id)));
@@ -256,6 +329,7 @@ export default async function handler(req, res) {
     const mergedCandidates = rankCandidates(rawMerged, vision);
 
     if (mergedCandidates.length === 0) {
+      console.log(`[scan] no candidates, vision fallback t=${Date.now() - t0}ms`);
       return res.status(200).json({
         status: 'complete',
         release: { ...vision, tracklist: [], source: 'vision', coverUrl: null },
@@ -266,13 +340,16 @@ export default async function handler(req, res) {
       const sole = mergedCandidates[0];
       const soleScore = scoreCandidate(sole, vision);
       // A clearly wrong-artist result (catno collision from a different label) is
-      // worse than returning the raw Vision reading — skip the bad Discogs match.
+      // worse than returning the raw Vision reading -- skip the bad Discogs match.
       if (soleScore < -1 && (vision.artist || vision.title)) {
+        console.log(`[scan] sole candidate bad score (${soleScore}), vision fallback t=${Date.now() - t0}ms`);
         return res.status(200).json({ status: 'complete', release: visionFallback(vision) });
       }
+      const rt = Date.now();
       const cached = googleOnlyReleases.find(r => String(r.id) === String(sole.id));
       const discogsRelease = cached || await fetchDiscogsRelease(sole.id);
       const release = await buildRelease(discogsRelease, vision, hasSpotify, apiKey);
+      console.log(`[scan] sole match: release fetch+build ${Date.now() - rt}ms total=${Date.now() - t0}ms`);
       return res.status(200).json({ status: 'complete', release });
     }
 
@@ -280,11 +357,14 @@ export default async function handler(req, res) {
     // skip the disambiguation screen and return the Vision reading instead.
     const allBad = mergedCandidates.every(c => scoreCandidate(c, vision) < -1);
     if (allBad && (vision.artist || vision.title)) {
+      console.log(`[scan] all ${mergedCandidates.length} candidates bad, vision fallback t=${Date.now() - t0}ms`);
       return res.status(200).json({ status: 'complete', release: visionFallback(vision) });
     }
 
+    console.log(`[scan] disambiguation: ${mergedCandidates.length} candidates t=${Date.now() - t0}ms`);
     return res.status(200).json({ status: 'disambiguation', vision, candidates: mergedCandidates });
   } catch (err) {
+    console.log(`[scan] unhandled error: ${err.message} t=${Date.now() - t0}ms`);
     return res.status(500).json({ error: err.message });
   }
 }

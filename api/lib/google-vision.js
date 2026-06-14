@@ -8,10 +8,10 @@ function extractDiscogsReleaseIds(urls) {
   return [...ids];
 }
 
-// Single API call: DOCUMENT_TEXT_DETECTION + WEB_DETECTION combined.
-// DOCUMENT_TEXT_DETECTION uses Google's dense-text/handwriting model, which
-// reads hand-written white labels and tightly-set curved credit text far more
-// reliably than plain TEXT_DETECTION. Both populate fullTextAnnotation.text.
+// Single API call: TEXT_DETECTION + WEB_DETECTION combined.
+// TEXT_DETECTION is the fast printed-text model -- typically 1-3s vs 4-8s for
+// DOCUMENT_TEXT_DETECTION. Commercial vinyl labels are typeset, not handwritten,
+// so the lighter model is sufficient and keeps the scan pipeline responsive.
 // Returns { ocrText, releaseIds } so callers can use OCR for interpretation
 // and web matches for Discogs ID cross-reference.
 export async function analyzeImage(imageBase64, apiKey) {
@@ -24,12 +24,12 @@ export async function analyzeImage(imageBase64, apiKey) {
         requests: [{
           image: { content: imageBase64 },
           features: [
-            { type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 },
+            { type: 'TEXT_DETECTION', maxResults: 1 },
             { type: 'WEB_DETECTION', maxResults: 10 },
           ],
         }],
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(7000),
     }
   );
 

@@ -120,13 +120,14 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     urls.add(buildSearchUrl({ q: title }));
   }
 
-  // Short timeout + 1 retry for search: we fire up to 15 URLs in parallel, so
-  // we want fast failure. 3s covers normal Discogs latency; 1 retry handles a
-  // single rate-limit bounce. Worst case per URL: 3+1+3 = 7s (vs 31s before).
+  // 5s timeout + 1 retry for search: Discogs responses regularly arrive in the
+  // 3-5s range, so 3s was cutting off valid responses. 5s keeps failure fast
+  // while catching the long tail. Worst case per URL: 5+1+5 = 11s, but all
+  // URLs run in parallel so the batch ceiling stays ~11s.
   const batches = await Promise.all(
     [...urls].map(async url => {
       try {
-        const res = await fetchWithRetry(url, { headers }, 1, 3000);
+        const res = await fetchWithRetry(url, { headers }, 1, 5000);
         if (!res.ok) return [];
         const data = await res.json();
         return data.results || [];
