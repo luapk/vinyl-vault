@@ -4431,6 +4431,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const [search, setSearch] = useState('');
   const [range, setRange] = useState(null); // null = follow data bounds until touched
   const [crateFilter, setCrateFilter] = useState(null);
+  const [crateMenuOpen, setCrateMenuOpen] = useState(false);
   const [showUnanalyzed, setShowUnanalyzed] = useState(false);
   const [detecting, setDetecting] = useState(() => new Set()); // previewUrls in flight
   const triedRef = useRef(new Set());
@@ -4541,6 +4542,11 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const selMax = range ? range[1] : dataHi;
 
   const allCrates = useMemo(() => [...new Set(collection.flatMap(r => r.crates || []))].sort(), [collection]);
+  const crateTrackCounts = useMemo(() => {
+    const counts = {};
+    for (const t of allTracks) for (const c of t.crates) counts[c] = (counts[c] || 0) + 1;
+    return counts;
+  }, [allTracks]);
 
   const q = search.trim().toLowerCase();
   const matchesSearch = (t) =>
@@ -4679,24 +4685,51 @@ function TracksView({ collection, accentRGB, onUpdate }) {
 
       {/* Crate filter */}
       {allCrates.length > 0 && (
-        <div className="mb-5 flex gap-1.5 flex-wrap">
-          <button
-            onClick={() => setCrateFilter(null)}
-            className="px-3 py-1 rounded-full text-[12px] tracking-[0.14em] uppercase font-mono transition-all"
-            style={crateFilter === null
-              ? { background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }
-              : { background: 'transparent', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }}
-          >All</button>
-          {allCrates.map(c => (
-            <button
-              key={c}
-              onClick={() => setCrateFilter(crateFilter === c ? null : c)}
-              className="px-3 py-1 rounded-full text-[12px] tracking-[0.14em] uppercase font-mono transition-all"
-              style={crateFilter === c
-                ? { background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }
-                : { background: 'transparent', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }}
-            >{c}</button>
-          ))}
+        <div className="mb-5 relative inline-block">
+          {crateFilter ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCrateMenuOpen(o => !o)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all"
+                style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.32)`, color: 'rgba(var(--fg),0.90)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: `0 4px 16px rgba(${accentRGB},0.20)` }}>
+                {crateFilter}
+                {(crateTrackCounts[crateFilter] || 0) > 0 && (
+                  <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1 }}>{crateTrackCounts[crateFilter]}</span>
+                )}
+              </button>
+              <button onClick={() => { setCrateFilter(null); setCrateMenuOpen(false); }} className="flex items-center justify-center w-6 h-6 rounded-full transition-all" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.80)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.40)'}><X size={10} /></button>
+            </div>
+          ) : (
+            <button onClick={() => setCrateMenuOpen(o => !o)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all"
+              style={{ background: 'rgba(var(--fg),0.025)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.50)' }}>
+              <Stack size={13} className="opacity-60" />
+              <span>Filter by crate</span>
+              <CaretDown size={11} className="opacity-50" style={{ transform: crateMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }} />
+            </button>
+          )}
+          {crateMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setCrateMenuOpen(false)} />
+              <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                {allCrates.map(c => {
+                  const active = crateFilter === c;
+                  return (
+                    <button key={c} onClick={() => { setCrateFilter(active ? null : c); setCrateMenuOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left transition-all"
+                      style={{ background: active ? 'rgba(var(--fg),0.07)' : 'transparent' }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(var(--fg),0.04)'; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+                      <span style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: 'rgba(var(--fg),0.28)' }} />
+                      <span className="flex-1 truncate text-[12px] tracking-[0.1em] uppercase font-mono" style={{ color: active ? 'rgba(var(--fg),0.92)' : 'rgba(var(--fg),0.62)' }}>{c}</span>
+                      {active && <Check size={11} weight="bold" style={{ color: 'rgba(var(--fg),0.7)' }} />}
+                      <span className="text-[11px] font-mono" style={{ color: 'rgba(var(--fg),0.30)' }}>{crateTrackCounts[c] || 0}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
