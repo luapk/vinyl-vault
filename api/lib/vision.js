@@ -36,7 +36,10 @@ notes: one sentence max, notable attributes or caveats.
 Return ONLY the JSON object, nothing else.`;
 
 // Shared Claude caller with retry logic for transient 500/529 (overloaded) errors.
-async function callClaude(body, apiKey, maxRetries = 2) {
+// 15s timeout per attempt, 1 retry = worst-case 31s. The previous 25s * 3 = 78s
+// budget exceeded the 50s client batch timeout, causing 100% batch failure when
+// the Anthropic API was under load.
+async function callClaude(body, apiKey, maxRetries = 1) {
   let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let response;
@@ -49,7 +52,7 @@ async function callClaude(body, apiKey, maxRetries = 2) {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(15000),
       });
     } catch (err) {
       // Network/timeout: retry transient failures with backoff, else surface.

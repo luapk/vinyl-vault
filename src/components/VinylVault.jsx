@@ -541,6 +541,7 @@ function getGreeting(name) {
 // a silent hang).
 async function getAuthToken() {
   const { supabase: sb } = await import('../lib/supabase.js');
+  if (!sb) return null;
   const result = await Promise.race([
     sb.auth.getSession(),
     new Promise(resolve => setTimeout(() => resolve({ data: { session: null } }), 5000)),
@@ -781,8 +782,10 @@ export default function VinylVault() {
         signal: externalSignal ?? controller?.signal,
       });
       if (response.status === 402) {
-        setPhase("idle");
-        setShowPricingModal(true);
+        if (!forBatch) { setPhase("idle"); setShowPricingModal(true); }
+        // In batch mode throw so startBatch can mark the item as error rather
+        // than trying to destructure the null return value.
+        if (forBatch) throw new Error("scan_limit_reached");
         return null;
       }
       if (!response.ok) {
@@ -831,6 +834,9 @@ export default function VinylVault() {
   const pickCandidate = async (candidate) => {
     const controller = new AbortController();
     scanAbortRef.current = controller;
+    // 50s hard ceiling: abort the controller on timeout so the user never waits
+    // forever. AbortSignal.any() is too new for all browsers, so use a timer instead.
+    const pickTimeoutId = setTimeout(() => controller.abort(), 50000);
     setPhase("processing");
     setStatus("Pulling release data");
     setErrorMsg("");
@@ -840,7 +846,7 @@ export default function VinylVault() {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${pickToken}` },
         body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(50000)]),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
@@ -854,11 +860,12 @@ export default function VinylVault() {
         throw new Error(data.error || "Unexpected response");
       }
     } catch (err) {
-      if (err.name === "AbortError") return; // user cancelled; cancelScan already reset the UI
+      if (err.name === "AbortError") return; // user cancelled or 50s timeout fired
       console.error(err);
-      setErrorMsg(err.name === "TimeoutError" ? "Request timed out -- please try again" : (err.message || "Failed to pull release data"));
+      setErrorMsg(err.message || "Failed to pull release data");
       setPhase("error");
     } finally {
+      clearTimeout(pickTimeoutId);
       if (scanAbortRef.current === controller) scanAbortRef.current = null;
     }
   };
@@ -944,8 +951,9 @@ export default function VinylVault() {
           q[i] = { ...q[i], status: "error" };
           syncQueue(q);
         }
-      } catch {
+      } catch (batchErr) {
         clearTimeout(timeoutId);
+        console.error(`[batch] item ${i} error:`, batchErr?.message || batchErr);
         const q = [...batchQueueRef.current];
         q[i] = { ...q[i], status: "error" };
         syncQueue(q);
