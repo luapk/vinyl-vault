@@ -144,15 +144,18 @@ export default async function handler(req, res) {
 
   const { image, mediaType, discogsId, vision: clientVision } = req.body || {};
 
-  // Enforce scan limits before doing any expensive work
-  const limitResult = await checkAndIncrementScanLimit(authUser.id).catch(() => null);
-  if (limitResult?.blocked) {
-    return res.status(402).json({
-      error: 'scan_limit_reached',
-      tier: limitResult.tier,
-      limit: limitResult.limit,
-      used: limitResult.used,
-    });
+  // Enforce scan limits on image scans only -- disambiguation resolutions are
+  // part of the same scan the user already paid for, so don't count them twice.
+  if (!discogsId) {
+    const limitResult = await checkAndIncrementScanLimit(authUser.id).catch(() => null);
+    if (limitResult?.blocked) {
+      return res.status(402).json({
+        error: 'scan_limit_reached',
+        tier: limitResult.tier,
+        limit: limitResult.limit,
+        used: limitResult.used,
+      });
+    }
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

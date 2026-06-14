@@ -983,6 +983,7 @@ export default function VinylVault() {
         body: JSON.stringify({ discogsId: candidate.id, vision }),
         signal: AbortSignal.timeout(50000),
       });
+      if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
       const latest = [...batchQueueRef.current];
@@ -995,7 +996,8 @@ export default function VinylVault() {
         latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       }
       syncQueue(latest);
-    } catch {
+    } catch (resolveErr) {
+      console.error(`[batch] resolve item ${itemIdx} error:`, resolveErr?.message || resolveErr);
       const latest = [...batchQueueRef.current];
       latest[itemIdx] = { ...latest[itemIdx], status: "error" };
       syncQueue(latest);
