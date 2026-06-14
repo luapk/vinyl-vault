@@ -1624,8 +1624,9 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (playingPreview === url) { setPlayingPreview(null); return; }
     const audio = new Audio(url);
+    audio.preload = 'auto';
     audioRef.current = audio;
-    audio.play().catch(() => {});
+    audio.oncanplay = () => { if (audioRef.current === audio) audio.play().catch(() => {}); };
     setPlayingPreview(url);
     audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
   };
@@ -2659,7 +2660,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (playingPreview === url) { setPlayingPreview(null); return; }
     const audio = new Audio(url);
-    audioRef.current = audio; audio.play().catch(() => {}); setPlayingPreview(url);
+    audio.preload = 'auto';
+    audioRef.current = audio;
+    audio.oncanplay = () => { if (audioRef.current === audio) audio.play().catch(() => {}); };
+    setPlayingPreview(url);
     audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
   };
   useEffect(() => () => audioRef.current?.pause(), []);
@@ -4426,6 +4430,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const [playing, setPlaying] = useState(null);
   const [search, setSearch] = useState('');
   const [range, setRange] = useState(null); // null = follow data bounds until touched
+  const [crateFilter, setCrateFilter] = useState(null);
   const [showUnanalyzed, setShowUnanalyzed] = useState(false);
   const [detecting, setDetecting] = useState(() => new Set()); // previewUrls in flight
   const triedRef = useRef(new Set());
@@ -4438,7 +4443,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Flatten every track, carrying its parent record's cover/artist/title.
+  // Flatten every track, carrying its parent record's cover/artist/title/crates.
   const allTracks = useMemo(() => {
     const out = [];
     for (const rec of collection) {
@@ -4457,6 +4462,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           key: t.key || null,
           previewUrl: t.previewUrl || null,
           duration: t.duration || null,
+          crates: rec.crates || [],
         });
       });
     }
@@ -4520,8 +4526,9 @@ function TracksView({ collection, accentRGB, onUpdate }) {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     if (playing === url) { setPlaying(null); return; }
     const a = new Audio(url);
+    a.preload = 'auto';
     audioRef.current = a;
-    a.play().catch(() => {});
+    a.oncanplay = () => { if (audioRef.current === a) a.play().catch(() => {}); };
     setPlaying(url);
     a.onended = () => { setPlaying(null); audioRef.current = null; };
   };
@@ -4533,16 +4540,19 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const selMin = range ? range[0] : dataLo;
   const selMax = range ? range[1] : dataHi;
 
+  const allCrates = useMemo(() => [...new Set(collection.flatMap(r => r.crates || []))].sort(), [collection]);
+
   const q = search.trim().toLowerCase();
   const matchesSearch = (t) =>
     !q || t.artist.toLowerCase().includes(q) || t.title.toLowerCase().includes(q) || t.recordTitle.toLowerCase().includes(q);
+  const matchesCrate = (t) => !crateFilter || t.crates.includes(crateFilter);
 
   const analyzed = useMemo(
-    () => allTracks.filter(t => t.bpm != null && matchesSearch(t)).sort((a, b) => a.bpm - b.bpm || a.artist.localeCompare(b.artist)),
-    [allTracks, q],
+    () => allTracks.filter(t => t.bpm != null && matchesSearch(t) && matchesCrate(t)).sort((a, b) => a.bpm - b.bpm || a.artist.localeCompare(b.artist)),
+    [allTracks, q, crateFilter],
   );
   const visible = analyzed.filter(t => t.bpm >= selMin && t.bpm <= selMax);
-  const unanalyzed = useMemo(() => allTracks.filter(t => t.bpm == null && matchesSearch(t)), [allTracks, q]);
+  const unanalyzed = useMemo(() => allTracks.filter(t => t.bpm == null && matchesSearch(t) && matchesCrate(t)), [allTracks, q, crateFilter]);
 
   // Histogram: counts per 5-BPM bucket across the slider range.
   const histogram = useMemo(() => {
@@ -4667,10 +4677,35 @@ function TracksView({ collection, accentRGB, onUpdate }) {
         </div>
       </div>
 
+      {/* Crate filter */}
+      {allCrates.length > 0 && (
+        <div className="mb-5 flex gap-1.5 flex-wrap">
+          <button
+            onClick={() => setCrateFilter(null)}
+            className="px-3 py-1 rounded-full text-[12px] tracking-[0.14em] uppercase font-mono transition-all"
+            style={crateFilter === null
+              ? { background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }
+              : { background: 'transparent', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }}
+          >All</button>
+          {allCrates.map(c => (
+            <button
+              key={c}
+              onClick={() => setCrateFilter(crateFilter === c ? null : c)}
+              className="px-3 py-1 rounded-full text-[12px] tracking-[0.14em] uppercase font-mono transition-all"
+              style={crateFilter === c
+                ? { background: `rgba(${accentRGB},0.18)`, border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})` }
+                : { background: 'transparent', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }}
+            >{c}</button>
+          ))}
+        </div>
+      )}
+
       {/* Analyzed track list, grouped by band */}
       {visible.length === 0 ? (
         <div className="text-center py-10 text-white/35 text-sm font-mono">
-          {analyzed.length === 0 ? 'No analyzed tracks yet — detection runs automatically for tracks with previews.' : 'No tracks in this BPM range.'}
+          {analyzed.length === 0
+            ? (crateFilter ? `No analyzed tracks in crate "${crateFilter}".` : 'No analyzed tracks yet — detection runs automatically for tracks with previews.')
+            : 'No tracks in this BPM range.'}
         </div>
       ) : (
         <div className="flex flex-col">{rows}</div>
