@@ -742,45 +742,49 @@ export default function VinylVault() {
     );
   }
 
-  const processImage = async (file, forBatch = false, externalSignal = null) => {
-    const controller = forBatch ? null : new AbortController();
-    if (controller) scanAbortRef.current = controller;
-    if (!forBatch) {
-      setPhase("processing");
-      setStatus("Reading sleeve");
-      setErrorMsg("");
+  // Sends a pre-loaded data URL to /api/scan and returns the parsed response.
+  // Used by startBatch where files are pre-read upfront. Throws on any error.
+  const scanDataUrl = async (dataUrl, signal) => {
+    const base64Data = dataUrl.split(",")[1];
+    const response = await fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+      body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
+      signal,
+    });
+    if (response.status === 402) throw new Error("scan_limit_reached");
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
     }
+    return response.json();
+  };
+
+  const processImage = async (file) => {
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    setPhase("processing");
+    setStatus("Reading sleeve");
+    setErrorMsg("");
     try {
       const dataUrl = await resizeImage(file);
-      if (!forBatch) {
-        setImageUrl(dataUrl);
-        const color = await extractDominantColor(dataUrl);
-        setAccent(color);
-        await new Promise((r) => setTimeout(r, 400));
-        setStatus("Searching Discogs");
+      setImageUrl(dataUrl);
+      const color = await extractDominantColor(dataUrl);
+      setAccent(color);
+      await new Promise((r) => setTimeout(r, 400));
+      setStatus("Searching Discogs");
+      let data;
+      try {
+        data = await scanDataUrl(dataUrl, controller.signal);
+      } catch (fetchErr) {
+        if (fetchErr.message === "scan_limit_reached") {
+          setPhase("idle");
+          setShowPricingModal(true);
+          return null;
+        }
+        throw fetchErr;
       }
-      const base64Data = dataUrl.split(",")[1];
-      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
-      const response = await fetch("/api/scan", {
-        method: "POST",
-        headers: scanAuthHeaders,
-        body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
-        signal: externalSignal ?? controller?.signal,
-      });
-      if (response.status === 402) {
-        if (!forBatch) { setPhase("idle"); setShowPricingModal(true); }
-        // In batch mode throw so startBatch can mark the item as error rather
-        // than trying to destructure the null return value.
-        if (forBatch) throw new Error("scan_limit_reached");
-        return null;
-      }
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
-      }
-      const data = await response.json();
-      if (forBatch) return { dataUrl, data };
-      if (controller?.signal.aborted) return null;
+      if (controller.signal.aborted) return;
       if (data.status === "disambiguation") {
         setCandidates(data.candidates);
         setVisionData(data.vision);
@@ -795,13 +799,12 @@ export default function VinylVault() {
         throw new Error(data.error || "Unexpected response");
       }
     } catch (err) {
-      if (forBatch) throw err;
       if (err.name === "AbortError") return null; // user cancelled; cancelScan already reset the UI
       console.error(err);
       setErrorMsg(err.message || "Identification failed");
       setPhase("error");
     } finally {
-      if (controller && scanAbortRef.current === controller) scanAbortRef.current = null;
+      if (scanAbortRef.current === controller) scanAbortRef.current = null;
     }
   };
 
@@ -887,8 +890,28 @@ export default function VinylVault() {
   };
 
   const startBatch = async (files) => {
-    const items = Array.from(files).map((file) => ({
-      file, status: "queued", release: null, candidates: null, vision: null, imageUrl: null,
+    const fileArray = Array.from(files);
+
+    // Pre-read all files to data URLs immediately while file handles are fresh.
+    // On Android, handles from a multi-file picker can become invalid if the tab
+    // is backgrounded between selection and processing. Google Photos "Smart Storage"
+    // also returns handles for cloud-only photos that fail to read later.
+    // Batch uses 1200px / 0.8q (vs 1500px / 0.85 for single scan) to reduce
+    // canvas memory pressure on mobile.
+    const preloaded = await Promise.all(
+      fileArray.map(file =>
+        resizeImage(file, 1200, 0.8)
+          .then(dataUrl => ({ dataUrl, error: null }))
+          .catch(() => ({ dataUrl: null, error: "Could not read image file" }))
+      )
+    );
+
+    const items = preloaded.map(({ dataUrl, error }) => ({
+      dataUrl,
+      status: error ? "error" : "queued",
+      errorMsg: error || null,
+      release: null, candidates: null, vision: null,
+      imageUrl: dataUrl || null,
     }));
     syncQueue(items);
     setAppView("batch");
@@ -909,6 +932,9 @@ export default function VinylVault() {
     // Always read from the ref before writing so concurrent resolveBatchDisambiguation
     // calls on other indices are never overwritten.
     for (let i = 0; i < items.length && !batchStopped; i++) {
+      // Skip items that failed pre-read (already marked error above)
+      if (items[i].status === "error") continue;
+
       const qPre = [...batchQueueRef.current];
       qPre[i] = { ...qPre[i], status: "processing" };
       syncQueue(qPre);
@@ -918,13 +944,13 @@ export default function VinylVault() {
       const timeoutId = setTimeout(() => currentItemController.abort(), 50000);
 
       try {
-        const { dataUrl, data } = await processImage(items[i].file, true, currentItemController.signal);
+        const data = await scanDataUrl(items[i].dataUrl, currentItemController.signal);
         clearTimeout(timeoutId);
         const q = [...batchQueueRef.current];
-        q[i] = { ...q[i], imageUrl: dataUrl };
         if (data.status === "complete") {
           q[i] = { ...q[i], status: "complete", release: data.release };
-          const batchRelease = !data.release.coverUrl && dataUrl ? { ...data.release, coverUrl: dataUrl } : data.release;
+          const itemDataUrl = items[i].dataUrl;
+          const batchRelease = !data.release.coverUrl && itemDataUrl ? { ...data.release, coverUrl: itemDataUrl } : data.release;
           syncQueue(q);
           // Crates are user-organisational, not derived from metadata. Genres
           // already flow into the record's tags inside recordFromRelease.
