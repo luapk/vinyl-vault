@@ -1423,7 +1423,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
             </div>
             <div>
               <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
-              <div className="text-lg font-display text-white/70">Batch queue</div>
+              <div className="text-lg font-display text-white/70">Upload photo/s</div>
             </div>
           </div>
           <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
@@ -1431,13 +1431,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
         </div>{/* end grid */}
       </div>{/* end relative wrapper */}
 
-      {/* "or choose from library" centred below the grid */}
       <div className="mt-4 flex flex-col items-center gap-2">
-        <label className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors cursor-pointer">
-          <Upload size={11} />
-          or choose a photo from library
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); }} />
-        </label>
         {onManual && (
           <button onClick={onManual} className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors">
             <MagnifyingGlass size={11} />
