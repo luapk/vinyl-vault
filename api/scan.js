@@ -202,16 +202,42 @@ export default async function handler(req, res) {
           });
         }
 
-        // Claude interprets OCR text and a preliminary Discogs search (catno patterns
-        // extracted from raw OCR) run in parallel. This saves Claude's ~5s latency
-        // from the Discogs critical path. After both complete, a targeted supplement
-        // with Claude's structured fields fills queries that rawText patterns miss.
+        // FAST PATH: WEB_DETECTION found a Discogs release in its image index.
+        // Fetch it directly in parallel with Claude -- no text search needed.
+        // This is the "Google Lens" path and is the common case for well-indexed records.
+        if (trimmedGoogleIds.length > 0) {
+          const ft = Date.now();
+          const [visionResult, directRelease] = await Promise.all([
+            identifyFromText(ocrText, apiKey),
+            fetchDiscogsRelease(trimmedGoogleIds[0]).catch(() => null),
+          ]);
+          vision = visionResult;
+          console.log(`[scan] t=${Date.now() - t0}ms fast-path: ${Date.now() - ft}ms id=${trimmedGoogleIds[0]} found=${!!directRelease}`);
+          if (directRelease) {
+            const release = await buildRelease(directRelease, vision, hasSpotify, apiKey);
+            console.log(`[scan] t=${Date.now() - t0}ms fast-path complete`);
+            return res.status(200).json({ status: 'complete', release });
+          }
+          // Discogs fetch failed -- fall through to text search.
+          // `vision` is already set so Claude won't be called again below.
+          console.log(`[scan] t=${Date.now() - t0}ms fast-path failed, falling back to text search`);
+        }
+
+        // TEXT SEARCH PATH: WEB_DETECTION found no IDs, or the direct fetch above failed.
+        // Claude may already be set from a failed fast path -- don't call it again.
         const ct = Date.now();
-        const [visionResult, prelimMatches] = await Promise.all([
-          identifyFromText(ocrText, apiKey),
-          searchDiscogs({ rawText: rawOcrText }),
-        ]);
-        vision = visionResult;
+        let prelimMatches;
+        if (vision) {
+          prelimMatches = await searchDiscogs({ rawText: rawOcrText });
+        } else {
+          // Claude interprets OCR text and a preliminary Discogs search run in parallel.
+          const [visionResult, pMatches] = await Promise.all([
+            identifyFromText(ocrText, apiKey),
+            searchDiscogs({ rawText: rawOcrText }),
+          ]);
+          vision = visionResult;
+          prelimMatches = pMatches;
+        }
         console.log(`[scan] t=${Date.now() - t0}ms claude+prelim: ${Date.now() - ct}ms artist="${vision.artist}" catno="${vision.catalogNumber}" prelim=${prelimMatches.length}`);
 
         // Targeted supplement: catno+artist, artist+title, label+title -- queries

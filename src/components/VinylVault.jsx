@@ -741,7 +741,7 @@ export default function VinylVault() {
     );
   }
 
-  const processImage = async (file, forBatch = false) => {
+  const processImage = async (file, forBatch = false, externalSignal = null) => {
     const controller = forBatch ? null : new AbortController();
     if (controller) scanAbortRef.current = controller;
     if (!forBatch) {
@@ -766,7 +766,7 @@ export default function VinylVault() {
         method: "POST",
         headers: scanAuthHeaders,
         body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
-        signal: controller?.signal,
+        signal: externalSignal ?? controller?.signal,
       });
       if (response.status === 402) {
         setPhase("idle");
@@ -808,6 +808,12 @@ export default function VinylVault() {
     scanAbortRef.current?.abort();
     scanAbortRef.current = null;
     reset();
+  };
+
+  const stopBatch = () => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    // Don't reset() -- stay on batch view so user can see completed items
   };
 
   const pickCandidate = async (candidate) => {
@@ -885,15 +891,32 @@ export default function VinylVault() {
     setAppView("batch");
     setBatchProcessing(true);
 
+    let batchStopped = false;
+    let currentItemController = null;
+
+    // Wire into scanAbortRef so the "Stop" button can abort the in-flight item
+    // and halt the queue. Don't call reset() on stop -- stay on the batch view.
+    scanAbortRef.current = {
+      abort: () => {
+        batchStopped = true;
+        currentItemController?.abort();
+      },
+    };
+
     // Always read from the ref before writing so concurrent resolveBatchDisambiguation
     // calls on other indices are never overwritten.
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < items.length && !batchStopped; i++) {
       const qPre = [...batchQueueRef.current];
       qPre[i] = { ...qPre[i], status: "processing" };
       syncQueue(qPre);
 
+      currentItemController = new AbortController();
+      // 50s per-item hard ceiling -- prevents a single scan from hanging the whole queue
+      const timeoutId = setTimeout(() => currentItemController.abort(), 50000);
+
       try {
-        const { dataUrl, data } = await processImage(items[i].file, true);
+        const { dataUrl, data } = await processImage(items[i].file, true, currentItemController.signal);
+        clearTimeout(timeoutId);
         const q = [...batchQueueRef.current];
         q[i] = { ...q[i], imageUrl: dataUrl };
         if (data.status === "complete") {
@@ -911,10 +934,15 @@ export default function VinylVault() {
           syncQueue(q);
         }
       } catch {
+        clearTimeout(timeoutId);
         const q = [...batchQueueRef.current];
         q[i] = { ...q[i], status: "error" };
         syncQueue(q);
       }
+    }
+
+    if (scanAbortRef.current && typeof scanAbortRef.current.abort === 'function') {
+      scanAbortRef.current = null;
     }
     setBatchProcessing(false);
   };
@@ -1070,7 +1098,7 @@ export default function VinylVault() {
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} />
         )}
         {appView === "batch" && (
-          <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} accentRGB={accentRGB} />
+          <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} onStop={stopBatch} accentRGB={accentRGB} />
         )}
         {appView === "community" && (
           <CommunityView
@@ -3803,7 +3831,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
 
 // ----- BatchView -------------------------------------------------------------
 
-function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
+function BatchView({ queue, processing, onResolve, onBatch, onStop, accentRGB }) {
   if (queue.length === 0) {
     return (
       <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
@@ -3837,6 +3865,11 @@ function BatchView({ queue, processing, onResolve, onBatch, accentRGB }) {
         <h2 className="text-2xl font-display"><span className="italic">Batch</span> progress</h2>
         <span className="text-[14px] font-mono text-white/35">{done}/{queue.length} saved</span>
         {processing && <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: `rgba(${accentRGB},0.25)`, borderTopColor: `rgb(${accentRGB})` }} />}
+        {processing && onStop && (
+          <button onClick={onStop} className="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[13px] font-mono transition-all hover:opacity-80" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.5)", background: "rgba(var(--fg),0.03)" }}>
+            <X size={11} />Stop
+          </button>
+        )}
       </div>
 
       {needsReview.length > 0 && (
