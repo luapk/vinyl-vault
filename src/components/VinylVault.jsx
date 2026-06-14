@@ -535,6 +535,19 @@ function getGreeting(name) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// Returns the session access token with a 5s ceiling so a hung Supabase token
+// refresh cannot freeze the scan UI indefinitely. Returns null on timeout (the
+// API will reject with 401, which surfaces as a user-visible error rather than
+// a silent hang).
+async function getAuthToken() {
+  const { supabase: sb } = await import('../lib/supabase.js');
+  const result = await Promise.race([
+    sb.auth.getSession(),
+    new Promise(resolve => setTimeout(() => resolve({ data: { session: null } }), 5000)),
+  ]);
+  return result.data?.session?.access_token ?? null;
+}
+
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
@@ -759,9 +772,8 @@ export default function VinylVault() {
         setStatus("Searching Discogs");
       }
       const base64Data = dataUrl.split(",")[1];
-      const { supabase: _scanSb } = await import('../lib/supabase.js');
-      const { data: { session: _scanSess } } = await _scanSb.auth.getSession();
-      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${_scanSess?.access_token}` };
+      const scanToken = await getAuthToken();
+      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${scanToken}` };
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: scanAuthHeaders,
@@ -823,13 +835,12 @@ export default function VinylVault() {
     setStatus("Pulling release data");
     setErrorMsg("");
     try {
-      const { supabase: _pickSb } = await import('../lib/supabase.js');
-      const { data: { session: _pickSess } } = await _pickSb.auth.getSession();
+      const pickToken = await getAuthToken();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_pickSess?.access_token}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${pickToken}` },
         body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
-        signal: controller.signal,
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(50000)]),
       });
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
@@ -845,7 +856,7 @@ export default function VinylVault() {
     } catch (err) {
       if (err.name === "AbortError") return; // user cancelled; cancelScan already reset the UI
       console.error(err);
-      setErrorMsg(err.message || "Enrichment failed");
+      setErrorMsg(err.name === "TimeoutError" ? "Request timed out -- please try again" : (err.message || "Failed to pull release data"));
       setPhase("error");
     } finally {
       if (scanAbortRef.current === controller) scanAbortRef.current = null;
@@ -957,12 +968,12 @@ export default function VinylVault() {
     syncQueue(snapshot);
 
     try {
-      const { supabase: _batchSb } = await import('../lib/supabase.js');
-      const { data: { session: _batchSess } } = await _batchSb.auth.getSession();
+      const batchToken = await getAuthToken();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_batchSess?.access_token}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${batchToken}` },
         body: JSON.stringify({ discogsId: candidate.id, vision }),
+        signal: AbortSignal.timeout(50000),
       });
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
