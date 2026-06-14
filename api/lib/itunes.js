@@ -131,11 +131,103 @@ async function searchTrackPreview(artist, trackTitle, discogsDuration, releaseYe
   return null;
 }
 
+async function searchCollection(artist, releaseTitle, releaseYear) {
+  try {
+    const term = encodeURIComponent(`${artist} ${releaseTitle}`);
+    const res = await fetch(
+      `${BASE}/search?term=${term}&entity=album&media=music&limit=10`,
+      { signal: AbortSignal.timeout(2500) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const collections = (data.results || []).filter(r => r.wrapperType === 'collection');
+
+    const na = norm(artist || '');
+    const naWords = na.split(' ').filter(w => w.length > 2);
+
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const c of collections) {
+      let score = titleScore(releaseTitle, c.collectionName || '');
+
+      const nb = norm(c.artistName || '');
+      const nbWords = nb.split(' ').filter(w => w.length > 2);
+
+      if (na && nb) {
+        if (na === nb || na.includes(nb) || nb.includes(na)) {
+          score += 3;
+        } else if (naWords.length && nbWords.length && naWords.some(w => nbWords.includes(w))) {
+          score += 1;
+        } else {
+          continue;
+        }
+      }
+
+      if (releaseYear && c.releaseDate) {
+        const itunesYear = new Date(c.releaseDate).getFullYear();
+        const gap = Math.abs(itunesYear - releaseYear);
+        if (gap <= 2) score += 2;
+        else if (gap > 10) score -= 2;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+
+    return best;
+  } catch {
+    return null;
+  }
+}
+
+async function getCollectionTracks(collectionId) {
+  try {
+    const res = await fetch(
+      `${BASE}/lookup?id=${collectionId}&entity=song&limit=200`,
+      { signal: AbortSignal.timeout(2500) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const tracks = (data.results || []).filter(r => r.wrapperType === 'track');
+    return tracks.length ? tracks : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fillItunesPreviews(tracks, artist, releaseContext = {}) {
   const needsFill = tracks.some(t => !t.previewUrl);
   if (!needsFill) return tracks;
 
   const { releaseYear, releaseTitle } = releaseContext;
+
+  if (releaseTitle) {
+    const collection = await searchCollection(artist, releaseTitle, releaseYear);
+    if (collection) {
+      const itunesTracks = await getCollectionTracks(collection.collectionId);
+      if (itunesTracks && itunesTracks.some(t => t.previewUrl)) {
+        const mapped = tracks.map(track => {
+          if (track.previewUrl) return track;
+          const scored = itunesTracks
+            .filter(t => t.previewUrl)
+            .map(t => ({ t, s: titleScore(track.title || '', t.trackName || '') }))
+            .filter(({ s }) => s >= 1)
+            .sort((a, b) => b.s - a.s);
+          if (!scored.length) return track;
+          const best = scored[0].t;
+          return {
+            ...track,
+            previewUrl: best.previewUrl,
+            duration: track.duration || msToMmSs(best.trackTimeMillis),
+          };
+        });
+        if (mapped.some(t => t.previewUrl)) return mapped;
+      }
+    }
+  }
 
   return Promise.all(
     tracks.map(async track => {

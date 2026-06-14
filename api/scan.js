@@ -2,6 +2,7 @@ import { identifyFromImage, identifyFromText, generateCrateSuggestions } from '.
 import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
+import { enrichWithDeezer } from './lib/deezer.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
@@ -74,25 +75,36 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   // immediately (does not need Spotify output). Spotify preview URLs take
   // priority; iTunes fills gaps. GetSongBPM is intentionally omitted here --
   // it runs client-side after the scan completes so it never blocks the UI.
-  const [enrichedTracks, itunesTracks, suggestedBoxes] = await raceTimeout(
+  // Spotify, iTunes (release-anchored), Deezer and crate suggestions all run in
+  // parallel under one 7s ceiling. Deezer fills any gaps Spotify and iTunes miss
+  // for both preview URLs and BPM. Running all three concurrently avoids the
+  // latency of sequential fallbacks.
+  const [enrichedTracks, itunesTracks, deezerTracks, suggestedBoxes] = await raceTimeout(
     Promise.all([
       (hasSpotify && tracklist.length > 0)
         ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => nullTracks)
         : Promise.resolve(nullTracks),
       fillItunesPreviews(tracklist, release.artist, releaseContext).catch(() => null),
+      enrichWithDeezer(tracklist, release.artist).catch(() => null),
       apiKey
         ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
         : Promise.resolve(vision?.suggestedBoxes || []),
     ]),
-    6000,
-    [nullTracks, null, vision?.suggestedBoxes || []],
+    7000,
+    [nullTracks, null, null, vision?.suggestedBoxes || []],
   );
 
-  // Merge: keep Spotify preview where found; back-fill with iTunes where not.
+  // Merge: Spotify > iTunes > Deezer for previews; Deezer fills BPM gaps.
   const finalTracks = enrichedTracks.map((t, i) => {
-    if (t.previewUrl) return t;
-    const ip = itunesTracks?.[i]?.previewUrl;
-    return ip ? { ...t, previewUrl: ip } : t;
+    let out = t;
+    if (!out.previewUrl) {
+      const ip = itunesTracks?.[i]?.previewUrl || deezerTracks?.[i]?.previewUrl;
+      if (ip) out = { ...out, previewUrl: ip };
+    }
+    if (out.bpm == null && deezerTracks?.[i]?.bpm != null) {
+      out = { ...out, bpm: deezerTracks[i].bpm, bpmSource: deezerTracks[i].bpmSource };
+    }
+    return out;
   });
 
   release.tracklist = finalTracks;

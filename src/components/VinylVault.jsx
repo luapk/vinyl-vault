@@ -345,7 +345,16 @@ function releaseCameraStream() {
   _sharedCamStream = null;
 }
 
-async function detectBPM(previewUrl) {
+function bpmFoldRange(genres) {
+  const g = (genres || []).join(' ').toLowerCase();
+  if (/jungle|drum.and.bass|dnb|hardcore|breakcore|neurofunk/.test(g)) return [140, 220];
+  if (/hip.?hop|rap|grime/.test(g)) return [70, 115];
+  if (/reggae|dub|ska/.test(g)) return [55, 95];
+  if (/ambient|drone/.test(g)) return [50, 100];
+  return [70, 180];
+}
+
+async function detectBPM(previewUrl, genres) {
   if (bpmCache.has(previewUrl)) return bpmCache.get(previewUrl);
   try {
     let arrayBuf;
@@ -446,8 +455,9 @@ async function detectBPM(previewUrl) {
     if (bestScore <= 0) { bpmCache.set(previewUrl, null); return null; }
 
     let bpm = (60 * fps) / bestLag;
-    while (bpm < 70) bpm *= 2;
-    while (bpm > 180) bpm /= 2;
+    const [bpmLo, bpmHi] = bpmFoldRange(genres);
+    while (bpm < bpmLo) bpm *= 2;
+    while (bpm > bpmHi) bpm /= 2;
     bpm = Math.round(bpm);
 
     bpmCache.set(previewUrl, bpm);
@@ -1531,7 +1541,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
       bpmTriedRef.current.add(track.previewUrl);
       setBpmDetecting(prev => new Set([...prev, i]));
-      detectBPM(track.previewUrl).then(bpm => {
+      detectBPM(track.previewUrl, release.genres).then(bpm => {
         if (bpm != null) onBpmDetected?.(i, bpm);
         setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
       });
@@ -2574,7 +2584,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
       total++;
       setBpmDetecting(prev => new Set([...prev, i]));
 
-      detectBPM(track.previewUrl).then(bpm => {
+      detectBPM(track.previewUrl, record.genres).then(bpm => {
         if (bpm != null) {
           pending[i] = bpm;
           setLocalBpms(prev => ({ ...prev, [i]: bpm }));
@@ -4413,7 +4423,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           for (let i = 0; i < tl.length; i++) {
             const t = tl[i];
             if (t?.previewUrl && t.bpm == null && !triedRef.current.has(t.previewUrl)) {
-              return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl };
+              return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl, genres: rec.genres || [] };
             }
           }
         }
@@ -4427,7 +4437,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           triedRef.current.add(job.previewUrl);
           if (mountedRef.current) setDetecting(prev => new Set(prev).add(job.previewUrl));
           let bpm = null;
-          try { bpm = await detectBPM(job.previewUrl); } catch { /* ignore */ }
+          try { bpm = await detectBPM(job.previewUrl, job.genres); } catch { /* ignore */ }
           if (bpm != null) persistBpm(job.recordId, job.trackIndex, bpm);
           if (mountedRef.current) setDetecting(prev => { const s = new Set(prev); s.delete(job.previewUrl); return s; });
         }
