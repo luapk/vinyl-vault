@@ -535,23 +535,10 @@ function getGreeting(name) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Returns the session access token with a 5s ceiling so a hung Supabase token
-// refresh cannot freeze the scan UI indefinitely. Returns null on timeout (the
-// API will reject with 401, which surfaces as a user-visible error rather than
-// a silent hang).
-async function getAuthToken() {
-  const { supabase: sb } = await import('../lib/supabase.js');
-  if (!sb) return null;
-  const result = await Promise.race([
-    sb.auth.getSession(),
-    new Promise(resolve => setTimeout(() => resolve({ data: { session: null } }), 5000)),
-  ]);
-  return result.data?.session?.access_token ?? null;
-}
 
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, loading: authLoading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
@@ -773,8 +760,7 @@ export default function VinylVault() {
         setStatus("Searching Discogs");
       }
       const base64Data = dataUrl.split(",")[1];
-      const scanToken = await getAuthToken();
-      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${scanToken}` };
+      const scanAuthHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` };
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: scanAuthHeaders,
@@ -841,10 +827,9 @@ export default function VinylVault() {
     setStatus("Pulling release data");
     setErrorMsg("");
     try {
-      const pickToken = await getAuthToken();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${pickToken}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
         signal: controller.signal,
       });
@@ -976,10 +961,9 @@ export default function VinylVault() {
     syncQueue(snapshot);
 
     try {
-      const batchToken = await getAuthToken();
       const response = await fetch("/api/scan", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${batchToken}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
         body: JSON.stringify({ discogsId: candidate.id, vision }),
         signal: AbortSignal.timeout(50000),
       });

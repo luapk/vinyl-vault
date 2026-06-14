@@ -14,6 +14,9 @@ export function useAuth() {
   const [user, setUser]       = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Kept in sync by onAuthStateChange -- always the latest valid JWT without
+  // any network call. Avoids the getSession() race on slow mobile connections.
+  const [accessToken, setAccessToken] = useState(null);
   // Track in-flight fetchProfile calls so INITIAL_SESSION and getSession()
   // don't both trigger a full round-trip concurrently.
   const fetchingRef = useRef(null);
@@ -46,6 +49,7 @@ export function useAuth() {
     Promise.race([supabase.auth.getSession(), timeout])
       .then(async ({ data: { session } }) => {
         setUser(session?.user ?? null);
+        setAccessToken(session?.access_token ?? null);
         if (session?.user) {
           const p = await fetchProfileOnce(session.user.id);
           setProfile(p);
@@ -56,6 +60,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null);
+        setAccessToken(session?.access_token ?? null);
         if (session?.user) {
           // For INITIAL_SESSION, reuse any in-flight getSession fetch.
           // For subsequent events (TOKEN_REFRESHED, SIGNED_IN) always re-fetch.
@@ -188,5 +193,5 @@ export function useAuth() {
     if (p) setProfile(p);
   }, [user?.id, fetchProfile]);
 
-  return { user, profile, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile };
+  return { user, profile, loading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile };
 }
