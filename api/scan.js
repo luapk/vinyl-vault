@@ -3,6 +3,7 @@ import { searchDiscogs, fetchDiscogsRelease } from './lib/discogs.js';
 import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
 import { enrichWithDeezer } from './lib/deezer.js';
+import { enrichBpm as enrichBpmGsb } from './lib/getsongbpm.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
@@ -111,7 +112,19 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
     return out;
   });
 
-  release.tracklist = finalTracks;
+  // GetSongBPM: title-based BPM lookup for tracks still missing BPM after Spotify/Deezer.
+  // Requires both GETSONGBPM_API_KEY and GETSONGBPM_PROXY_URL (CF Worker) to be set,
+  // since api.getsongbpm.com blocks Vercel IPs via Cloudflare.
+  let outputTracks = finalTracks;
+  if (
+    process.env.GETSONGBPM_API_KEY &&
+    process.env.GETSONGBPM_PROXY_URL &&
+    finalTracks.some(t => t.bpm == null)
+  ) {
+    outputTracks = await raceTimeout(enrichBpmGsb(finalTracks, release.artist), 7000, finalTracks);
+  }
+
+  release.tracklist = outputTracks;
   release.suggestedBoxes = suggestedBoxes;
   release.source = finalTracks.some(t => t.spotifyMatch) ? 'discogs+spotify' : 'discogs';
 

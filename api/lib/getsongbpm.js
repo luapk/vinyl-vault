@@ -2,7 +2,9 @@
 // This is a metadata lookup (no audio required), so it covers tracks that have
 // no preview URL, which is where the client-side waveform analyser cannot help.
 // Free API; an attribution backlink to getsongbpm.com is mandatory (see UI).
-const BASE = 'https://api.getsongbpm.com';
+// Requests from Vercel (AWS IPs) are blocked by Cloudflare on getsongbpm.com,
+// so GETSONGBPM_PROXY_URL should point to a CF Worker that forwards the traffic.
+const BASE = process.env.GETSONGBPM_PROXY_URL || 'https://api.getsongbpm.com';
 
 const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 
