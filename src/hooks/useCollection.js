@@ -41,6 +41,8 @@ function recordFromRelease(release, crates) {
       title: t.title,
       duration: t.duration || null,
       bpm: t.bpm || null,
+      bpmSource: t.bpmSource || null,
+      bpmConfidence: t.bpmConfidence || null,
       key: t.key || null,
       previewUrl: t.previewUrl || null,
       hot: t.hot || false,

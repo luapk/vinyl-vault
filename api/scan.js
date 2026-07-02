@@ -4,6 +4,7 @@ import { enrichTracks } from './lib/spotify.js';
 import { fillItunesPreviews } from './lib/itunes.js';
 import { enrichWithDeezer } from './lib/deezer.js';
 import { enrichBpm as enrichBpmGsb } from './lib/getsongbpm.js';
+import { lookupBpms, storeBpms } from './lib/bpm-cache.js';
 import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
@@ -80,26 +81,29 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const releaseContext = { releaseYear: release.year, releaseTitle: release.title };
   const nullTracks = tracklist.map(nullTrack);
 
-  // Spotify, iTunes (release-anchored), Deezer, and crate suggestions all run in
-  // parallel under a 10s ceiling. Deezer fills any gaps Spotify and iTunes miss
-  // for both preview URLs and BPM. Running all three concurrently avoids the
-  // latency of sequential fallbacks.
-  const [enrichedTracks, itunesTracks, deezerTracks, suggestedBoxes] = await raceTimeout(
+  // Spotify, iTunes (release-anchored), Deezer, the shared BPM cache, and
+  // crate suggestions all run in parallel under a 10s ceiling. Deezer fills
+  // any gaps Spotify and iTunes miss for both preview URLs and BPM.
+  const [enrichedTracks, itunesTracks, deezerTracks, cachedBpms, suggestedBoxes] = await raceTimeout(
     Promise.all([
       (hasSpotify && tracklist.length > 0)
         ? enrichTracks(tracklist, release.artist, releaseContext).catch(() => nullTracks)
         : Promise.resolve(nullTracks),
       fillItunesPreviews(tracklist, release.artist, releaseContext).catch(() => null),
       enrichWithDeezer(tracklist, release.artist).catch(() => null),
+      lookupBpms(release.artist, tracklist).catch(() => null),
       apiKey
         ? generateCrateSuggestions(release, apiKey).catch(() => vision?.suggestedBoxes || [])
         : Promise.resolve(vision?.suggestedBoxes || []),
     ]),
     10000,
-    [nullTracks, null, null, vision?.suggestedBoxes || []],
+    [nullTracks, null, null, null, vision?.suggestedBoxes || []],
   );
 
-  // Merge: Spotify > iTunes > Deezer for previews; Deezer fills BPM gaps.
+  // Merge: Spotify > iTunes > Deezer for previews. BPM: Deezer first, then the
+  // shared cache. When Deezer and the cache independently agree (within 2%)
+  // the value is confirmed -> bpmConfidence high; a disagreement keeps the
+  // fresh Deezer value but flags it low so the UI can dim it.
   const finalTracks = enrichedTracks.map((t, i) => {
     let out = t;
     if (!out.previewUrl) {
@@ -108,6 +112,16 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
     }
     if (out.bpm == null && deezerTracks?.[i]?.bpm != null) {
       out = { ...out, bpm: deezerTracks[i].bpm, bpmSource: deezerTracks[i].bpmSource };
+    }
+    const cached = cachedBpms?.[i];
+    if (cached?.bpm != null) {
+      if (out.bpm == null) {
+        out = { ...out, bpm: cached.bpm, bpmSource: `cache:${cached.source}`, bpmConfidence: cached.confidence };
+      } else if (Math.abs(out.bpm - cached.bpm) <= Math.max(out.bpm, cached.bpm) * 0.02) {
+        out = { ...out, bpmConfidence: 'high' };
+      } else {
+        out = { ...out, bpmConfidence: 'low' };
+      }
     }
     return out;
   });
@@ -123,6 +137,20 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   ) {
     outputTracks = await raceTimeout(enrichBpmGsb(finalTracks, release.artist), 7000, finalTracks);
   }
+
+  // Store freshly resolved BPMs back into the shared cache (best-effort,
+  // 2s ceiling). Cache-sourced values are not re-stored.
+  const toStore = outputTracks
+    .filter(t => t.bpm != null && t.bpmSource && !t.bpmSource.startsWith('cache'))
+    .map(t => ({
+      artist: release.artist,
+      title: t.title,
+      duration: t.duration,
+      bpm: t.bpm,
+      source: t.bpmSource,
+      confidence: t.bpmConfidence || 'medium',
+    }));
+  if (toStore.length) await raceTimeout(storeBpms(toStore), 2000, null);
 
   release.tracklist = outputTracks;
   release.suggestedBoxes = suggestedBoxes;

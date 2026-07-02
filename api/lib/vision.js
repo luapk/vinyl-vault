@@ -39,7 +39,7 @@ Return ONLY the JSON object, nothing else.`;
 // 15s timeout per attempt, 1 retry = worst-case 31s. The previous 25s * 3 = 78s
 // budget exceeded the 50s client batch timeout, causing 100% batch failure when
 // the Anthropic API was under load.
-async function callClaude(body, apiKey, maxRetries = 1) {
+export async function callClaude(body, apiKey, maxRetries = 1) {
   let delay = 1000;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let response;

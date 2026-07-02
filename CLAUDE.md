@@ -36,8 +36,10 @@ api/                   # Vercel serverless functions (all secret keys live here)
   scan.js              # image -> Claude vision -> record identification
   identify.js          # single record identification
   discogs-search.js    # Discogs search proxy
-  spotify-features.js  # Spotify BPM / key lookup
-  audio-proxy.js       # preview audio proxy (CORS)
+  spotify-features.js  # Spotify preview lookup (audio-features is dead; see lib/spotify.js)
+  bpm-report.js        # client waveform BPM results -> shared track_bpm cache
+  bpm-arbiter.js       # Claude picks between octave-ambiguous BPM candidates (87 vs 174)
+  audio-proxy.js       # preview audio proxy (CORS): Apple, Spotify, Deezer CDNs
   image-proxy.js       # cover art proxy (CORS) for caching covers into storage
   price.js             # Discogs price history
   gelato-order.js      # print-on-demand order
@@ -46,6 +48,7 @@ api/                   # Vercel serverless functions (all secret keys live here)
 supabase/
   schema.sql           # full schema (run on a fresh project)
   storage.sql          # storage buckets: avatars (profile photos), covers (cached cover art)
+  bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
 ```
 
 ## Security rules
@@ -103,6 +106,7 @@ create policy "profiles_self_update" on public.profiles
 Also run when updating an existing database:
 - the `records_exist` function from `supabase/social-schema.sql` (accurate chat thumbnail existence check)
 - the `covers` bucket section from `supabase/storage.sql` (cover art caching)
+- `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
 
 ## Data model
 
@@ -112,7 +116,9 @@ Each record is a JSON blob stored in the `data` jsonb column:
 - `artist`, `title`, `label`, `catalogNumber`, `year`, `country`, `format`
 - `genres[]`, `tags[]`
 - `crates[]` -- user-assigned crate names (strings)
-- `tracklist[]` -- `{ position, title, duration, bpm, key, previewUrl, hot }`
+- `tracklist[]` -- `{ position, title, duration, bpm, bpmSource, bpmConfidence, key, previewUrl, hot }`
+  - `bpmSource`: `deezer` | `getsongbpm` | `cache:*` | `waveform` | `waveform+arbiter`
+  - `bpmConfidence`: `high` (two independent sources agree) | `low` (sources disagree; dimmed in Tracks view) | null (single source)
 - `coverUrl`, `images[]`
 - `identified`, `confidence`, `source`, `notes`
 - `savedAt` -- timestamp

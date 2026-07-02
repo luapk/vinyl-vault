@@ -442,13 +442,19 @@ async function detectBPM(previewUrl, genres) {
       ac[lag] = sum / (onset.length - lag);
     }
 
-    let bestLag = minLag, bestScore = -Infinity;
-    for (let lag = minLag; lag <= maxLag; lag++) {
-      // Reward harmonic support: a true beat period also correlates at 2x and 3x
-      // its lag, which biases away from picking a random sub-multiple.
+    // Reward harmonic support: a true beat period also correlates at 2x and 3x
+    // its lag, which biases away from picking a random sub-multiple.
+    const scoreAt = (lag) => {
+      if (lag < minLag || lag > maxLag) return -Infinity;
       let score = ac[lag];
       if (lag * 2 <= maxLag) score += 0.5 * ac[lag * 2];
       if (lag * 3 <= maxLag) score += 0.25 * ac[lag * 3];
+      return score;
+    };
+
+    let bestLag = minLag, bestScore = -Infinity;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      const score = scoreAt(lag);
       if (score > bestScore) { bestScore = score; bestLag = lag; }
     }
 
@@ -458,14 +464,61 @@ async function detectBPM(previewUrl, genres) {
     const [bpmLo, bpmHi] = bpmFoldRange(genres);
     while (bpm < bpmLo) bpm *= 2;
     while (bpm > bpmHi) bpm /= 2;
-    bpm = Math.round(bpm);
 
-    bpmCache.set(previewUrl, bpm);
-    return bpm;
+    // Octave ambiguity: when the half/double-tempo lag scores nearly as well
+    // as the winner AND the competing octave also fits the genre window,
+    // autocorrelation alone cannot settle it (87 vs 174). Callers send these
+    // to the arbiter instead of persisting a coin flip.
+    const competitor = Math.max(scoreAt(bestLag * 2), scoreAt(Math.round(bestLag / 2)));
+    let alt = null;
+    if (competitor >= 0.7 * bestScore) {
+      if (bpm * 2 <= bpmHi) alt = Math.round(bpm * 2);
+      else if (bpm / 2 >= bpmLo) alt = Math.round(bpm / 2);
+    }
+    bpm = Math.round(bpm);
+    if (alt === bpm) alt = null;
+
+    const result = { bpm, alt };
+    bpmCache.set(previewUrl, result);
+    return result;
   } catch (e) {
     console.log('[bpm]', e.message);
     return null;
   }
+}
+
+// Resolve octave-ambiguous waveform readings: one batched call, Claude picks
+// between the two candidates from artist/genre/era. Returns choices aligned
+// with items, or null on failure.
+async function arbitrateOctaves(items, token) {
+  if (!items.length || !token) return null;
+  try {
+    const res = await fetch('/api/bpm-arbiter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        tracks: items.map(it => ({
+          artist: it.artist, title: it.title, genres: it.genres, year: it.year, options: it.options,
+        })),
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.choices) ? data.choices : null;
+  } catch {
+    return null;
+  }
+}
+
+// Fire-and-forget: feed resolved waveform BPMs into the shared community cache
+// so other users' scans of the same tracks get them instantly.
+function reportBpmsToCache(items, token) {
+  if (!items.length || !token) return;
+  fetch('/api/bpm-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ tracks: items }),
+  }).catch(() => {});
 }
 
 // ----- Main Component --------------------------------------------------------
@@ -1128,7 +1181,7 @@ export default function VinylVault() {
           <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "tracks" && (
-          <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} />
+          <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
         )}
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} onStop={stopBatch} accentRGB={accentRGB} />
@@ -1596,8 +1649,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       if (!track.previewUrl || track.bpm != null || bpmTriedRef.current.has(track.previewUrl)) return;
       bpmTriedRef.current.add(track.previewUrl);
       setBpmDetecting(prev => new Set([...prev, i]));
-      detectBPM(track.previewUrl, release.genres).then(bpm => {
-        if (bpm != null) onBpmDetected?.(i, bpm);
+      detectBPM(track.previewUrl, release.genres).then(res => {
+        // Octave-ambiguous readings stay null here; the Tracks view resolves
+        // them through the arbiter rather than persisting a coin flip.
+        if (res?.bpm != null && res.alt == null) onBpmDetected?.(i, res.bpm);
         setBpmDetecting(prev => { const s = new Set(prev); s.delete(i); return s; });
       });
     });
@@ -2640,7 +2695,9 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
       total++;
       setBpmDetecting(prev => new Set([...prev, i]));
 
-      detectBPM(track.previewUrl, record.genres).then(bpm => {
+      detectBPM(track.previewUrl, record.genres).then(res => {
+        // Only unambiguous readings persist; the Tracks view arbitrates the rest.
+        const bpm = (res?.bpm != null && res.alt == null) ? res.bpm : null;
         if (bpm != null) {
           pending[i] = bpm;
           setLocalBpms(prev => ({ ...prev, [i]: bpm }));
@@ -4425,7 +4482,7 @@ const BPM_SLIDER_MIN = 60;
 const BPM_SLIDER_MAX = 200;
 const BPM_BUCKET = 5;
 
-function TracksView({ collection, accentRGB, onUpdate }) {
+function TracksView({ collection, accentRGB, onUpdate, accessToken }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(null);
   const [search, setSearch] = useState('');
@@ -4437,10 +4494,13 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   const triedRef = useRef(new Set());
   const mountedRef = useRef(true);
 
-  // Live mirror so the detection pump and persist read fresh state without
-  // becoming effect dependencies (which would restart the pump on every save).
+  // Live mirrors so the detection pump and persist read fresh state without
+  // becoming effect dependencies (which would restart the pump on every save
+  // or token refresh).
   const collectionRef = useRef(collection);
   collectionRef.current = collection;
+  const tokenRef = useRef(accessToken);
+  tokenRef.current = accessToken;
 
   useEffect(() => () => { mountedRef.current = false; }, []);
 
@@ -4460,6 +4520,7 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           title: t.title || `Track ${i + 1}`,
           position: t.position || '',
           bpm: typeof t.bpm === 'number' ? t.bpm : null,
+          bpmConfidence: t.bpmConfidence || null,
           key: t.key || null,
           previewUrl: t.previewUrl || null,
           duration: t.duration || null,
@@ -4471,16 +4532,19 @@ function TracksView({ collection, accentRGB, onUpdate }) {
   }, [collection]);
 
   // Persist a detected BPM back into the record's tracklist (idempotent).
-  const persistBpm = useCallback((recordId, trackIndex, bpm) => {
+  const persistBpm = useCallback((recordId, trackIndex, bpm, source = 'waveform') => {
     const rec = collectionRef.current.find(r => r.id === recordId);
     if (!rec) return;
-    const next = (rec.tracklist || []).map((t, i) => i === trackIndex ? { ...t, bpm, bpmSource: 'waveform' } : t);
+    const next = (rec.tracklist || []).map((t, i) => i === trackIndex ? { ...t, bpm, bpmSource: source } : t);
     onUpdate?.(recordId, { tracklist: next });
   }, [onUpdate]);
 
 
   // Waveform BPM detection: runs when TracksView mounts, processes every track
   // that has a previewUrl but no BPM yet. Each URL is tried once per session.
+  // Unambiguous readings persist immediately; octave-ambiguous ones (87 vs 174)
+  // are batched to the arbiter afterwards. Everything resolved is reported to
+  // the shared community cache.
   useEffect(() => {
     let active = true;
 
@@ -4492,12 +4556,19 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           for (let i = 0; i < tl.length; i++) {
             const t = tl[i];
             if (t?.previewUrl && t.bpm == null && !triedRef.current.has(t.previewUrl)) {
-              return { recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl, genres: rec.genres || [] };
+              return {
+                recordId: rec.id, trackIndex: i, previewUrl: t.previewUrl,
+                genres: rec.genres || [], artist: rec.artist || '',
+                title: t.title || '', duration: t.duration || null, year: rec.year || null,
+              };
             }
           }
         }
         return null;
       };
+
+      const ambiguous = [];
+      const resolved = [];
 
       const worker = async () => {
         while (active) {
@@ -4505,14 +4576,37 @@ function TracksView({ collection, accentRGB, onUpdate }) {
           if (!job) return;
           triedRef.current.add(job.previewUrl);
           if (mountedRef.current) setDetecting(prev => new Set(prev).add(job.previewUrl));
-          let bpm = null;
-          try { bpm = await detectBPM(job.previewUrl, job.genres); } catch { /* ignore */ }
-          if (bpm != null) persistBpm(job.recordId, job.trackIndex, bpm);
+          let res = null;
+          try { res = await detectBPM(job.previewUrl, job.genres); } catch { /* ignore */ }
+          if (res?.bpm != null) {
+            if (res.alt == null) {
+              persistBpm(job.recordId, job.trackIndex, res.bpm);
+              resolved.push({ artist: job.artist, title: job.title, duration: job.duration, bpm: res.bpm, source: 'waveform' });
+            } else {
+              ambiguous.push({ ...job, options: [res.bpm, res.alt] });
+            }
+          }
           if (mountedRef.current) setDetecting(prev => { const s = new Set(prev); s.delete(job.previewUrl); return s; });
         }
       };
 
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+      for (let i = 0; i < ambiguous.length && active; i += 20) {
+        const batch = ambiguous.slice(i, i + 20);
+        const choices = await arbitrateOctaves(batch, tokenRef.current);
+        batch.forEach((job, j) => {
+          const bpm = choices?.[j];
+          if (bpm != null) {
+            persistBpm(job.recordId, job.trackIndex, bpm, 'waveform+arbiter');
+            resolved.push({ artist: job.artist, title: job.title, duration: job.duration, bpm, source: 'waveform+arbiter' });
+          }
+        });
+      }
+
+      for (let i = 0; i < resolved.length; i += 40) {
+        reportBpmsToCache(resolved.slice(i, i + 40), tokenRef.current);
+      }
     };
 
     runWaveformPass();
@@ -4793,7 +4887,7 @@ function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
       {/* BPM */}
       <div className="text-right shrink-0 w-[52px]">
         {t.bpm != null ? (
-          <><span className="text-[19px] font-display tabular-nums" style={{ color: `rgb(${accentRGB})` }}>{t.bpm}</span><span className="text-[9px] block tracking-[0.14em] uppercase font-mono text-white/30 -mt-0.5">bpm</span></>
+          <><span className={`text-[19px] font-display tabular-nums${t.bpmConfidence === 'low' ? ' opacity-50' : ''}`} style={{ color: `rgb(${accentRGB})` }} title={t.bpmConfidence === 'low' ? 'Sources disagree on this tempo' : undefined}>{t.bpm}</span><span className="text-[9px] block tracking-[0.14em] uppercase font-mono text-white/30 -mt-0.5">bpm</span></>
         ) : detecting ? (
           <div className="w-3.5 h-3.5 ml-auto rounded-full border border-t-transparent animate-spin" style={{ borderColor: `rgba(${accentRGB},0.4)`, borderTopColor: 'transparent' }} />
         ) : (
