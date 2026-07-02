@@ -1,5 +1,3 @@
-import { toCamelot } from '../../src/lib/camelot.js';
-
 let cachedToken = null;
 let tokenExpiry = 0;
 
@@ -132,34 +130,33 @@ async function searchTrack(token, artist, trackTitle, releaseYear, discogsDurati
   return { id: track.id, previewUrl: preview };
 }
 
-// Spotify deprecated /v1/audio-features in Nov 2024; app credentials issued
-// after the cutoff receive 403 here. When that happens there is no bpm/key to
-// be had from Spotify -- the client-side waveform analyser fills bpm instead.
-let featuresDisabled = false;
+// Spotify deprecated /v1/audio-features in Nov 2024 for new app credentials
+// (403), so the only value left in this leg is preview URLs -- and apps created
+// after the same cutoff get preview_url: null on every track too. If Spotify
+// keeps matching tracks but never returns a preview, stop paying its latency
+// for the rest of this lambda instance. iTunes and Deezer cover previews;
+// Deezer, waveform analysis, and GetSongBPM cover BPM.
+const PREVIEW_MISS_LIMIT = 8;
+let previewMisses = 0;
+let previewsDisabled = false;
 
-async function fetchAudioFeatures(token, trackId) {
-  if (featuresDisabled) return null;
-  const res = await fetch(
-    `https://api.spotify.com/v1/audio-features/${trackId}`,
-    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(2500) }
-  );
-  if (!res.ok) {
-    if (res.status === 403 || res.status === 401) {
-      featuresDisabled = true;  // stop hammering a blocked endpoint for the rest of this batch
-      console.log(`[spotify] audio-features ${res.status}: endpoint unavailable for this app (deprecated). Falling back to waveform bpm.`);
-    } else {
-      console.log(`[spotify] features=${res.status}`);
-    }
-    return null;
+function notePreviewOutcome(gotPreview) {
+  if (gotPreview) {
+    previewMisses = 0;
+    return;
   }
-  const f = await res.json();
-  console.log(`[spotify] features: bpm=${Math.round(f.tempo)} key=${f.key} mode=${f.mode}`);
-  return f;
+  previewMisses += 1;
+  if (previewMisses >= PREVIEW_MISS_LIMIT && !previewsDisabled) {
+    previewsDisabled = true;
+    console.log(`[spotify] ${PREVIEW_MISS_LIMIT} consecutive matches with no preview_url: previews unavailable for this app (deprecated). Skipping Spotify for this instance.`);
+  }
 }
 
 const noMatch = { bpm: null, key: null, energy: null, valence: null, spotifyMatch: false, previewUrl: null };
 
 export async function enrichTracks(tracks, artist, releaseContext = {}) {
+  if (previewsDisabled) return tracks.map(track => ({ ...track, ...noMatch }));
+
   const token = await getToken();
   const { releaseYear } = releaseContext;
 
@@ -169,17 +166,12 @@ export async function enrichTracks(tracks, artist, releaseContext = {}) {
         const result = await searchTrack(token, artist, track.title, releaseYear, track.duration);
         if (!result) return { ...track, ...noMatch };
 
-        const features = await fetchAudioFeatures(token, result.id);
-        if (!features) return { ...track, ...noMatch, previewUrl: result.previewUrl };
-
+        notePreviewOutcome(!!result.previewUrl);
         return {
           ...track,
-          bpm: features.tempo != null ? Math.round(features.tempo) : null,
-          key: toCamelot(features.key, features.mode),
-          energy: features.energy ?? null,
-          valence: features.valence ?? null,
-          spotifyMatch: true,
+          ...noMatch,
           previewUrl: result.previewUrl,
+          spotifyMatch: !!result.previewUrl,
         };
       } catch {
         return { ...track, ...noMatch };

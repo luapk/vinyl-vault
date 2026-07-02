@@ -3,13 +3,25 @@ export default async function handler(req, res) {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'url required' });
 
-  // Only proxy known audio preview CDNs
-  const allowed = [
+  // Only proxy known audio preview CDNs. Deezer preview hosts are numbered
+  // (cdns-preview-3.dzcdn.net, cdnt-preview.dzcdn.net, ...) so they are
+  // matched by hostname suffix rather than URL prefix.
+  const allowedPrefixes = [
     'https://audio-ssl.itunes.apple.com/',
     'https://a1.mzstatic.com/',
     'https://p.scdn.co/',
   ];
-  if (!allowed.some(prefix => url.startsWith(prefix))) {
+  const isAllowed = (u) => {
+    if (allowedPrefixes.some(prefix => u.startsWith(prefix))) return true;
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'https:' &&
+        (parsed.hostname === 'dzcdn.net' || parsed.hostname.endsWith('.dzcdn.net'));
+    } catch {
+      return false;
+    }
+  };
+  if (!isAllowed(url)) {
     return res.status(400).json({ error: 'URL not allowed' });
   }
 
