@@ -64,7 +64,9 @@ function reducer(state, action) {
         const old = state[idx];
         // Merge: keep existing user-assigned crates when re-saving the same record
         const crates = [...new Set([...(old.crates || []), ...(action.record.crates || [])])];
-        next[idx] = { ...action.record, id: old.id, savedAt: Date.now(), crates };
+        // Spread old first so fields the normaliser doesn't know about
+        // (priceData, priceCheckedAt) survive a re-scan.
+        next[idx] = { ...old, ...action.record, id: old.id, savedAt: Date.now(), crates };
         return next;
       }
       return [action.record, ...state];
@@ -252,7 +254,7 @@ export function useCollection(userId = null) {
       // Duplicate: update the existing DB row instead of creating a ghost second row.
       // Merge crates so existing user assignments survive a re-scan.
       const mergedCrates = [...new Set([...(existing.crates || []), ...(record.crates || [])])];
-      return dbUpdate(dbIds.current[existing.id], { ...record, id: existing.id, crates: mergedCrates })
+      return dbUpdate(dbIds.current[existing.id], { ...existing, ...record, id: existing.id, crates: mergedCrates })
         .then(() => { cacheCoverFor({ ...record, id: existing.id }); })
         .catch(console.error);
     }

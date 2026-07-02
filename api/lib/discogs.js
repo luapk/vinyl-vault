@@ -213,68 +213,97 @@ export async function fetchDiscogsRelease(id) {
   };
 }
 
+// Discogs suggestion keys -> the short grade codes the app stores in
+// mediaCondition (CONDITION_GRADES in the UI).
+const SUGGESTION_GRADES = [
+  ['Mint (M)', 'M'],
+  ['Near Mint (NM or M-)', 'NM'],
+  ['Very Good Plus (VG+)', 'VG+'],
+  ['Very Good (VG)', 'VG'],
+  ['Good Plus (G+)', 'G+'],
+  ['Good (G)', 'G'],
+  ['Fair (F)', 'F'],
+  ['Poor (P)', 'P'],
+];
+
 export async function fetchDiscogsPrice(releaseId) {
   const headers = authHeaders();
 
-  // Discogs has no public endpoint that lists individual marketplace listings
-  // with their conditions, so the old marketplace/search call never returned
-  // condition data (it 404s and we fell back to stats, which only has a floor
-  // price + listing count). Instead we use two real endpoints:
-  //   price_suggestions/{id} -- a suggested price per condition grade
-  //   stats/{id}             -- live listing count + lowest active price
+  // Three layers, so something always comes back:
+  //   1. price_suggestions/{id} -- Discogs' own per-condition price estimates,
+  //      derived from real sales history. Needs the token's account to have
+  //      marketplace seller settings enabled, and the release to have sold.
+  //   2. marketplace/stats/{id} -- live listing count + lowest active price.
+  //   3. releases/{id}          -- lowest_price/num_for_sale fallback when the
+  //      stats endpoint itself fails.
   const [suggestRes, statsRes] = await Promise.all([
     fetchWithRetry(`${BASE}/marketplace/price_suggestions/${releaseId}`, { headers }),
     fetchWithRetry(`${BASE}/marketplace/stats/${releaseId}`, { headers }),
   ]);
 
-  // price_suggestions returns { "Near Mint (NM or M-)": { currency, value }, ... }
-  // keyed by the same condition names the PriceGraph expects.
-  const byCondition = {};
+  // Layer 1: per-condition ladder, ordered best grade first.
+  const conditions = [];
   let currency = null;
+  let suggestionsStatus = 'error';
   if (suggestRes && suggestRes.ok) {
-    const suggestions = await suggestRes.json();
-    for (const [cond, info] of Object.entries(suggestions || {})) {
-      const val = info && info.value;
+    const suggestions = await suggestRes.json().catch(() => null);
+    for (const [key, grade] of SUGGESTION_GRADES) {
+      const val = suggestions?.[key]?.value;
       if (typeof val !== 'number' || val <= 0) continue;
-      byCondition[cond] = { avg: Math.round(val * 100) / 100, count: 0 };
-      if (!currency && info.currency) currency = info.currency;
+      conditions.push({ grade, value: Math.round(val * 100) / 100 });
+      if (!currency && suggestions[key].currency) currency = suggestions[key].currency;
     }
+    suggestionsStatus = conditions.length ? 'ok' : 'empty';
   } else if (suggestRes) {
-    console.log('price_suggestions failed:', suggestRes.status);
+    // 401/403/404: token account lacks seller settings, or no sales history.
+    suggestionsStatus = `http_${suggestRes.status}`;
+    console.log(`[price] price_suggestions ${suggestRes.status} for release ${releaseId}`);
   }
 
-  // stats gives the headline listing count and floor price.
+  // Layer 2: floor price + listing count.
   let totalListings = 0;
-  let low = null;
+  let floor = null;
+  let statsOk = false;
   if (statsRes && statsRes.ok) {
-    const stats = await statsRes.json();
-    totalListings = stats.num_for_sale || 0;
-    if (stats.lowest_price) {
-      low = stats.lowest_price.value;
-      if (!currency) currency = stats.lowest_price.currency;
+    const stats = await statsRes.json().catch(() => null);
+    if (stats) {
+      statsOk = true;
+      totalListings = stats.num_for_sale || 0;
+      if (stats.lowest_price?.value != null) {
+        floor = {
+          value: Math.round(stats.lowest_price.value * 100) / 100,
+          currency: stats.lowest_price.currency || currency || 'USD',
+        };
+      }
     }
   }
 
-  const condVals = Object.values(byCondition).map(c => c.avg).sort((a, b) => a - b);
+  // Layer 3: the release document carries the same floor data; use it only
+  // when the stats endpoint failed outright.
+  if (!statsOk) {
+    try {
+      const relRes = await fetchWithRetry(`${BASE}/releases/${releaseId}`, { headers }, 1, 5000);
+      if (relRes && relRes.ok) {
+        const rel = await relRes.json();
+        totalListings = rel.num_for_sale || 0;
+        if (rel.lowest_price != null && rel.lowest_price > 0) {
+          floor = {
+            value: Math.round(rel.lowest_price * 100) / 100,
+            currency: currency || 'USD',
+          };
+        }
+      }
+    } catch { /* keep whatever we have */ }
+  }
 
-  // Nothing usable from either endpoint.
-  if (condVals.length === 0 && totalListings === 0 && low == null) return null;
-
-  const median = condVals.length ? condVals[Math.floor(condVals.length / 2)] : null;
-  const mean = condVals.length
-    ? Math.round((condVals.reduce((s, p) => s + p, 0) / condVals.length) * 100) / 100
-    : null;
-  const high = condVals.length ? condVals[condVals.length - 1] : null;
-  if (low == null && condVals.length) low = condVals[0];
+  if (!conditions.length && !floor && !totalListings) return null;
 
   return {
-    currency: currency || 'USD',
-    median,
-    mean,
-    low: low != null ? Math.round(low * 100) / 100 : null,
-    high,
-    sampleSize: condVals.length || null,
+    currency: currency || floor?.currency || 'USD',
+    conditions,
+    suggestionsStatus,
+    floor,
     totalListings,
-    byCondition,
+    checkedAt: Date.now(),
   };
 }

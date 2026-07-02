@@ -2616,8 +2616,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [imgIdx, setImgIdx] = useState(0);
-  const [price, setPrice] = useState(null); // null=not loaded, false=no data, object=loaded
+  // null=not loaded, false=no data, object=loaded. Seeded from the persisted
+  // result so a previously checked record shows its graph immediately.
+  const [price, setPrice] = useState(record.priceData || null);
   const [priceLoading, setPriceLoading] = useState(false);
+  useEffect(() => { setPrice(record.priceData || null); }, [record.id]);
   const [bpmDetecting, setBpmDetecting] = useState(new Set());
   const [localBpms, setLocalBpms] = useState({});
   const [localHots, setLocalHots] = useState(() =>
@@ -2736,7 +2739,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
         headers: { 'Authorization': `Bearer ${_priceSess?.access_token}` },
       });
       const data = await res.json();
-      setPrice(data.totalListings === 0 && !data.low ? false : data);
+      const usable = res.ok && (data.conditions?.length || data.floor || data.totalListings) ? data : false;
+      setPrice(usable);
+      // Persist so the graph shows instantly next time the record is opened.
+      if (usable) onUpdate?.(record.id, { priceData: usable, priceCheckedAt: usable.checkedAt || Date.now() });
     } catch {
       setPrice(false);
     }
@@ -3001,7 +3007,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
               <div className="text-[14px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
             )}
             {price && typeof price === "object" && (
-              <PriceSummary price={price} accentRGB={localAccent} />
+              <PriceGraph price={price} accentRGB={localAccent} mediaCondition={record.mediaCondition || ''} onRefresh={checkPrice} refreshing={priceLoading} />
             )}
           </div>
         )}
@@ -3060,34 +3066,112 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
 // ----- PriceGraph ------------------------------------------------------------
 
-function PriceSummary({ price, accentRGB }) {
-  const cur = price.currency || '';
-  const fmt = v => v != null ? `${cur} ${v.toFixed(2)}`.trim() : null;
+const PRICE_GRAPH_GRADES = ['M', 'NM', 'VG+', 'VG', 'G+', 'G'];
+const PRICE_GRADE_NAMES = {
+  M: 'Mint', NM: 'Near Mint', 'VG+': 'Very Good Plus',
+  VG: 'Very Good', 'G+': 'Good Plus', G: 'Good',
+};
 
-  const stats = [
-    { label: 'Low',    value: fmt(price.low) },
-    { label: 'Median', value: fmt(price.median), accent: true },
-    { label: 'High',   value: fmt(price.high) },
-  ].filter(s => s.value);
+// Ordinal colour ramp for the condition bars: the record's accent hue with
+// monotone lightness steps (best grade brightest). Both endpoints are anchored
+// by construction -- the dark end lifted until it clears 2:1 contrast on the
+// surface, the light end pushed toward white until the ramp spans enough
+// lightness for visible per-step gaps -- so any album-cover accent yields a
+// legible ramp on the dark UI.
+function conditionRamp(accentStr, steps = 6) {
+  const accent = (accentStr || '150,150,150').split(',').map(n => parseInt(n, 10) || 0);
+  const SURFACE = [18, 18, 18];
+  const WHITE = [255, 255, 255];
+  const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const relLum = rgb => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  const contrast = (a, b) => { const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+  const okL = rgb => Math.cbrt(relLum(rgb));
+  const mix = (a, b, t) => a.map((c, i) => c + (b[i] - c) * t);
+
+  const mx = Math.max(...accent, 1);
+  const base = accent.map(c => c * (200 / mx));
+  let dark = mix(base, SURFACE, 0.5);
+  for (let i = 0; i < 30 && contrast(dark, SURFACE) < 2.15; i++) dark = mix(dark, WHITE, 0.05);
+  let light = mix(base, WHITE, 0.5);
+  for (let i = 0; i < 30 && okL(light) - okL(dark) < 0.36; i++) light = mix(light, WHITE, 0.08);
+  return Array.from({ length: steps }, (_, i) =>
+    `rgb(${mix(light, dark, i / (steps - 1)).map(Math.round).join(',')})`);
+}
+
+function PriceGraph({ price, accentRGB, mediaCondition, onRefresh, refreshing }) {
+  const cur = price.currency || '';
+  const fmt = v => `${cur} ${v.toFixed(2)}`.trim();
+
+  const conditions = PRICE_GRAPH_GRADES
+    .map(grade => ({ grade, value: (price.conditions || []).find(c => c.grade === grade)?.value }))
+    .filter(c => c.value != null);
+  const maxValue = conditions.length ? Math.max(...conditions.map(c => c.value)) : 0;
+  const ramp = conditionRamp(accentRGB, Math.max(conditions.length, 2));
+
+  // The headline number: the suggestion matching the user's own graded copy,
+  // falling back to VG+ (the most common trading grade).
+  const ownGrade = conditions.some(c => c.grade === mediaCondition) ? mediaCondition : null;
+  const headGrade = ownGrade || (conditions.some(c => c.grade === 'VG+') ? 'VG+' : conditions[0]?.grade);
+  const headline = conditions.find(c => c.grade === headGrade);
+
+  const checked = price.checkedAt
+    ? new Date(price.checkedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+    : null;
+  const sellerHint = /^http_(401|403|404)$/.test(price.suggestionsStatus || '');
 
   return (
     <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(var(--fg),0.02)', border: '1px solid rgba(var(--fg),0.07)' }}>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-baseline justify-between flex-wrap gap-x-3 gap-y-0.5 mb-3">
         <span className="text-[11px] tracking-[0.25em] uppercase font-mono" style={{ color: 'rgba(var(--fg),0.25)' }}>Marketplace</span>
-        {price.totalListings > 0 && (
-          <span className="text-[12px] font-mono" style={{ color: 'rgba(var(--fg),0.22)' }}>{price.totalListings} listing{price.totalListings !== 1 ? 's' : ''}</span>
-        )}
+        <span className="text-[11px] font-mono flex items-baseline gap-2 text-right" style={{ color: 'rgba(var(--fg),0.22)' }}>
+          {price.totalListings > 0 && <span>{price.totalListings} for sale{!conditions.length && price.floor ? ` · from ${fmt(price.floor.value)}` : ''}</span>}
+          <button onClick={onRefresh} disabled={refreshing} className="underline-offset-2 hover:underline disabled:opacity-40" style={{ color: 'rgba(var(--fg),0.3)' }}>
+            {refreshing ? '...' : (checked ? `checked ${checked}` : 'refresh')}
+          </button>
+        </span>
       </div>
-      {stats.length === 0 ? (
-        <div className="text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.25)' }}>No price data available.</div>
-      ) : (
-        <div className="flex gap-5">
-          {stats.map(({ label, value, accent }) => (
-            <div key={label}>
-              <div className="text-[11px] tracking-[0.18em] uppercase font-mono mb-0.5" style={{ color: 'rgba(var(--fg),0.22)' }}>{label}</div>
-              <div className="text-[16px] font-mono" style={{ color: accent ? `rgba(${accentRGB},0.85)` : 'rgba(var(--fg),0.55)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+
+      {conditions.length > 0 ? (
+        <>
+          {headline && (
+            <div className="mb-3">
+              <div className="text-[11px] tracking-[0.18em] uppercase font-mono mb-0.5" style={{ color: 'rgba(var(--fg),0.22)' }}>
+                {ownGrade ? `Your copy · ${ownGrade}` : `Typical copy · ${headGrade}`}
+              </div>
+              <div className="text-[20px] font-mono" style={{ color: `rgba(${accentRGB},0.9)` }}>{fmt(headline.value)}</div>
             </div>
-          ))}
+          )}
+          <div className="flex flex-col gap-[5px]" role="table" aria-label="Suggested price by condition">
+            {conditions.map(({ grade, value }, i) => (
+              <div key={grade} role="row" className="grid items-center gap-2" style={{ gridTemplateColumns: '36px 1fr 64px' }}
+                title={`${PRICE_GRADE_NAMES[grade]} (${grade}) · ${fmt(value)}`}>
+                <span role="rowheader" className="text-[11px] font-mono flex items-center gap-1" style={{ color: grade === ownGrade ? 'rgba(var(--fg),0.8)' : 'rgba(var(--fg),0.35)' }}>
+                  {grade === ownGrade && <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: `rgb(${accentRGB})` }} />}
+                  {grade}
+                </span>
+                <div className="h-[13px] rounded-r" style={{ background: 'rgba(var(--fg),0.035)' }}>
+                  <div className="h-full" style={{
+                    width: `${Math.max((value / maxValue) * 100, 3)}%`,
+                    background: ramp[i],
+                    borderRadius: '1px 4px 4px 1px',
+                  }} />
+                </div>
+                <span role="cell" className="text-[12px] font-mono text-right" style={{ color: grade === ownGrade ? 'rgba(var(--fg),0.8)' : 'rgba(var(--fg),0.45)', fontVariantNumeric: 'tabular-nums' }}>
+                  {value.toFixed(2)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2.5 text-[10px] font-mono" style={{ color: 'rgba(var(--fg),0.18)' }}>
+            Discogs suggested prices, from this pressing's sales history
+          </div>
+        </>
+      ) : (
+        <div className="text-[13px] font-mono leading-relaxed" style={{ color: 'rgba(var(--fg),0.3)' }}>
+          {price.totalListings === 0 && (price.floor ? <>Cheapest known listing {fmt(price.floor.value)}. </> : <>No active listings. </>)}
+          {sellerHint
+            ? 'Per-condition pricing needs seller settings enabled on the Discogs account behind the API token.'
+            : 'No per-condition sales history for this pressing yet.'}
         </div>
       )}
     </div>

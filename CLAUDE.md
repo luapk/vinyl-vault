@@ -121,6 +121,7 @@ Each record is a JSON blob stored in the `data` jsonb column:
   - `bpmConfidence`: `high` (two independent sources agree) | `low` (sources disagree; dimmed in Tracks view) | null (single source)
 - `coverUrl`, `images[]`
 - `identified`, `confidence`, `source`, `notes`
+- `priceData`, `priceCheckedAt` -- persisted result of the last marketplace price check (`/api/price`): `{ currency, conditions: [{grade, value}], suggestionsStatus, floor, totalListings, checkedAt }`
 - `savedAt` -- timestamp
 
 ### Sync behaviour
