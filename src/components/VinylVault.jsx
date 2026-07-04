@@ -594,12 +594,13 @@ export default function VinylVault() {
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
-  // Minimum splash display so the boot animation reads even when the session
-  // restores instantly. Cleared on a timer; the splash also stays up for as
-  // long as auth is genuinely still loading.
+  // Splash stays up until the boot animation has played through at least once
+  // (the video's onEnded clears the hold), and for as long as auth is genuinely
+  // still loading. The 7.5s timer is a safety net so a video that never plays
+  // (data saver, load failure) cannot trap the user on the splash.
   const [splashHold, setSplashHold] = useState(isSupabaseEnabled);
   useEffect(() => {
-    const t = setTimeout(() => setSplashHold(false), 2200);
+    const t = setTimeout(() => setSplashHold(false), 7500);
     return () => clearTimeout(t);
   }, []);
 
@@ -786,7 +787,7 @@ export default function VinylVault() {
     if (showWalkthrough) {
       return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
     }
-    return <SplashScreen />;
+    return <SplashScreen onCycleComplete={() => setSplashHold(false)} />;
   }
   if (isSupabaseEnabled && !authLoading && !user) {
     if (!pricingSeen) {
@@ -4496,13 +4497,13 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
 // invisible and the animation reads as part of the page.
 const SPLASH_ACID = '#cafd04';
 
-function SplashScreen() {
+function SplashScreen({ onCycleComplete }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
         src="/logo-black.png"
         alt="Vinyl Vault"
-        className="w-[64vw] max-w-[360px]"
+        className="w-[54vw] max-w-[300px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
       <video
@@ -4511,12 +4512,13 @@ function SplashScreen() {
         autoPlay
         muted
         playsInline
-        loop
-        className="w-[88vw] max-w-[540px]"
+        onEnded={(e) => { onCycleComplete?.(); e.target.play().catch(() => {}); }}
+        onError={() => onCycleComplete?.()}
+        className="w-[98vw] max-w-[620px]"
         style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
       />
       <div
-        className="flex items-center gap-2.5 px-5 py-2.5 rounded-full mt-5"
+        className="flex items-center gap-2 px-4 py-2 rounded-full mt-4"
         style={{
           background: 'rgba(0,0,0,0.06)',
           border: '1px solid rgba(0,0,0,0.14)',
@@ -4526,8 +4528,8 @@ function SplashScreen() {
           animation: 'splashFadeUp 0.9s ease-out 0.6s both',
         }}
       >
-        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(0,0,0,0.15)', borderTopColor: 'rgba(0,0,0,0.65)' }} />
-        <span className="font-mono text-[13px] tracking-[0.22em] uppercase" style={{ color: 'rgba(0,0,0,0.75)' }}>Connecting...</span>
+        <div className="w-3 h-3 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(0,0,0,0.15)', borderTopColor: 'rgba(0,0,0,0.65)' }} />
+        <span className="font-mono text-[11px] tracking-[0.22em] uppercase" style={{ color: 'rgba(0,0,0,0.75)' }}>Connecting...</span>
       </div>
     </div>
   );
