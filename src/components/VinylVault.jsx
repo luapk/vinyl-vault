@@ -4515,6 +4515,20 @@ function SplashScreen() {
         className="w-[88vw] max-w-[540px]"
         style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
       />
+      <div
+        className="flex items-center gap-2.5 px-5 py-2.5 rounded-full mt-5"
+        style={{
+          background: 'rgba(0,0,0,0.06)',
+          border: '1px solid rgba(0,0,0,0.14)',
+          backdropFilter: 'blur(14px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+          boxShadow: '0 8px 24px -12px rgba(0,0,0,0.25)',
+          animation: 'splashFadeUp 0.9s ease-out 0.6s both',
+        }}
+      >
+        <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(0,0,0,0.15)', borderTopColor: 'rgba(0,0,0,0.65)' }} />
+        <span className="font-mono text-[13px] tracking-[0.22em] uppercase" style={{ color: 'rgba(0,0,0,0.75)' }}>Connecting...</span>
+      </div>
     </div>
   );
 }
