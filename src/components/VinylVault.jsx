@@ -594,6 +594,15 @@ export default function VinylVault() {
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
+  // Minimum splash display so the boot animation reads even when the session
+  // restores instantly. Cleared on a timer; the splash also stays up for as
+  // long as auth is genuinely still loading.
+  const [splashHold, setSplashHold] = useState(isSupabaseEnabled);
+  useEffect(() => {
+    const t = setTimeout(() => setSplashHold(false), 2200);
+    return () => clearTimeout(t);
+  }, []);
+
   const [appView, setAppView] = useState("scan"); // scan | collection | batch | about | admin
   const [phase, setPhase] = useState("idle");
   const [status, setStatus] = useState("");
@@ -771,6 +780,14 @@ export default function VinylVault() {
   }, []);
 
   // Gate: unauthenticated visitors see pricing first, then auth.
+  // Splash shows while auth resolves, with a minimum hold so the mascot
+  // animation reads even when the session restores instantly.
+  if (isSupabaseEnabled && (authLoading || splashHold)) {
+    if (showWalkthrough) {
+      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
+    }
+    return <SplashScreen />;
+  }
   if (isSupabaseEnabled && !authLoading && !user) {
     if (!pricingSeen) {
       return (
@@ -781,18 +798,6 @@ export default function VinylVault() {
       );
     }
     return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} initialMode={authInitialMode} />;
-  }
-  if (isSupabaseEnabled && authLoading) {
-    if (showWalkthrough) {
-      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
-    }
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg-hex)" }}>
-        <video src="/intro.mp4" autoPlay muted playsInline style={{ height: 192, mixBlendMode: 'screen', marginBottom: 8 }} />
-        <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(var(--fg),0.1)", borderTopColor: "rgba(var(--fg),0.5)" }} />
-        <span style={{ fontSize: 18, fontFamily: 'monospace', color: 'rgba(var(--fg),0.25)' }}>Connecting...</span>
-      </div>
-    );
   }
 
   // Sends a pre-loaded data URL to /api/scan and returns the parsed response.
@@ -1091,7 +1096,7 @@ export default function VinylVault() {
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)" }}>
         <div className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Vinyl Vault" style={{ height: 90, opacity: 0.92 }} />
+          <img src="/logo-white.png" alt="Vinyl Vault" style={{ height: 56, opacity: 0.92 }} />
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
@@ -4480,6 +4485,36 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ----- SplashScreen ------------------------------------------------------------
+// Acid boot screen: the crate-mascot animation plays and the logo fades up
+// while auth and the first data pull happen. The background colour matches
+// the video's own backdrop exactly (rgb 202,253,4) so the frame edge is
+// invisible and the animation reads as part of the page.
+const SPLASH_ACID = '#cafd04';
+
+function SplashScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
+      <img
+        src="/logo-black.png"
+        alt="Vinyl Vault"
+        className="w-[64vw] max-w-[360px]"
+        style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
+      />
+      <video
+        src="/splash.mp4"
+        poster="/splash-poster.jpg"
+        autoPlay
+        muted
+        playsInline
+        loop
+        className="w-[88vw] max-w-[540px]"
+        style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
+      />
     </div>
   );
 }

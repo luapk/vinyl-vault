@@ -99,6 +99,18 @@ body {
   opacity: 0.88 !important;
 }
 
+/* Header logo (white letters, transparent bg): invert to black in light mode */
+[data-theme="light"] img[src="/logo-white.png"] {
+  filter: invert(1) !important;
+  opacity: 0.85 !important;
+}
+
+/* Splash screen: logo and mascot animation fade up while the app boots */
+@keyframes splashFadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes scanLine {
   0% { top: 0%; }
   50% { top: calc(100% - 3px); }
