@@ -1178,7 +1178,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "tracks" && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
@@ -1938,7 +1938,7 @@ function RotatingCube({ color, size = 9 }) {
 
 // ----- CollectionView --------------------------------------------------------
 
-function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
+function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   const [viewMode, setViewMode] = useState("carousel");
   const [search, setSearch] = useState("");
@@ -2233,7 +2233,7 @@ function CollectionView({ collection, syncedIds, accentRGB, onRemove, onUpdate, 
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} accessToken={accessToken} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -2611,7 +2611,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, crateColors = {}, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, accessToken, crateColors = {}, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
@@ -2733,10 +2733,9 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
     if (!discogsId) return;
     setPriceLoading(true);
     try {
-      const { supabase: _priceSb } = await import('../lib/supabase.js');
-      const { data: { session: _priceSess } } = await _priceSb.auth.getSession();
       const res = await fetch(`/api/price?id=${encodeURIComponent(discogsId)}`, {
-        headers: { 'Authorization': `Bearer ${_priceSess?.access_token}` },
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(20000),
       });
       const data = await res.json();
       const usable = res.ok && (data.conditions?.length || data.floor || data.totalListings) ? data : false;
@@ -2779,16 +2778,21 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
 
   const pickReidentifyCandidate = async (candidate) => {
     setReidentifyPicking(true);
+    setReidentifyError(null);
     try {
-      const { supabase: _reidentSb } = await import('../lib/supabase.js');
-      const { data: { session: _reidentSess } } = await _reidentSb.auth.getSession();
+      // Cached token from useAuth, not getSession(): getSession() can hang
+      // indefinitely during a token refresh, which left reidentifyPicking
+      // stuck true and every candidate button permanently disabled.
       const res = await fetch('/api/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_reidentSess?.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
         body: JSON.stringify({ discogsId: candidate.id }),
+        signal: AbortSignal.timeout(50000),
       });
+      if (!res.ok) throw new Error(`API ${res.status}`);
       const data = await res.json();
-      if (data.release && onUpdate) {
+      if (!data.release) throw new Error(data.error || 'No release data returned');
+      if (onUpdate) {
         const r = data.release;
         onUpdate(record.id, {
           discogsId: r.id || candidate.id,
@@ -2813,7 +2817,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, cra
       setReidentifying(false);
       setReidentifyResults(null);
     } catch (err) {
-      setReidentifyError('Failed to load release details.');
+      // Keep the panel and results open so the user can retry.
+      console.error('[reidentify]', err);
+      setReidentifyError(err.name === 'TimeoutError'
+        ? 'Timed out pulling release data. Try again.'
+        : 'Failed to load release details. Try again.');
     }
     setReidentifyPicking(false);
   };
