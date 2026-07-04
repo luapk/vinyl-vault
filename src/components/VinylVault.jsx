@@ -526,63 +526,84 @@ function reportBpmsToCache(items, token) {
 // ----- Greeting helper -------------------------------------------------------
 
 function getGreeting(name) {
+  // Greetings: six words max, including the name. Dry, laconic, a little
+  // sarcastic, ultimately pointing at the dig. The idle view bolds the clause
+  // before the first period and dims the rest, so a short two-beat lands well.
   const hour = new Date().getHours();
   let pool;
   if (hour >= 3 && hour < 5) {
     pool = [
-      `It's 3am, ${name}. The records aren't going anywhere. Neither, clearly, are you.`,
-      `Still up, ${name}. This is precisely how a collection becomes a problem. Carry on.`,
+      `3am again, ${name}. Respectable.`,
+      `Still up, ${name}? Figures.`,
+      `The records waited, ${name}.`,
+      `Sleep's overrated anyway, ${name}.`,
+      `Witching hour, ${name}. Dig.`,
+      `${name}, the vault never sleeps.`,
+      `One more record, ${name}? Sure.`,
+      `Nocturnal as ever, ${name}.`,
     ];
   } else if (hour >= 5 && hour < 8) {
     pool = [
-      `Morning, ${name}. The records survived the night. Did you?`,
-      `Up early, ${name}. Nobody files at this hour for the joy of it.`,
-      `Dawn, ${name}. Still smells of last night's club in here.`,
-      `Early start, ${name}. The wantlist never went to bed either.`,
-      `Early start, ${name}. Coffee and crates?`,
+      `Dawn patrol, ${name}. Respect.`,
+      `Up early, ${name}. Good.`,
+      `Coffee and crates, ${name}?`,
       `Rise and spin, ${name}.`,
+      `Early bird digs deep, ${name}.`,
+      `Morning, ${name}. Beat the rush.`,
+      `First light, first find, ${name}.`,
+      `Sunrise sorting, ${name}? Bold.`,
     ];
   } else if (hour >= 8 && hour < 12) {
     pool = [
-      `Morning, ${name}. The stack's exactly where you left it. Still judging you.`,
-      `Morning, ${name}. Yesterday's haul is still in the bag. It knows you forgot.`,
-      `Morning, ${name}. Alphabetical order was a beautiful dream, once.`,
-      `Morning, ${name}. Coffee, then the duplicates. In that order, for everyone's sake.`,
+      `Morning, ${name}. The stack waits.`,
+      `Coffee first, ${name}. Then crates.`,
+      `Fresh start, ${name}. Dig in.`,
+      `Morning, ${name}. Yesterday's haul judges.`,
+      `Back at it, ${name}. Good.`,
+      `Morning, ${name}. Files won't sort themselves.`,
+      `Bright and early, ${name}.`,
+      `${name}, the crates missed you.`,
     ];
   } else if (hour >= 12 && hour < 14) {
     pool = [
-      `Midday, ${name}. The collection grew again while you slept. It does that.`,
-      `Afternoon, ${name}. Stack's not going to sort itself.`,
+      `Midday, ${name}. Still digging?`,
+      `Lunch can wait, ${name}.`,
       `Back at it, ${name}?`,
+      `Half the day, ${name}. Dig on.`,
+      `Noon, ${name}. The stack grew.`,
+      `Midday dig, ${name}? Respectable.`,
     ];
   } else if (hour >= 14 && hour < 17) {
     pool = [
-      `Afternoon, ${name}. In here somewhere is the record you swore you didn't own. Twice.`,
-      `Afternoon, ${name}. The shelf is at capacity. The shelf is always at capacity.`,
-      `Afternoon, ${name}. File three, buy none. We both know how this goes.`,
-      `Afternoon, ${name}. That white label's been a mystery two years. Today won't crack it either.`,
-      `Afternoon, ${name}. Stack's not going to sort itself.`,
-      `Back at it, ${name}?`,
-      `Good afternoon, ${name}. Ready to dig?`,
+      `Afternoon, ${name}. File three, buy none.`,
+      `Afternoon, ${name}. The shelf's full again.`,
+      `Back digging, ${name}. Naturally.`,
+      `Afternoon, ${name}. Ready to dig?`,
+      `Prime crate hours, ${name}.`,
+      `Afternoon, ${name}. No willpower required.`,
+      `${name}, that white label awaits.`,
     ];
   } else if (hour >= 17 && hour < 21) {
     pool = [
-      `Evening, ${name}. Pull a set, or stare at the spines. Dealer's choice.`,
-      `Evening, ${name}. The gig bag's empty and hopeful. See to it.`,
-      `Evening, ${name}. You'll find the one you need at 2am. You always do.`,
-      `Evening, ${name}. Time to spin something.`,
-      `Hey ${name}, what's going in tonight?`,
-      `Good evening, ${name}. The vault awaits.`,
+      `Evening, ${name}. Time to spin.`,
+      `Evening, ${name}. Pull a set.`,
+      `Golden hour, ${name}. Dig in.`,
+      `Evening, ${name}. What's going in?`,
+      `The vault awaits, ${name}.`,
+      `Prime time, ${name}. Load up.`,
+      `Evening, ${name}. Gig bag's hopeful.`,
+      `Showtime soon, ${name}. Dig.`,
     ];
   } else {
     pool = [
-      `Late, ${name}. The wantlist's open in the other tab. We saw.`,
-      `Night, ${name}. Nothing good gets ordered after midnight. Order it anyway.`,
-      `Night, ${name}. The needle's earned a rest. You, apparently, have not.`,
-      `Late night crate-digging, ${name}?`,
+      `Late, ${name}. The wantlist's open.`,
+      `Night, ${name}. Best finds happen now.`,
       `Still at it, ${name}. Respect.`,
-      `Night owl mode, ${name}.`,
-      `The best finds happen late, ${name}.`,
+      `Night owl, ${name}? Naturally.`,
+      `Midnight crates, ${name}. Dangerous.`,
+      `Late, ${name}. Order it anyway.`,
+      `The needle rests, ${name}. You don't.`,
+      `After midnight, ${name}. No regrets.`,
     ];
   }
   return pool[Math.floor(Math.random() * pool.length)];
