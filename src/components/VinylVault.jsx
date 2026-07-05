@@ -4599,6 +4599,7 @@ const SPLASH_CLIPS = [
   { src: '/splash.mp4', poster: '/splash-poster.jpg' },
   { src: '/splash2.mp4', poster: '/splash2-poster.jpg' },
   { src: '/splash3.mp4', poster: '/splash3-poster.jpg' },
+  { src: '/splash4.mp4', poster: '/splash4-poster.jpg' },
 ];
 
 const splashClip = (() => {
