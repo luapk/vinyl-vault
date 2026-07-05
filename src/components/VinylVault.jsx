@@ -346,13 +346,38 @@ function releaseCameraStream() {
   _sharedCamStream = null;
 }
 
-function bpmFoldRange(genres) {
-  const g = (genres || []).join(' ').toLowerCase();
-  if (/jungle|drum.and.bass|dnb|hardcore|breakcore|neurofunk/.test(g)) return [140, 220];
-  if (/hip.?hop|rap|grime/.test(g)) return [70, 115];
-  if (/reggae|dub|ska/.test(g)) return [55, 95];
-  if (/ambient|drone/.test(g)) return [50, 100];
-  return [70, 180];
+// Typical tempo band + perceptual centre per broad genre. `center` drives an
+// octave-symmetric tempo prior during lag selection (so a 174 BPM D&B track
+// is not read as its half-time 87); [lo,hi] is a final safety clamp.
+// Genres are normalised (punctuation -> spaces) first so "Drum & Bass",
+// "Drum n Bass", and "D&B" all match -- the old regex missed every one of
+// these, which is why D&B kept resolving to half tempo.
+function tempoProfile(genres) {
+  const g = (genres || []).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const has = (re) => re.test(g);
+  if (has(/\bdnb\b|\bd b\b|drum ?n ?bass|drum and bass|jungle|neurofunk|techstep|darkstep|jump up|liquid funk|ragga|halftime/))
+    return { lo: 150, hi: 190, center: 174 };
+  if (has(/hardcore|gabber|speedcore|breakcore/))
+    return { lo: 155, hi: 210, center: 180 };
+  if (has(/dubstep|grime|\b2 ?step\b|uk garage|speed garage/))
+    return { lo: 128, hi: 150, center: 140 };
+  if (has(/hip ?hop|\brap\b|\btrap\b|boom bap|g funk/))
+    return { lo: 70, hi: 110, center: 90 };
+  if (has(/reggae|\bdub\b|dancehall|\bska\b|dub techno/))
+    return { lo: 60, hi: 100, center: 75 };
+  if (has(/ambient|drone|downtempo|trip ?hop|\bidm\b/))
+    return { lo: 60, hi: 110, center: 85 };
+  if (has(/house|techno|electro|disco|garage|breakbeat|\bbreaks\b|nu skool|acid/))
+    return { lo: 110, hi: 140, center: 126 };
+  return { lo: 70, hi: 180, center: 120 };
+}
+
+// Octave-symmetric weight: bpm and its double are equally far from centre in
+// log space, so an octave error is penalised hard (~0.004 at 2x), while
+// nearby tempi stay near 1. sigma ~ a third of an octave.
+function tempoPrior(bpm, center) {
+  const x = Math.log2(bpm / center) / 0.30;
+  return Math.exp(-0.5 * x * x);
 }
 
 async function detectBPM(previewUrl, genres) {
@@ -384,16 +409,25 @@ async function detectBPM(previewUrl, genres) {
     const sr = buffer.sampleRate;
     const dur = buffer.duration;
 
-    // OfflineAudioContext with 150 Hz low-pass: isolates kick/bass transients
+    // Band-pass 50 Hz - 2 kHz (highpass -> lowpass). The old sub-only 150 Hz
+    // low-pass threw away the snare/breakbeat transients that carry the pulse
+    // in drum & bass and jungle, leaving a half-time kick pattern that read as
+    // 87 instead of 174. This band keeps the kick fundamental AND the snare
+    // body while dropping rumble and hiss.
     const offCtx = new OfflineAudioContext(1, Math.floor(sr * dur), sr);
     const src = offCtx.createBufferSource();
     src.buffer = buffer;
-    const filt = offCtx.createBiquadFilter();
-    filt.type = 'lowpass';
-    filt.frequency.value = 150;
-    filt.Q.value = 0.7;
-    src.connect(filt);
-    filt.connect(offCtx.destination);
+    const hp = offCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 50;
+    hp.Q.value = 0.7;
+    const lp = offCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2000;
+    lp.Q.value = 0.7;
+    src.connect(hp);
+    hp.connect(lp);
+    lp.connect(offCtx.destination);
     src.start(0);
     const filtered = await offCtx.startRendering();
     const raw = filtered.getChannelData(0);
@@ -453,26 +487,32 @@ async function detectBPM(previewUrl, genres) {
       return score;
     };
 
+    // Weight each candidate lag by the genre tempo prior, so the octave that
+    // matches the genre's typical tempo wins at selection time rather than
+    // being fixed up afterwards. This is what stops a 174 D&B track locking
+    // onto its half-time 87.
+    const { lo: bpmLo, hi: bpmHi, center } = tempoProfile(genres);
     let bestLag = minLag, bestScore = -Infinity;
     for (let lag = minLag; lag <= maxLag; lag++) {
-      const score = scoreAt(lag);
+      const score = scoreAt(lag) * tempoPrior((60 * fps) / lag, center);
       if (score > bestScore) { bestScore = score; bestLag = lag; }
     }
 
-    if (bestScore <= 0) { bpmCache.set(previewUrl, null); return null; }
+    if (scoreAt(bestLag) <= 0) { bpmCache.set(previewUrl, null); return null; }
 
     let bpm = (60 * fps) / bestLag;
-    const [bpmLo, bpmHi] = bpmFoldRange(genres);
     while (bpm < bpmLo) bpm *= 2;
     while (bpm > bpmHi) bpm /= 2;
 
     // Octave ambiguity: when the half/double-tempo lag scores nearly as well
-    // as the winner AND the competing octave also fits the genre window,
-    // autocorrelation alone cannot settle it (87 vs 174). Callers send these
-    // to the arbiter instead of persisting a coin flip.
+    // as the winner (on raw autocorrelation) AND the competing octave still
+    // fits the genre window, send it to the arbiter rather than persist a
+    // coin flip. Compared on raw scores so genuine ambiguity still surfaces
+    // even after the prior has picked a primary.
+    const rawBest = scoreAt(bestLag);
     const competitor = Math.max(scoreAt(bestLag * 2), scoreAt(Math.round(bestLag / 2)));
     let alt = null;
-    if (competitor >= 0.7 * bestScore) {
+    if (competitor >= 0.7 * rawBest) {
       if (bpm * 2 <= bpmHi) alt = Math.round(bpm * 2);
       else if (bpm / 2 >= bpmLo) alt = Math.round(bpm / 2);
     }
