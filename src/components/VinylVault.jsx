@@ -4553,11 +4553,29 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
 }
 
 // ----- SplashScreen ------------------------------------------------------------
-// Acid boot screen: the crate-mascot animation plays and the logo fades up
+// Acid boot screen: a crate-mascot animation plays and the logo fades up
 // while auth and the first data pull happen. The background colour matches
-// the video's own backdrop exactly (rgb 202,253,4) so the frame edge is
+// the videos' own backdrop exactly (rgb 202,253,4) so the frame edge is
 // invisible and the animation reads as part of the page.
 const SPLASH_ACID = '#cafd04';
+
+// Two mascot animations, alternated on each visit so the boot screen varies.
+// The chosen index is advanced in localStorage at module load (once per app
+// open), falling back to a fixed clip if storage is unavailable.
+const SPLASH_CLIPS = [
+  { src: '/splash.mp4', poster: '/splash-poster.jpg' },
+  { src: '/splash2.mp4', poster: '/splash2-poster.jpg' },
+];
+
+const splashClip = (() => {
+  try {
+    const next = (parseInt(localStorage.getItem('vv_splash_i') || '0', 10) || 0) % SPLASH_CLIPS.length;
+    localStorage.setItem('vv_splash_i', String((next + 1) % SPLASH_CLIPS.length));
+    return SPLASH_CLIPS[next];
+  } catch {
+    return SPLASH_CLIPS[0];
+  }
+})();
 
 function SplashScreen({ onCycleComplete }) {
   return (
@@ -4569,8 +4587,8 @@ function SplashScreen({ onCycleComplete }) {
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
       <video
-        src="/splash.mp4"
-        poster="/splash-poster.jpg"
+        src={splashClip.src}
+        poster={splashClip.poster}
         autoPlay
         muted
         playsInline
