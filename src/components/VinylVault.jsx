@@ -4350,6 +4350,53 @@ function StatsView({ collection, accentRGB }) {
 
 // ----- AboutView -------------------------------------------------------------
 
+// The four onboarding steps. Each is an acid tile with a looping mascot
+// animation as the hero (the video's own acid backdrop matches the tile, so
+// the frame edge is invisible -- same trick as the splash). Until a clip is
+// wired in, the tile shows a big black step icon on acid as a placeholder.
+// To add a clip: set `video`/`poster` to the processed asset paths.
+const HOW_STEPS = [
+  { num: 1, title: 'Photograph', Icon: Camera,      video: null, poster: null, desc: 'Point your camera at the sleeve or label. A single photo is all it takes.' },
+  { num: 2, title: 'Identify',   Icon: Scan,        video: null, poster: null, desc: 'The exact pressing is matched against the global record database: label, catalogue number, year, country.' },
+  { num: 3, title: 'Enrich',     Icon: Sparkle,     video: null, poster: null, desc: 'Tracklist, BPM, and Camelot key notation are pulled automatically where available.' },
+  { num: 4, title: 'File',       Icon: VinylRecord, video: null, poster: null, desc: 'Assign the record to one or more crates, or save it unassigned and sort later.' },
+];
+
+function HowStep({ num, title, desc, Icon, video, poster }) {
+  // Play the clip only while the tile is on screen (battery/decode friendly).
+  const vidRef = useRef(null);
+  useEffect(() => {
+    const el = vidRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) el.play?.().catch(() => {}); else el.pause?.();
+    }, { threshold: 0.3 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [video]);
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#cafd04' }}>
+      <div className="relative w-full aspect-video">
+        {video ? (
+          <video ref={vidRef} src={video} poster={poster || undefined} muted loop playsInline preload="none"
+            className="w-full h-full object-contain" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon size={58} weight="regular" style={{ color: '#08080c' }} />
+          </div>
+        )}
+        <span className="absolute top-2.5 left-2.5 w-6 h-6 rounded-full flex items-center justify-center font-mono text-[12px] font-bold"
+          style={{ background: '#08080c', color: '#cafd04' }}>{num}</span>
+      </div>
+      <div className="px-4 pt-3 pb-4">
+        <div className="text-[15px] font-display mb-1" style={{ color: '#08080c' }}>{title}</div>
+        <div className="text-[13.5px] leading-relaxed font-mono" style={{ color: 'rgba(8,8,12,0.72)' }}>{desc}</div>
+      </div>
+    </div>
+  );
+}
+
 function AboutView({ accentRGB }) {
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
@@ -4374,23 +4421,8 @@ function AboutView({ accentRGB }) {
 
         <div>
           <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
-          <div className="space-y-3">
-            {[
-              { Icon: Camera,          title: "Photograph", desc: "Point your camera at the sleeve or label. A single photo is all it takes." },
-              { Icon: Scan,            title: "Identify",   desc: "The exact pressing is matched against the global record database: label, catalogue number, year, country." },
-              { Icon: Sparkle,         title: "Enrich",     desc: "Tracklist, BPM, and Camelot key notation are pulled automatically where available." },
-              { Icon: VinylRecord,     title: "File",       desc: "Assign the record to one or more crates, or save it unassigned and sort later." },
-            ].map(({ Icon, title, desc }) => (
-              <div key={title} className="flex gap-4 p-4 rounded-2xl" style={glassSubtle()}>
-                <div className="shrink-0 mt-0.5">
-                  <Icon size={16} style={{ color: `rgba(${accentRGB},0.7)` }} />
-                </div>
-                <div>
-                  <div className="text-sm font-display mb-0.5 text-white/85">{title}</div>
-                  <div className="text-[16px] text-white/40 leading-relaxed">{desc}</div>
-                </div>
-              </div>
-            ))}
+          <div className="grid sm:grid-cols-2 gap-3">
+            {HOW_STEPS.map(step => <HowStep key={step.title} {...step} />)}
           </div>
         </div>
 
