@@ -658,11 +658,12 @@ export default function VinylVault() {
 
   // Splash stays up until the boot animation has played through at least once
   // (the video's onEnded clears the hold), and for as long as auth is genuinely
-  // still loading. The 7.5s timer is a safety net so a video that never plays
-  // (data saver, load failure) cannot trap the user on the splash.
+  // still loading. The timer is a safety net so a video that never plays (data
+  // saver, load failure) cannot trap the user; it must exceed the longest clip
+  // (~8s) so a full play-through is never cut short.
   const [splashHold, setSplashHold] = useState(isSupabaseEnabled);
   useEffect(() => {
-    const t = setTimeout(() => setSplashHold(false), 7500);
+    const t = setTimeout(() => setSplashHold(false), 9000);
     return () => clearTimeout(t);
   }, []);
 
@@ -4565,6 +4566,7 @@ const SPLASH_ACID = '#cafd04';
 const SPLASH_CLIPS = [
   { src: '/splash.mp4', poster: '/splash-poster.jpg' },
   { src: '/splash2.mp4', poster: '/splash2-poster.jpg' },
+  { src: '/splash3.mp4', poster: '/splash3-poster.jpg' },
 ];
 
 const splashClip = (() => {
