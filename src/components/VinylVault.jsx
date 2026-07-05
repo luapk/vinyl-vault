@@ -4598,11 +4598,14 @@ const SPLASH_ACID = '#cafd04';
 // Every clip's background is chroma-keyed onto the exact canonical acid at
 // build time, so all four (and the page) share one background colour -- no
 // per-clip tone matching needed.
+// The ?v query busts browser/CDN caches when a clip's bytes are replaced at
+// the same path (e.g. re-keying); bump it whenever the mp4s are reprocessed.
+const SPLASH_V = '2';
 const SPLASH_CLIPS = [
-  { src: '/splash.mp4', poster: '/splash-poster.jpg' },
-  { src: '/splash2.mp4', poster: '/splash2-poster.jpg' },
-  { src: '/splash3.mp4', poster: '/splash3-poster.jpg' },
-  { src: '/splash4.mp4', poster: '/splash4-poster.jpg' },
+  { src: `/splash.mp4?v=${SPLASH_V}`, poster: `/splash-poster.jpg?v=${SPLASH_V}` },
+  { src: `/splash2.mp4?v=${SPLASH_V}`, poster: `/splash2-poster.jpg?v=${SPLASH_V}` },
+  { src: `/splash3.mp4?v=${SPLASH_V}`, poster: `/splash3-poster.jpg?v=${SPLASH_V}` },
+  { src: `/splash4.mp4?v=${SPLASH_V}`, poster: `/splash4-poster.jpg?v=${SPLASH_V}` },
 ];
 
 const splashClip = (() => {
