@@ -145,6 +145,23 @@ export async function searchUsers(query, currentUserId, limit = 20) {
   return (data || []).filter(p => p.id !== currentUserId);
 }
 
+// The most recently joined public collectors, for discovery in the search
+// pane. Excludes the current user and anyone already followed (passed in as
+// excludeIds). Over-fetches so the exclusion filter still yields `limit` rows.
+export async function getLatestMembers(currentUserId, excludeIds = [], limit = 10) {
+  if (!supabase) return [];
+  const exclude = new Set([currentUserId, ...excludeIds].filter(Boolean));
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`${PROFILE_FIELDS}, created_at`)
+    .eq('is_public', true)
+    .not('username', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(limit + exclude.size + 5);
+  if (error) throw error;
+  return (data || []).filter(p => !exclude.has(p.id)).slice(0, limit);
+}
+
 // ─── Public collection ────────────────────────────────────────────────────────
 
 // Pulls a page of a public user's records. Returns the inner data jsonb blobs

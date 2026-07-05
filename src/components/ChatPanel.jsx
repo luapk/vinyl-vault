@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ArrowLeft, PaperPlaneTilt, ChatCircleDots, PencilSimpleLine, Smiley, VinylRecord } from '@phosphor-icons/react';
 import { supabase } from '../lib/supabase';
 import { getConversations, getMessages, sendMessage, markMessagesRead, getFollowing, getReactionsForMessages, toggleMessageReaction, bustConversationsCache, checkRecordsExist } from '../lib/social';
+import { spaceIconFor } from '../lib/avatarIcon.js';
 
 const REACT_EMOJIS = ['❤️', '😂', '👍'];
 
 function ChatAvatar({ profile, size = 32, isOnline = false }) {
-  const letter = (profile?.display_name || profile?.username || '?')[0].toUpperCase();
   const dotSize = Math.max(8, Math.round(size * 0.25));
   const dot = isOnline && (
     <span style={{ position: 'absolute', bottom: 0, right: 0, width: dotSize, height: dotSize, borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-hex)', boxSizing: 'border-box' }} />
@@ -19,9 +19,10 @@ function ChatAvatar({ profile, size = 32, isOnline = false }) {
       </div>
     );
   }
+  const SpaceIcon = spaceIconFor(profile);
   return (
-    <div style={{ position: 'relative', width: size, height: size, borderRadius: '50%', background: 'rgba(var(--fg),0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.floor(size * 0.38), fontWeight: 600, color: 'rgba(var(--fg),0.55)', flexShrink: 0, fontFamily: 'monospace' }}>
-      {letter}
+    <div className="vv-avatar-fallback" style={{ position: 'relative', width: size, height: size, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <SpaceIcon size={Math.round(size * 0.5)} weight="regular" />
       {dot}
     </div>
   );

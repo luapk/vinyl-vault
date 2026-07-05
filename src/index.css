@@ -111,6 +111,17 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Default avatar (no profile photo): a space/sci-fi icon.
+   Dark mode: black icon on acid. Light mode: white icon on black. */
+.vv-avatar-fallback {
+  background: #cafd04;
+  color: #08080c;
+}
+[data-theme="light"] .vv-avatar-fallback {
+  background: #08080c;
+  color: #ffffff;
+}
+
 @keyframes scanLine {
   0% { top: 0%; }
   50% { top: calc(100% - 3px); }

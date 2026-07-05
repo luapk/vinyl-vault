@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, CaretLeft, MagnifyingGlass, Users, ShareNetwork, PaperPlaneRight,
-  Trash, VinylRecord, ChatCircle, Check, Clock, Bell, PaperPlaneTilt,
+  Trash, VinylRecord, ChatCircle, Check, Clock, Bell, PaperPlaneTilt, Plus, Sparkle,
 } from "@phosphor-icons/react";
 import {
   getProfileByUsername, getPublicCollection, getCollectionCount,
   getFollowState, followUser, unfollowUser, getFollowing, getFollowers, getFeed, searchUsers,
+  getLatestMembers,
   REACTION_EMOJI, getReactionsForRecords, getReactions, toggleReaction,
   getComments, addComment, deleteComment, sendMessage,
   getNotifications, getLastSeenTs, bustFollowCache,
 } from "../lib/social.js";
+import { spaceIconFor } from "../lib/avatarIcon.js";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,14 +41,20 @@ function relativeTime(ts) {
 function Avatar({ profile, size = 40, isOnline = false }) {
   const [imgFailed, setImgFailed] = useState(false);
   const dotSize = Math.max(8, Math.round(size * 0.24));
+  const hasPhoto = profile?.avatar_url && !imgFailed;
+  const SpaceIcon = spaceIconFor(profile);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <div className="rounded-full overflow-hidden flex items-center justify-center w-full h-full"
-        style={{ border: '1px solid rgba(var(--fg),0.15)', background: 'rgba(var(--fg),0.06)' }}>
-        {profile?.avatar_url && !imgFailed
-          ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
-          : <span style={{ fontSize: size * 0.4, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)' }}>{initials(profile)}</span>}
-      </div>
+      {hasPhoto ? (
+        <div className="rounded-full overflow-hidden flex items-center justify-center w-full h-full"
+          style={{ border: '1px solid rgba(var(--fg),0.15)', background: 'rgba(var(--fg),0.06)' }}>
+          <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" onError={() => setImgFailed(true)} />
+        </div>
+      ) : (
+        <div className="vv-avatar-fallback rounded-full overflow-hidden flex items-center justify-center w-full h-full">
+          <SpaceIcon size={Math.round(size * 0.5)} weight="regular" />
+        </div>
+      )}
       {isOnline && (
         <span style={{ position: 'absolute', bottom: 0, right: 0, width: dotSize, height: dotSize, borderRadius: '50%', background: '#22c55e', border: '2px solid var(--bg-hex)', boxSizing: 'border-box' }} />
       )}
@@ -562,6 +570,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
   const [feed, setFeed] = useState([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [following, setFollowing] = useState([]);
+  const [latestMembers, setLatestMembers] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [selectedNotifRecord, setSelectedNotifRecord] = useState(null);
   // Capture the "last seen" timestamp at render time, before VinylVault resets it.
@@ -590,6 +599,28 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
     }, 300);
     return () => searchTimer.current && clearTimeout(searchTimer.current);
   }, [query, currentUser?.id]);
+
+  // Newest public members to discover, minus the current user and anyone
+  // already followed. Refreshes when the following set changes.
+  const followingKey = following.map(f => f.id).join(',');
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    getLatestMembers(currentUser.id, following.map(f => f.id)).then(setLatestMembers).catch(() => {});
+  }, [currentUser?.id, followingKey]);
+
+  // Follow a newest-member row: optimistic -- drop it from the discovery list
+  // and prepend it to the following strip, reverting both on failure.
+  const followMember = async (p) => {
+    if (!currentUser?.id) return;
+    setLatestMembers(prev => prev.filter(m => m.id !== p.id));
+    setFollowing(prev => [p, ...prev.filter(f => f.id !== p.id)]);
+    try {
+      await followUser(p.id, currentUser.id);
+    } catch {
+      setFollowing(prev => prev.filter(f => f.id !== p.id));
+      setLatestMembers(prev => [p, ...prev]);
+    }
+  };
 
   const hasUsername = !!currentProfile?.username;
   const isPublic = !!currentProfile?.is_public;
@@ -670,6 +701,33 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Newest members to discover (only when not actively searching) */}
+      {query.trim().length < 2 && latestMembers.length > 0 && (
+        <div className="mb-8">
+          <div className="text-[11px] tracking-[0.25em] uppercase font-mono text-white/30 mb-2.5 flex items-center gap-1.5">
+            <Sparkle size={11} /> Newest members
+          </div>
+          <div className="space-y-1.5">
+            {latestMembers.map(p => (
+              <div key={p.id} className="w-full flex items-center gap-3 p-2.5 rounded-xl" style={{ background: 'rgba(var(--fg),0.03)', border: '1px solid rgba(var(--fg),0.06)' }}>
+                <button onClick={() => p.username && onOpenProfile(p.username)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                  <Avatar profile={p} size={36} isOnline={onlineUsers?.has(p.id)} />
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-medium truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>{nameFor(p)}</div>
+                    <div className="text-[12px] font-mono text-white/35 truncate">@{p.username}{p.bio ? ` · ${p.bio}` : ''}</div>
+                  </div>
+                </button>
+                <button onClick={() => followMember(p)} title={`Follow ${nameFor(p)}`}
+                  className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-[0.1em] transition-all hover:opacity-80"
+                  style={{ border: `1px solid rgba(${accentRGB},0.4)`, color: `rgb(${accentRGB})`, background: `rgba(${accentRGB},0.1)` }}>
+                  <Plus size={12} weight="bold" /> Follow
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

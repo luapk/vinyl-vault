@@ -17,6 +17,7 @@ import CommunityView from "./Community.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
+import { spaceIconFor } from '../lib/avatarIcon.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -1163,13 +1164,13 @@ export default function VinylVault() {
               )}
             </button>
             <button onClick={() => setShowAccount(true)} title="Account settings"
-              className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-opacity hover:opacity-70"
-              style={{ border: "1px solid rgba(var(--fg),0.18)", background: "rgba(var(--fg),0.06)" }}>
+              className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center transition-opacity hover:opacity-70${profile?.avatar_url ? '' : ' vv-avatar-fallback'}`}
+              style={profile?.avatar_url
+                ? { border: "1px solid rgba(var(--fg),0.18)", background: "rgba(var(--fg),0.06)" }
+                : undefined}>
               {profile?.avatar_url
                 ? <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                : <span style={{ fontSize: 21, fontFamily: 'monospace', fontWeight: 600, color: 'rgba(var(--fg),0.45)', lineHeight: 1 }}>
-                    {(user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase()}
-                  </span>
+                : (() => { const SpaceIcon = spaceIconFor(profile || { id: user?.id, email: user?.email }); return <SpaceIcon size={17} weight="regular" />; })()
               }
             </button>
           </div>
@@ -3400,17 +3401,17 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile} />
           <button
             onClick={() => avatarInputRef.current?.click()}
-            className="relative rounded-full overflow-hidden flex items-center justify-center mb-2 transition-opacity hover:opacity-80"
+            className={`relative rounded-full overflow-hidden flex items-center justify-center mb-2 transition-opacity hover:opacity-80${avatarPreview ? '' : ' vv-avatar-fallback'}`}
             style={{
               width: 76, height: 76,
               border: avatarSavedOk ? '2px solid rgba(120,220,140,0.8)' : '2px solid rgba(var(--fg),0.15)',
-              background: 'rgba(var(--fg),0.06)',
+              ...(avatarPreview ? { background: 'rgba(var(--fg),0.06)' } : {}),
               boxShadow: avatarSavedOk ? '0 0 20px -4px rgba(120,220,140,0.55)' : 'none',
               transition: 'all 0.3s',
             }}>
             {avatarPreview
               ? <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-              : <span style={{ fontSize: 32, fontFamily: 'monospace', fontWeight: 700, color: 'rgba(var(--fg),0.35)' }}>{initials}</span>
+              : (() => { const SpaceIcon = spaceIconFor(profile || { id: user?.id, email: user?.email }); return <SpaceIcon size={38} weight="regular" />; })()
             }
             {avatarSavedOk && (
               <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
