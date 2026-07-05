@@ -4595,11 +4595,16 @@ const SPLASH_ACID = '#cafd04';
 // Two mascot animations, alternated on each visit so the boot screen varies.
 // The chosen index is advanced in localStorage at module load (once per app
 // open), falling back to a fixed clip if storage is unavailable.
+// Each clip carries its own background colour (sampled from the video's top
+// edge). The splash container is painted that exact colour so the video edge
+// dissolves into the page -- the clips' acid backdrops differ by a couple of
+// percent, which would otherwise show as a faint rectangle against a fixed
+// page colour.
 const SPLASH_CLIPS = [
-  { src: '/splash.mp4', poster: '/splash-poster.jpg' },
-  { src: '/splash2.mp4', poster: '/splash2-poster.jpg' },
-  { src: '/splash3.mp4', poster: '/splash3-poster.jpg' },
-  { src: '/splash4.mp4', poster: '/splash4-poster.jpg' },
+  { src: '/splash.mp4', poster: '/splash-poster.jpg', bg: '#cafe05' },
+  { src: '/splash2.mp4', poster: '/splash2-poster.jpg', bg: '#cafe05' },
+  { src: '/splash3.mp4', poster: '/splash3-poster.jpg', bg: '#c6fc07' },
+  { src: '/splash4.mp4', poster: '/splash4-poster.jpg', bg: '#c8ff0b' },
 ];
 
 const splashClip = (() => {
@@ -4614,7 +4619,7 @@ const splashClip = (() => {
 
 function SplashScreen({ onCycleComplete }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: splashClip.bg || SPLASH_ACID }}>
       <img
         src="/logo-black.png"
         alt="Vinyl Vault"
