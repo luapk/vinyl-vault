@@ -114,7 +114,7 @@ body {
 /* Default avatar (no profile photo): a space/sci-fi icon.
    Dark mode: black icon on acid. Light mode: white icon on black. */
 .vv-avatar-fallback {
-  background: #cafd04;
+  background: #cafe04;
   color: #08080c;
 }
 [data-theme="light"] .vv-avatar-fallback {

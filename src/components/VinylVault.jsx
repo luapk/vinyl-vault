@@ -4376,7 +4376,7 @@ function HowStep({ num, title, desc, Icon, video, poster }) {
   }, [video]);
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: '#cafd04' }}>
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#cafe04' }}>
       <div className="relative w-full aspect-video">
         {video ? (
           <video ref={vidRef} src={video} poster={poster || undefined} muted loop playsInline preload="none"
@@ -4387,7 +4387,7 @@ function HowStep({ num, title, desc, Icon, video, poster }) {
           </div>
         )}
         <span className="absolute top-2.5 left-2.5 w-6 h-6 rounded-full flex items-center justify-center font-mono text-[12px] font-bold"
-          style={{ background: '#08080c', color: '#cafd04' }}>{num}</span>
+          style={{ background: '#08080c', color: '#cafe04' }}>{num}</span>
       </div>
       <div className="px-4 pt-3 pb-4">
         <div className="text-[15px] font-display mb-1" style={{ color: '#08080c' }}>{title}</div>
@@ -4590,7 +4590,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
 // while auth and the first data pull happen. The background colour matches
 // the videos' own backdrop exactly (rgb 202,253,4) so the frame edge is
 // invisible and the animation reads as part of the page.
-const SPLASH_ACID = '#cafd04';
+const SPLASH_ACID = '#cafe04';
 
 // Two mascot animations, alternated on each visit so the boot screen varies.
 // The chosen index is advanced in localStorage at module load (once per app
@@ -4600,7 +4600,7 @@ const SPLASH_ACID = '#cafd04';
 // per-clip tone matching needed.
 // The ?v query busts browser/CDN caches when a clip's bytes are replaced at
 // the same path (e.g. re-keying); bump it whenever the mp4s are reprocessed.
-const SPLASH_V = '2';
+const SPLASH_V = '3';
 const SPLASH_CLIPS = [
   { src: `/splash.mp4?v=${SPLASH_V}`, poster: `/splash-poster.jpg?v=${SPLASH_V}` },
   { src: `/splash2.mp4?v=${SPLASH_V}`, poster: `/splash2-poster.jpg?v=${SPLASH_V}` },

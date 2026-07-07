@@ -4,7 +4,7 @@
   "description": "Archive, identify, mix.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#cafd04",
+  "background_color": "#cafe04",
   "theme_color": "#08080c",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
