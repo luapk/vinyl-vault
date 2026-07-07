@@ -656,14 +656,12 @@ export default function VinylVault() {
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
-  // Splash stays up until the boot animation has played through at least once
-  // (the video's onEnded clears the hold), and for as long as auth is genuinely
-  // still loading. The timer is a safety net so a video that never plays (data
-  // saver, load failure) cannot trap the user; it must exceed the longest clip
-  // (~8s) so a full play-through is never cut short.
+  // Splash stays up for one full loop of the chosen WebP clip (its duration),
+  // and for as long as auth is genuinely still loading. WebP <img> has no
+  // "ended" event, so a per-clip timer stands in; +400ms covers decode/start.
   const [splashHold, setSplashHold] = useState(isSupabaseEnabled);
   useEffect(() => {
-    const t = setTimeout(() => setSplashHold(false), 9000);
+    const t = setTimeout(() => setSplashHold(false), (splashClip.dur || 6) * 1000 + 400);
     return () => clearTimeout(t);
   }, []);
 
@@ -850,7 +848,7 @@ export default function VinylVault() {
     if (showWalkthrough) {
       return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
     }
-    return <SplashScreen onCycleComplete={() => setSplashHold(false)} />;
+    return <SplashScreen />;
   }
   if (isSupabaseEnabled && !authLoading && !user) {
     if (!pricingSeen) {
@@ -4595,17 +4593,17 @@ const SPLASH_ACID = '#cafe04';
 // Two mascot animations, alternated on each visit so the boot screen varies.
 // The chosen index is advanced in localStorage at module load (once per app
 // open), falling back to a fixed clip if storage is unavailable.
-// Every clip's background is chroma-keyed onto the exact canonical acid at
-// build time, so all four (and the page) share one background colour -- no
-// per-clip tone matching needed.
-// The ?v query busts browser/CDN caches when a clip's bytes are replaced at
-// the same path (e.g. re-keying); bump it whenever the mp4s are reprocessed.
-const SPLASH_V = '3';
+// Clips are transparent animated WebP (not video): WebP is sRGB, so there is
+// no YUV colour-range shift -- the transparent background lets the page's own
+// acid show through, making a colour mismatch impossible. `dur` (seconds) is
+// used to hold the splash for one full loop. Bump SPLASH_V when a clip's bytes
+// change at the same path, to bust browser/CDN caches.
+const SPLASH_V = '4';
 const SPLASH_CLIPS = [
-  { src: `/splash.mp4?v=${SPLASH_V}`, poster: `/splash-poster.jpg?v=${SPLASH_V}` },
-  { src: `/splash2.mp4?v=${SPLASH_V}`, poster: `/splash2-poster.jpg?v=${SPLASH_V}` },
-  { src: `/splash3.mp4?v=${SPLASH_V}`, poster: `/splash3-poster.jpg?v=${SPLASH_V}` },
-  { src: `/splash4.mp4?v=${SPLASH_V}`, poster: `/splash4-poster.jpg?v=${SPLASH_V}` },
+  { src: `/splash.webp?v=${SPLASH_V}`, dur: 5 },
+  { src: `/splash2.webp?v=${SPLASH_V}`, dur: 5 },
+  { src: `/splash3.webp?v=${SPLASH_V}`, dur: 8 },
+  { src: `/splash4.webp?v=${SPLASH_V}`, dur: 6 },
 ];
 
 const splashClip = (() => {
@@ -4618,7 +4616,7 @@ const splashClip = (() => {
   }
 })();
 
-function SplashScreen({ onCycleComplete }) {
+function SplashScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
@@ -4627,14 +4625,9 @@ function SplashScreen({ onCycleComplete }) {
         className="w-[54vw] max-w-[300px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
-      <video
+      <img
         src={splashClip.src}
-        poster={splashClip.poster}
-        autoPlay
-        muted
-        playsInline
-        onEnded={(e) => { onCycleComplete?.(); e.target.play().catch(() => {}); }}
-        onError={() => onCycleComplete?.()}
+        alt=""
         className="w-[98vw] max-w-[620px]"
         style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
       />
