@@ -10,6 +10,12 @@ import {
   TIERS as TIER_IDS,
 } from '../lib/pricing.js';
 
+// Brand acid + ink. This screen is deliberately theme-independent: acid page,
+// black chrome, dark cards with white interiors -- matching the splash and app
+// icon (black-on-acid). ACID matches the value the mascot clips decode to.
+const ACID = '#cafe04';
+const INK = '#08080c';
+
 // ---- Tier definitions --------------------------------------------------------
 
 const TIERS = [
@@ -105,20 +111,20 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
   return (
     // Outer wrapper provides space for the overhanging roundel
     <div style={{ paddingTop: OVERLAP, width: '100%', boxSizing: 'border-box' }}>
-      {/* Glass card */}
+      {/* Dark card -- a solid near-black chip so it pops on the acid page.
+          Interior colours are hardcoded white so the card never flips with the
+          app theme (the page is always acid here). */}
       <div style={{
         position: 'relative',
         borderRadius: 22,
         background: comingSoon
-          ? 'linear-gradient(145deg, rgba(var(--fg),0.04) 0%, rgba(var(--fg),0.01) 100%)'
-          : `linear-gradient(145deg, rgba(${accentRGB},0.14) 0%, rgba(${accentRGB},0.05) 55%, rgba(var(--fg),0.02) 100%)`,
-        backdropFilter: 'blur(28px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-        border: `1px solid rgba(var(--fg),${comingSoon ? '0.07' : '0.13'})`,
+          ? '#131217'
+          : `linear-gradient(145deg, rgba(${accentRGB},0.20) 0%, rgba(${accentRGB},0.06) 55%, rgba(255,255,255,0.02) 100%), #121116`,
+        border: `1px solid ${comingSoon ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.14)'}`,
         boxShadow: comingSoon
-          ? '0 8px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(var(--fg),0.07)'
-          : `0 28px 64px -12px rgba(0,0,0,0.9), inset 0 1px 0 rgba(var(--fg),0.18), inset 0 -1px 0 rgba(0,0,0,0.15), 0 0 0 1px rgba(var(--fg),0.06)`,
-        opacity: comingSoon ? 0.58 : 1,
+          ? '0 10px 30px -12px rgba(0,0,0,0.5)'
+          : `0 22px 50px -14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.14)`,
+        opacity: comingSoon ? 0.72 : 1,
         // Top padding makes room for the roundel that overlaps from above
         paddingTop: ROUNDEL_INSIDE + 14,
         paddingBottom: 18,
@@ -141,23 +147,23 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
         }} />
 
         {/* Tier name */}
-        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.32)', marginBottom: 4, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4, textAlign: 'center' }}>
           {name}
         </div>
 
         {/* Price row */}
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5, marginBottom: founding ? 3 : 12 }}>
-          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: comingSoon ? 'rgba(var(--fg),0.32)' : 'rgba(var(--fg),0.92)' }}>
+          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: comingSoon ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.95)' }}>
             {price}
           </span>
           {billing && (
-            <span style={{ fontSize: 11, color: 'rgba(var(--fg),0.28)', fontFamily: 'monospace' }}>{billing}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>{billing}</span>
           )}
         </div>
 
         {/* Founding note */}
         {founding && (
-          <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: `rgb(${accentRGB})`, fontFamily: 'monospace', fontWeight: 600, opacity: 0.65 }}>
+          <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: `rgb(${accentRGB})`, fontFamily: 'monospace', fontWeight: 600, opacity: 0.9 }}>
             {foundingPriceEnvKey && import.meta.env[foundingPriceEnvKey]
               ? <button onClick={handleFounding} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>{founding}</button>
               : founding}
@@ -165,13 +171,13 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
         )}
 
         {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(var(--fg),0.07)', marginBottom: 11 }} />
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 11 }} />
 
         {/* Features */}
         {features.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 7 }}>
-            <Check size={11} weight="bold" style={{ color: 'rgba(var(--fg),0.38)', marginTop: 2, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: 'rgba(var(--fg),0.58)', lineHeight: 1.4 }}>{f}</span>
+            <Check size={11} weight="bold" style={{ color: `rgba(${accentRGB},0.9)`, marginTop: 2, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', lineHeight: 1.4 }}>{f}</span>
           </div>
         ))}
 
@@ -188,11 +194,11 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
             fontWeight: 600,
             letterSpacing: '0.01em',
             cursor: comingSoon || checkoutLoading ? 'default' : 'pointer',
-            border: comingSoon ? '1px solid rgba(var(--fg),0.08)' : `1px solid rgba(${accentRGB},0.45)`,
+            border: comingSoon ? '1px solid rgba(255,255,255,0.08)' : `1px solid rgba(${accentRGB},0.45)`,
             background: comingSoon
-              ? 'rgba(var(--fg),0.04)'
+              ? 'rgba(255,255,255,0.05)'
               : `linear-gradient(160deg, rgba(${accentRGB},0.92) 0%, rgba(${accentRGB},0.65) 100%)`,
-            color: comingSoon ? 'rgba(var(--fg),0.18)' : ctaOnDark ? '#000' : '#fff',
+            color: comingSoon ? 'rgba(255,255,255,0.25)' : ctaOnDark ? '#000' : '#fff',
             boxShadow: comingSoon ? 'none' : `0 4px 20px rgba(${accentRGB},0.28), inset 0 1px 0 rgba(255,255,255,0.18)`,
             transition: 'all 0.15s',
             opacity: checkoutLoading ? 0.7 : 1,
@@ -276,22 +282,22 @@ export function TierCarousel({ onGetStarted, onCheckout }) {
         </div>
       </div>
 
-      {/* Dots + arrows */}
+      {/* Dots + arrows -- dark, sitting on the acid page */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 16 }}>
         <button onClick={() => goTo(idx - 1)} disabled={idx === 0}
-          style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: `rgba(var(--fg),${idx === 0 ? '0.15' : '0.4'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
+          style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: `rgba(8,8,12,${idx === 0 ? '0.2' : '0.55'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
           <CaretLeft size={14} weight="bold" />
         </button>
         <div style={{ display: 'flex', gap: 6 }}>
           {TIERS.map((_, i) => (
             <button key={i} onClick={() => goTo(i)}
               style={{ width: i === idx ? 18 : 5, height: 5, borderRadius: 3, border: 'none', cursor: 'pointer', padding: 0,
-                background: i === idx ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.15)',
+                background: i === idx ? 'rgba(8,8,12,0.7)' : 'rgba(8,8,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.25,1.1,0.5,1)' }} />
           ))}
         </div>
         <button onClick={() => goTo(idx + 1)} disabled={idx === TIERS.length - 1}
-          style={{ background: 'none', border: 'none', cursor: idx === TIERS.length - 1 ? 'default' : 'pointer', color: `rgba(var(--fg),${idx === TIERS.length - 1 ? '0.15' : '0.4'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
+          style={{ background: 'none', border: 'none', cursor: idx === TIERS.length - 1 ? 'default' : 'pointer', color: `rgba(8,8,12,${idx === TIERS.length - 1 ? '0.2' : '0.55'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
           <CaretRight size={14} weight="bold" />
         </button>
       </div>
@@ -304,25 +310,22 @@ export function TierCarousel({ onGetStarted, onCheckout }) {
 export default function PricingScreen({ onGetStarted, onSignIn }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-5 py-8 overflow-y-auto"
-      style={{ background: 'var(--bg-hex)' }}>
-
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(var(--fg),0.04) 0%, transparent 50%)' }} />
+      style={{ background: ACID }}>
 
       <div style={{ width: '100%', maxWidth: 400, position: 'relative' }}>
 
-        {/* Logo -- doubled from 90px to 180px */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20, ...anim(0) }}>
-          <img src="/logo.png" alt="Vinyl Vault"
-            style={{ height: 180, opacity: 0.92 }} />
+        {/* Logo -- black logotype on acid */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, ...anim(0) }}>
+          <img src="/logo-black.png" alt="Vinyl Vault"
+            style={{ width: 'min(58vw, 230px)', height: 'auto' }} />
         </div>
 
         {/* Headline */}
         <div style={{ textAlign: 'center', marginBottom: 24, ...anim(120) }}>
-          <h1 style={{ fontSize: 'clamp(22px, 5.5vw, 30px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, color: 'rgba(var(--fg),0.9)', margin: '0 0 6px' }}>
+          <h1 style={{ fontSize: 'clamp(22px, 5.5vw, 30px)', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.1, color: INK, margin: '0 0 6px' }}>
             For collectors who play out
           </h1>
-          <p style={{ fontSize: 13, color: 'rgba(var(--fg),0.35)', margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: 13, color: 'rgba(8,8,12,0.6)', margin: 0, lineHeight: 1.4 }}>
             Smart vinyl sorting tool, from shelf to booth.
           </p>
         </div>
@@ -334,15 +337,15 @@ export default function PricingScreen({ onGetStarted, onSignIn }) {
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 18, display: 'flex', flexDirection: 'column', gap: 6, ...anim(380) }}>
-          <p style={{ fontSize: 13, color: 'rgba(var(--fg),0.25)', margin: 0 }}>
+          <p style={{ fontSize: 13, color: 'rgba(8,8,12,0.55)', margin: 0 }}>
             Already have an account?{' '}
             <button onClick={onSignIn}
-              style={{ color: 'rgba(var(--fg),0.48)', textDecoration: 'underline', textUnderlineOffset: 3,
+              style={{ color: INK, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3,
                 background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0 }}>
               Sign in
             </button>
           </p>
-          <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(var(--fg),0.16)', margin: 0, letterSpacing: '0.04em' }}>
+          <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(8,8,12,0.4)', margin: 0, letterSpacing: '0.04em' }}>
             Selector and Resident launching soon. Fair use applies.
           </p>
         </div>
