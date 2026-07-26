@@ -200,6 +200,9 @@ export default function ChatPanel({ currentUser, onClose, initialRecipient, acce
     boxShadow: '-16px 0 48px rgba(0,0,0,0.22)',
     zIndex: 45, display: 'flex', flexDirection: 'column',
     animation: 'slideInRight 0.22s cubic-bezier(0.25,0.46,0.45,0.94)',
+    // iOS notch/home-indicator: keep the header and message input tappable.
+    paddingTop: 'env(safe-area-inset-top)',
+    paddingBottom: 'env(safe-area-inset-bottom)',
   };
 
   const btnStyle = { width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(var(--fg),0.07)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(var(--fg),0.55)', flexShrink: 0 };
