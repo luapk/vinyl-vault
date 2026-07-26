@@ -1399,7 +1399,7 @@ function PWAInstallBanner({ accentRGB }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pointer-events-none">
       <div className="mx-auto max-w-md rounded-2xl p-4 pointer-events-auto"
-        style={{ background: 'rgba(20,20,24,0.94)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)', animation: 'fadeUp 0.4s ease-out both' }}>
+        style={{ background: 'rgba(var(--bg),0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)', animation: 'fadeUp 0.4s ease-out both' }}>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.3)` }}>
             <DeviceMobile size={20} style={{ color: `rgb(${accentRGB})` }} />
@@ -2199,7 +2199,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
               {sortMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setSortMenuOpen(false)} />
-                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5" style={{ minWidth: 190, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5" style={{ minWidth: 190, background: 'rgba(var(--bg),0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)' }}>
                     {[['added', 'Recently added'], ['artist', 'Artist A–Z'], ['title', 'Title A–Z'], ['label', 'Label A–Z']].map(([key, label]) => (
                       <button key={key} onClick={() => { setSortBy(key); setSortMenuOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left transition-all"
@@ -2248,7 +2248,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
               {crateMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-20" onClick={() => setCrateMenuOpen(false)} />
-                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+                  <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(var(--bg),0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)' }}>
                     {allCrates.map((c) => {
                       const active = filterCrate === c;
                       return (
@@ -5062,7 +5062,7 @@ function TracksView({ collection, accentRGB, onUpdate, accessToken }) {
           {crateMenuOpen && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setCrateMenuOpen(false)} />
-              <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(20,20,22,0.96)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.7)' }}>
+              <div className="absolute left-0 mt-1.5 z-30 rounded-2xl overflow-hidden py-1.5 max-h-[320px] overflow-y-auto" style={{ minWidth: 220, background: 'rgba(var(--bg),0.97)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(var(--fg),0.12)', boxShadow: '0 24px 60px -12px rgba(0,0,0,0.4)' }}>
                 {allCrates.map(c => {
                   const active = crateFilter === c;
                   return (
