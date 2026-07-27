@@ -41,8 +41,11 @@ function parseDiscogsTitle(combined) {
   return { artist: combined.slice(0, idx), recordTitle: combined.slice(idx + 3) };
 }
 
+// Vinyl Vault is a vinyl-only app: every Discogs search is constrained to
+// format=Vinyl so CD / cassette / file pressings are never returned (and never
+// crowd real vinyl pressings out of the small per_page window).
 function buildSearchUrl(params) {
-  return `${BASE}/database/search?${new URLSearchParams({ type: 'release', per_page: '5', ...params })}`;
+  return `${BASE}/database/search?${new URLSearchParams({ type: 'release', format: 'Vinyl', per_page: '5', ...params })}`;
 }
 
 export async function searchDiscogs({ catalogNumber, artist, title, label, rawText, manual = false }) {
@@ -56,18 +59,18 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
 
   if (catalogNumber) {
     // Broad catno-only search (may return false collisions from other labels)
-    urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&type=release&per_page=5`);
+    urls.add(buildSearchUrl({ catno: catalogNumber }));
     // Normalised variants: strip/replace separators so "PM012" finds "PM-012"
     const stripped = catalogNumber.replace(/[\s\-\.]/g, '');
     const dashed = catalogNumber.replace(/[\s\.]/g, '-');
     for (const variant of new Set([stripped, dashed])) {
       if (variant !== catalogNumber) {
-        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(variant)}&type=release&per_page=5`);
+        urls.add(buildSearchUrl({ catno: variant }));
       }
     }
     // Combined catno + artist: much more targeted, avoids cross-label collisions
     if (artist) {
-      urls.add(`${BASE}/database/search?catno=${encodeURIComponent(catalogNumber)}&artist=${encodeURIComponent(artist)}&type=release&per_page=5`);
+      urls.add(buildSearchUrl({ catno: catalogNumber, artist }));
     }
   }
   if (artist && title) {
@@ -97,10 +100,10 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
       const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
       const rawCatnos = [...new Set([...rawText.matchAll(catnoPattern)].map(m => m[1]))].slice(0, 3);
       for (const c of rawCatnos) {
-        urls.add(`${BASE}/database/search?catno=${encodeURIComponent(c)}&type=release&per_page=5`);
+        urls.add(buildSearchUrl({ catno: c }));
         const stripped = c.replace(/[\s\-]/g, '');
         if (stripped !== c) {
-          urls.add(`${BASE}/database/search?catno=${encodeURIComponent(stripped)}&type=release&per_page=5`);
+          urls.add(buildSearchUrl({ catno: stripped }));
         }
       }
     }
@@ -137,12 +140,20 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
     })
   );
 
-  // Merge and deduplicate — earlier strategies (catNo first) win on ordering
+  // Merge and deduplicate — earlier strategies (catNo first) win on ordering.
+  // Safety net for the format=Vinyl query filter: drop anything whose format is
+  // present and not vinyl (CD, Cassette, File...). Results with no format data
+  // are kept -- Discogs almost always populates it, and dropping them risks
+  // losing a valid vinyl pressing.
+  const isVinyl = (r) => {
+    const fmt = Array.isArray(r.format) ? r.format : (r.format ? [r.format] : []);
+    return fmt.length === 0 || fmt.some(f => /vinyl/i.test(f));
+  };
   const seen = new Set();
   const merged = [];
   for (const batch of batches) {
     for (const r of batch) {
-      if (!seen.has(r.id)) {
+      if (!seen.has(r.id) && isVinyl(r)) {
         seen.add(r.id);
         merged.push(r);
       }
