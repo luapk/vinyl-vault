@@ -18,6 +18,25 @@ import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { supabase } from '../lib/supabase.js';
+
+// A Supabase access token expires ~hourly. The cached token from useAuth stays
+// fresh only while background auto-refresh fires; if the app sat idle the
+// cached token can be expired, so authed API calls (/api/scan) 401. getSession()
+// returns the current token and transparently refreshes an expired one -- we
+// race it against a timeout so a stalled refresh can never hang the call, and
+// fall back to the cached token if it does.
+async function freshAccessToken(fallback) {
+  try {
+    const { data } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 4000)),
+    ]);
+    return data?.session?.access_token || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -862,16 +881,36 @@ export default function VinylVault() {
     return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} initialMode={authInitialMode} />;
   }
 
+  // POST to /api/scan with a guaranteed-fresh access token. If the token is
+  // rejected (401 -- expired while the app sat idle), force one refresh and
+  // retry, so a stale cached token doesn't surface as "Couldn't read that one".
+  const scanFetch = useCallback(async (body, signal) => {
+    const send = (tok) => fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${tok}` },
+      body: JSON.stringify(body),
+      signal,
+    });
+    const token = await freshAccessToken(accessToken);
+    let response = await send(token);
+    if (response.status === 401) {
+      try {
+        const { data } = await Promise.race([
+          supabase.auth.refreshSession(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 4000)),
+        ]);
+        const refreshed = data?.session?.access_token;
+        if (refreshed && refreshed !== token) response = await send(refreshed);
+      } catch { /* fall through with the original 401 */ }
+    }
+    return response;
+  }, [accessToken]);
+
   // Sends a pre-loaded data URL to /api/scan and returns the parsed response.
   // Used by startBatch where files are pre-read upfront. Throws on any error.
   const scanDataUrl = async (dataUrl, signal) => {
     const base64Data = dataUrl.split(",")[1];
-    const response = await fetch("/api/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-      body: JSON.stringify({ image: base64Data, mediaType: "image/jpeg" }),
-      signal,
-    });
+    const response = await scanFetch({ image: base64Data, mediaType: "image/jpeg" }, signal);
     if (response.status === 402) throw new Error("scan_limit_reached");
     if (!response.ok) {
       const errorBody = await response.text();
@@ -950,12 +989,8 @@ export default function VinylVault() {
     setStatus("Pulling release data");
     setErrorMsg("");
     try {
-      const response = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ discogsId: candidate.id, vision: visionData }),
-        signal: controller.signal,
-      });
+      const response = await scanFetch({ discogsId: candidate.id, vision: visionData }, controller.signal);
+      if (response.status === 401) throw new Error('Your session expired. Sign out and back in, then try again.');
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
       if (controller.signal.aborted) return;
@@ -1108,12 +1143,7 @@ export default function VinylVault() {
     syncQueue(snapshot);
 
     try {
-      const response = await fetch("/api/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
-        body: JSON.stringify({ discogsId: candidate.id, vision }),
-        signal: AbortSignal.timeout(50000),
-      });
+      const response = await scanFetch({ discogsId: candidate.id, vision }, AbortSignal.timeout(50000));
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
@@ -2847,15 +2877,25 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
     setReidentifyPicking(true);
     setReidentifyError(null);
     try {
-      // Cached token from useAuth, not getSession(): getSession() can hang
-      // indefinitely during a token refresh, which left reidentifyPicking
-      // stuck true and every candidate button permanently disabled.
-      const res = await fetch('/api/scan', {
+      // freshAccessToken refreshes an expired token (timeout-guarded so it can
+      // never hang the picker); a 401 then forces one refresh + retry so an
+      // idle-expired token doesn't fail the re-identify.
+      const sendReident = (tok) => fetch('/api/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tok}` },
         body: JSON.stringify({ discogsId: candidate.id }),
         signal: AbortSignal.timeout(50000),
       });
+      const reidentToken = await freshAccessToken(accessToken);
+      let res = await sendReident(reidentToken);
+      if (res.status === 401) {
+        const { data } = await Promise.race([
+          supabase.auth.refreshSession(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 4000)),
+        ]).catch(() => ({ data: null }));
+        const refreshed = data?.session?.access_token;
+        if (refreshed && refreshed !== reidentToken) res = await sendReident(refreshed);
+      }
       if (!res.ok) throw new Error(`API ${res.status}`);
       const data = await res.json();
       if (!data.release) throw new Error(data.error || 'No release data returned');
