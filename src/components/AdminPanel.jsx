@@ -8,6 +8,7 @@ export default function AdminPanel({ onBack }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [message, setMessage]   = useState(null);
+  const [savingId, setSavingId] = useState(null);
 
   useEffect(() => {
     loadUsers();
@@ -19,7 +20,7 @@ export default function AdminPanel({ onBack }) {
       // Admins can see all profiles via the RLS policy.
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, email, role, created_at, display_name, username, is_public')
+        .select('id, email, role, created_at, display_name, username, is_public, subscription_tier, subscription_status')
         .order('created_at', { ascending: true });
       if (error) throw error;
 
@@ -69,9 +70,39 @@ export default function AdminPanel({ onBack }) {
     }
   }
 
+  // Admins can update any profile row (profiles_admin_update RLS policy).
+  // Setting a tier also clears the scan block: status -> active and the
+  // current-period scan count -> 0, so the change takes effect immediately
+  // (the user picks it up on their next refresh).
+  async function changeTier(userId, newTier, label) {
+    setSavingId(userId);
+    setMessage(null);
+    const prev = users;
+    setUsers(us => us.map(u => u.id === userId ? { ...u, subscription_tier: newTier, subscription_status: 'active' } : u));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_tier: newTier, subscription_status: 'active', scans_this_period: 0 })
+        .eq('id', userId);
+      if (error) throw error;
+      setMessage({ type: 'success', text: `${label} set to ${newTier[0].toUpperCase() + newTier.slice(1)}` });
+    } catch (err) {
+      setUsers(prev);
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   const inputStyle = {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.1)',
+  };
+
+  const TIER_COLORS = {
+    digger:   'rgba(255,255,255,0.35)',
+    selector: 'rgba(201,255,0,0.9)',
+    resident: 'rgba(172,144,226,0.95)',
   };
 
   return (
@@ -173,9 +204,31 @@ export default function AdminPanel({ onBack }) {
                     {u.email} &middot; {u.role === 'admin' ? 'Admin' : 'User'} &middot; {u.recordCount} record{u.recordCount !== 1 ? 's' : ''}
                   </p>
                 </div>
-                <span className="text-xs text-white/20 flex-shrink-0">
-                  {new Date(u.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <select
+                    value={u.subscription_tier || 'digger'}
+                    onChange={e => changeTier(u.id, e.target.value, u.display_name || u.email)}
+                    disabled={savingId === u.id}
+                    title="Access tier"
+                    className="text-xs rounded-lg pl-2.5 pr-6 py-1.5 outline-none cursor-pointer transition-opacity"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${TIER_COLORS[u.subscription_tier] || TIER_COLORS.digger}`,
+                      color: TIER_COLORS[u.subscription_tier] || 'rgba(255,255,255,0.75)',
+                      opacity: savingId === u.id ? 0.4 : 1,
+                      appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                      backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23888\' stroke-width=\'3\'><path d=\'M6 9l6 6 6-6\'/></svg>")',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 7px center',
+                    }}>
+                    <option value="digger"   style={{ color: '#000' }}>Digger (free)</option>
+                    <option value="selector" style={{ color: '#000' }}>Selector</option>
+                    <option value="resident" style={{ color: '#000' }}>Resident</option>
+                  </select>
+                  <span className="text-[10px] text-white/20">
+                    {new Date(u.created_at).toLocaleDateString()}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>
