@@ -884,7 +884,9 @@ export default function VinylVault() {
   // POST to /api/scan with a guaranteed-fresh access token. If the token is
   // rejected (401 -- expired while the app sat idle), force one refresh and
   // retry, so a stale cached token doesn't surface as "Couldn't read that one".
-  const scanFetch = useCallback(async (body, signal) => {
+  // Plain function (not useCallback): it lives below the early gate returns, so
+  // it must not be a hook.
+  const scanFetch = async (body, signal) => {
     const send = (tok) => fetch("/api/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${tok}` },
@@ -904,7 +906,7 @@ export default function VinylVault() {
       } catch { /* fall through with the original 401 */ }
     }
     return response;
-  }, [accessToken]);
+  };
 
   // Sends a pre-loaded data URL to /api/scan and returns the parsed response.
   // Used by startBatch where files are pre-read upfront. Throws on any error.
