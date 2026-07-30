@@ -174,45 +174,34 @@ export function useCollection(userId = null) {
     if (!useDb) { dbHasData.current = false; return; }
     dbLoad(userId).then(async records => {
       records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
-      const rawRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+      const dbRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
 
-      // Deduplicate by artist+title, keeping the newest copy and deleting orphan rows.
-      // Ghost rows are created when a record is re-scanned (addRecord previously inserted
-      // a new DB row on every scan, even for records already in the collection).
-      const seen = new Map();
-      for (const r of rawRecords) {
-        const key = `${r.artist}|||${r.title}`;
-        const prev = seen.get(key);
-        if (prev) {
-          const dropOld = (r.savedAt || 0) >= (prev.savedAt || 0);
-          const orphan = dropOld ? prev : r;
-          const orphanDbId = dbIds.current[orphan.id];
-          if (orphanDbId) {
-            dbDelete(orphanDbId).catch(() => {});
-            delete dbIds.current[orphan.id];
-          }
-          if (dropOld) seen.set(key, r);
-        } else {
-          seen.set(key, r);
-        }
-      }
-      const dbRecords = [...seen.values()];
+      // Records are keyed by their stable local `id` (the UUID inside the data
+      // blob). We NEVER delete rows on load: two records that merely share
+      // artist+title -- a double, a different pressing, two same-album scans in
+      // one batch, or an as-yet-unidentified scan with a blank artist/title --
+      // are legitimately distinct and must all survive. (The old load-time
+      // "ghost row" dedup deleted one of every such pair, silently losing
+      // records; new duplicate DB rows are already prevented at insert time by
+      // addRecord/addRecordsBulk.)
       const confirmed = new Set(dbRecords.map(r => r.id));
+      const dbIdSet = new Set(dbRecords.map(r => r.id));
 
-      // Push localStorage records that are not yet in Supabase into the DB.
+      // Push any localStorage record not yet in the DB, matched by stable id.
+      // This also recovers a record whose insert failed mid-scan: it stayed in
+      // localStorage but never reached Supabase, and would otherwise vanish on
+      // the next load.
       const local = load();
-      if (local.length > 0) {
-        const dbKeys = new Set(dbRecords.map(r => `${r.artist}|||${r.title}`));
-        for (const record of local) {
-          if (!dbKeys.has(`${record.artist}|||${record.title}`)) {
-            try {
-              const dbId = await dbInsert(userId, record);
-              dbIds.current[record.id] = dbId;
-              dbRecords.unshift(record);
-              confirmed.add(record.id);
-            } catch (e) {
-              console.error('Migration failed for record', record.artist, record.title, e);
-            }
+      for (const record of local) {
+        if (record?.id && !dbIdSet.has(record.id)) {
+          try {
+            const dbId = await dbInsert(userId, record);
+            dbIds.current[record.id] = dbId;
+            dbRecords.unshift(record);
+            confirmed.add(record.id);
+            dbIdSet.add(record.id);
+          } catch (e) {
+            console.error('Migration failed for record', record.artist, record.title, e);
           }
         }
       }
