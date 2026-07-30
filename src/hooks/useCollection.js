@@ -56,20 +56,26 @@ function reducer(state, action) {
     case 'SET':
       return action.records;
     case 'ADD': {
-      const idx = state.findIndex(
-        r => r.artist === action.record.artist && r.title === action.record.title
-      );
+      const rec = action.record;
+      // Record identity is the Discogs release id. Re-scanning the same release
+      // updates it in place; a different pressing (different discogsId) is kept
+      // separately; and an unidentified record (no discogsId) is ALWAYS treated
+      // as new so it can never be merged away. Matching on artist+title was the
+      // data-loss bug -- doubles, pressings and blank-field scans all collided.
+      const idx = rec.discogsId
+        ? state.findIndex(r => r.discogsId && r.discogsId === rec.discogsId)
+        : -1;
       if (idx >= 0) {
         const next = [...state];
         const old = state[idx];
         // Merge: keep existing user-assigned crates when re-saving the same record
-        const crates = [...new Set([...(old.crates || []), ...(action.record.crates || [])])];
+        const crates = [...new Set([...(old.crates || []), ...(rec.crates || [])])];
         // Spread old first so fields the normaliser doesn't know about
         // (priceData, priceCheckedAt) survive a re-scan.
-        next[idx] = { ...old, ...action.record, id: old.id, savedAt: Date.now(), crates };
+        next[idx] = { ...old, ...rec, id: old.id, savedAt: Date.now(), crates };
         return next;
       }
-      return [action.record, ...state];
+      return [rec, ...state];
     }
     case 'REMOVE':
       return state.filter(r => r.id !== action.id);
@@ -90,10 +96,6 @@ function reducer(state, action) {
     default:
       return state;
   }
-}
-
-function localNormalizeKey(artist, title) {
-  return `${artist}${title}`.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 // ─── Supabase persistence helpers ─────────────────────────────────────────────
@@ -233,11 +235,17 @@ export function useCollection(userId = null) {
 
   const addRecord = useCallback((release, crates = []) => {
     const record = recordFromRelease(release, crates);
-    // Check for a duplicate before dispatching so we can decide insert vs update.
-    const existing = collectionRef.current.find(
-      r => r.artist === record.artist && r.title === record.title
-    );
+    // Duplicate = same Discogs release. Unidentified records (no discogsId) are
+    // never duplicates, so they always insert as a fresh row.
+    const existing = record.discogsId
+      ? collectionRef.current.find(r => r.discogsId && r.discogsId === record.discogsId)
+      : null;
     dispatch({ type: 'ADD', record });
+    // Persist a brand-new record to localStorage immediately (the debounced
+    // effect could miss it if the app closes/crashes within 800ms).
+    if (!existing) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...collectionRef.current])); } catch { /* storage full */ }
+    }
     if (!useDb) return Promise.resolve();
     if (existing && dbIds.current[existing.id]) {
       // Duplicate: update the existing DB row instead of creating a ghost second row.
@@ -314,18 +322,24 @@ export function useCollection(userId = null) {
 
   const addRecordsBulk = useCallback(async (releases) => {
     const existing = collectionRef.current;
+    // Skip only genuine duplicates -- same Discogs release id, whether already
+    // in the collection or earlier in this same batch. Records without a
+    // discogsId (unidentified) are always kept: they must never be dropped as
+    // "duplicates" just because they share a blank artist/title.
+    const seenDiscogs = new Set(existing.map(e => e.discogsId).filter(Boolean));
     const newRecords = [];
     for (const release of releases) {
       const r = recordFromRelease(release, []);
-      const isDupe = existing.some(
-        e =>
-          (r.discogsId && e.discogsId === r.discogsId) ||
-          localNormalizeKey(r.artist, r.title) === localNormalizeKey(e.artist, e.title)
-      );
-      if (!isDupe) newRecords.push(r);
+      if (r.discogsId && seenDiscogs.has(r.discogsId)) continue;
+      if (r.discogsId) seenDiscogs.add(r.discogsId);
+      newRecords.push(r);
     }
     if (newRecords.length > 0) {
       dispatch({ type: 'BULK_ADD', records: newRecords });
+      // Persist immediately (the effect that writes localStorage is debounced
+      // 800ms; a crash inside that window after a batch scan would otherwise
+      // lose freshly-added records that also hadn't reached Supabase yet).
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...newRecords, ...existing])); } catch { /* storage full */ }
       if (useDb) {
         try {
           const { data, error } = await supabase
