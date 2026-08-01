@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { UserCircle, EnvelopeSimple, ArrowLeft, Crown, ArrowClockwise } from '@phosphor-icons/react';
+import { UserCircle, EnvelopeSimple, ArrowLeft, Crown, ArrowClockwise, Stack } from '@phosphor-icons/react';
 
 export default function AdminPanel({ onBack }) {
   const [users, setUsers]       = useState([]);
@@ -9,6 +9,11 @@ export default function AdminPanel({ onBack }) {
   const [inviting, setInviting] = useState(false);
   const [message, setMessage]   = useState(null);
   const [savingId, setSavingId] = useState(null);
+  // Bulk restore
+  const [restoreUserId, setRestoreUserId] = useState('');
+  const [restoreText, setRestoreText] = useState('');
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreResults, setRestoreResults] = useState(null);
 
   useEffect(() => {
     loadUsers();
@@ -94,6 +99,39 @@ export default function AdminPanel({ onBack }) {
     }
   }
 
+  // Bulk restore: each line is "Artist - Title". The server resolves every
+  // line against Discogs (vinyl only) and inserts the matches into the chosen
+  // user's collection. dryRun previews the matches without writing.
+  async function runRestore(dryRun) {
+    const lines = restoreText.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!restoreUserId || lines.length === 0) return;
+    setRestoreBusy(true);
+    setRestoreResults(null);
+    setMessage(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin-add-records', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ userId: restoreUserId, lines, dryRun }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `API ${res.status}`);
+      setRestoreResults(data);
+      if (!dryRun) {
+        setMessage({ type: 'success', text: `Added ${data.added} record${data.added === 1 ? '' : 's'}` });
+        loadUsers();
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   const inputStyle = {
     background: 'rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.1)',
@@ -161,6 +199,93 @@ export default function AdminPanel({ onBack }) {
             }}>
             {message.text}
           </p>
+        )}
+      </div>
+
+      {/* Bulk restore records to a user */}
+      <div className="rounded-2xl p-5 mb-6"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <h2 className="text-sm font-semibold text-white/70 mb-1 flex items-center gap-2">
+          <Stack size={16} className="text-emerald-400" />
+          Restore records to a collection
+        </h2>
+        <p className="text-[11px] text-white/35 mb-4 leading-relaxed">
+          One record per line as <span className="text-white/55 font-mono">Artist - Title</span>. Each line is matched
+          on Discogs (vinyl only, best cover match) and added to the chosen collection. Preview first, then add.
+          Records already present are skipped.
+        </p>
+
+        <select
+          value={restoreUserId}
+          onChange={e => { setRestoreUserId(e.target.value); setRestoreResults(null); }}
+          className="w-full mb-2 px-3 py-2.5 rounded-xl text-sm outline-none"
+          style={{ ...inputStyle, color: restoreUserId ? '#fff' : 'rgba(255,255,255,0.35)' }}>
+          <option value="" style={{ color: '#000' }}>Choose a collection…</option>
+          {users.map(u => (
+            <option key={u.id} value={u.id} style={{ color: '#000' }}>
+              {(u.display_name || u.email)} — {u.recordCount} record{u.recordCount === 1 ? '' : 's'}
+            </option>
+          ))}
+        </select>
+
+        <textarea
+          value={restoreText}
+          onChange={e => setRestoreText(e.target.value)}
+          rows={8}
+          spellCheck={false}
+          placeholder={'Pavement - Slanted and Enchanted\nThe Killers - Hot Fuss\nBjörk - Debut'}
+          className="w-full px-3 py-2.5 rounded-xl text-[13px] font-mono text-white placeholder-white/20 outline-none resize-y"
+          style={inputStyle}
+        />
+
+        <div className="flex items-center gap-2 mt-3">
+          <button onClick={() => runRestore(true)} disabled={restoreBusy || !restoreUserId || !restoreText.trim()}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.8)' }}>
+            {restoreBusy ? 'Working…' : 'Preview matches'}
+          </button>
+          <button onClick={() => runRestore(false)} disabled={restoreBusy || !restoreUserId || !restoreText.trim()}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
+            style={{ background: 'rgba(34,197,94,0.55)', border: '1px solid rgba(34,197,94,0.5)' }}>
+            Add to collection
+          </button>
+          <span className="text-[11px] text-white/30 ml-auto">
+            {restoreText.split('\n').filter(l => l.trim()).length} line(s)
+          </span>
+        </div>
+
+        {restoreResults && (
+          <ul className="mt-4 space-y-1 max-h-72 overflow-y-auto">
+            {restoreResults.results.map((r, i) => {
+              const ok = r.status === 'added' || r.status === 'matched';
+              const skip = r.status === 'already_present';
+              return (
+                <li key={i} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  {r.coverUrl
+                    ? <img src={r.coverUrl} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                    : <div className="w-8 h-8 rounded flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }} />}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] text-white/85 truncate">
+                      {ok || skip ? `${r.artist} — ${r.title}` : r.line}
+                    </div>
+                    <div className="text-[10px] text-white/35 truncate">
+                      {ok || skip
+                        ? [r.year, r.label, r.tracks ? `${r.tracks} tracks` : null].filter(Boolean).join(' · ') || r.line
+                        : r.error || 'no vinyl match found'}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded"
+                    style={{
+                      color: ok ? '#86efac' : skip ? 'rgba(255,255,255,0.4)' : '#fca5a5',
+                      background: ok ? 'rgba(34,197,94,0.12)' : skip ? 'rgba(255,255,255,0.06)' : 'rgba(239,68,68,0.12)',
+                    }}>
+                    {r.status}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
