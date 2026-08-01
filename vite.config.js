@@ -8,6 +8,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['api/**/*.test.js'],
+    include: ['api/**/*.test.js', 'src/**/*.test.js'],
   },
 });

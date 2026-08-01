@@ -1,12 +1,28 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
 import { cacheCover, isCachedCover } from '../lib/coverCache';
+import { planLoadMerge } from '../lib/collectionMerge';
 
 const STORAGE_KEY = 'vinylvault_collection';
+const BACKUP_KEY = 'vinylvault_collection_backup';
+const TOMBSTONE_KEY = 'vinylvault_deleted_ids';
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
   catch { return []; }
+}
+
+// Explicit user deletions, remembered so a deleted record is never
+// resurrected by the local->cloud merge. Bounded to the most recent 400.
+function loadTombstones() {
+  try { return new Set(JSON.parse(localStorage.getItem(TOMBSTONE_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function addTombstone(id) {
+  try {
+    const t = [...loadTombstones(), id].slice(-400);
+    localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(t));
+  } catch { /* storage full */ }
 }
 
 function recordFromRelease(release, crates) {
@@ -149,6 +165,9 @@ export function useCollection(userId = null) {
   // True once dbLoad has confirmed the DB has records for this user.
   // Prevents an empty DB response from wiping a non-empty local collection.
   const dbHasData = useRef(false);
+  // True once the initial dbLoad+merge has completed; gates the background
+  // retry so it can't insert duplicates before dbIds is populated.
+  const dbLoadedRef = useRef(false);
   // Mirror of collection so async writers can read the latest state without
   // dispatch-then-read races (needed for partial updates like crate changes).
   const collectionRef = useRef(collection);
@@ -171,45 +190,53 @@ export function useCollection(userId = null) {
   }, [useDb, userId]);
 
   // Load from Supabase when userId arrives or changes.
-  // Also migrates any localStorage-only records into Supabase so all devices stay in sync.
+  // MERGE, never replace: the cloud view and the local view are combined so a
+  // record present on this device can only leave the collection via an
+  // explicit user delete. This is the invariant that ends the data-loss bugs:
+  // previously the load "SET" replaced state with the cloud view, so any
+  // record whose insert had failed (e.g. every scan made while the session was
+  // expired) was dropped from state -- and the debounced localStorage write
+  // then destroyed the only remaining copy.
   useEffect(() => {
     if (!useDb) { dbHasData.current = false; return; }
-    dbLoad(userId).then(async records => {
-      records.forEach(r => { if (r._dbId) dbIds.current[r.id] = r._dbId; });
-      const dbRecords = records.map(r => { const c = { ...r }; delete c._dbId; return c; });
+    dbLoad(userId).then(async rows => {
+      // The merge decision is a pure, unit-tested function (collectionMerge.js).
+      // Its invariant: local records are NEVER dropped -- whether or not their
+      // upload succeeded -- unless the user explicitly deleted them
+      // (tombstone). Trade-off, chosen deliberately: a record deleted on
+      // another device can reappear here (annoying, recoverable) rather than
+      // an unsynced record being destroyed (catastrophic, unrecoverable).
+      const plan = planLoadMerge(rows, [...collectionRef.current, ...load()], loadTombstones());
+      const dbRecords = plan.records;
+      Object.assign(dbIds.current, plan.dbIdMap);
+      for (const rowId of plan.spareRowIds) dbDelete(rowId).catch(() => {});
 
-      // Records are keyed by their stable local `id` (the UUID inside the data
-      // blob). We NEVER delete rows on load: two records that merely share
-      // artist+title -- a double, a different pressing, two same-album scans in
-      // one batch, or an as-yet-unidentified scan with a blank artist/title --
-      // are legitimately distinct and must all survive. (The old load-time
-      // "ghost row" dedup deleted one of every such pair, silently losing
-      // records; new duplicate DB rows are already prevented at insert time by
-      // addRecord/addRecordsBulk.)
-      const confirmed = new Set(dbRecords.map(r => r.id));
-      const dbIdSet = new Set(dbRecords.map(r => r.id));
-
-      // Push any localStorage record not yet in the DB, matched by stable id.
-      // This also recovers a record whose insert failed mid-scan: it stayed in
-      // localStorage but never reached Supabase, and would otherwise vanish on
-      // the next load.
-      const local = load();
-      for (const record of local) {
-        if (record?.id && !dbIdSet.has(record.id)) {
-          try {
-            const dbId = await dbInsert(userId, record);
-            dbIds.current[record.id] = dbId;
-            dbRecords.unshift(record);
-            confirmed.add(record.id);
-            dbIdSet.add(record.id);
-          } catch (e) {
-            console.error('Migration failed for record', record.artist, record.title, e);
-          }
+      const confirmed = new Set(Object.keys(plan.dbIdMap));
+      // Upload local-only records; a failure leaves the record in state as
+      // unsynced (amber badge) and the background retry keeps trying.
+      for (const record of plan.toInsert) {
+        try {
+          const dbId = await dbInsert(userId, record);
+          dbIds.current[record.id] = dbId;
+          confirmed.add(record.id);
+        } catch (e) {
+          console.error('Sync pending for', record.artist || '(unidentified)', record.title || '', e);
         }
       }
 
+      // Paranoia snapshot: if this merge would still drop any id present in
+      // current state, stash the pre-merge state in a backup key first so a
+      // future bug can never destroy the last copy of a collection.
+      try {
+        const nextIds = new Set(dbRecords.map(r => r.id));
+        if (collectionRef.current.some(r => r?.id && !nextIds.has(r.id))) {
+          localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), records: collectionRef.current }));
+        }
+      } catch { /* storage full */ }
+
       if (dbRecords.length === 0 && !dbHasData.current) return;
       dbHasData.current = dbRecords.length > 0;
+      dbLoadedRef.current = true;
       setSyncedIds(confirmed);
       dispatch({ type: 'SET', records: dbRecords });
 
@@ -220,6 +247,31 @@ export function useCollection(userId = null) {
         .slice(0, 10);
       for (const r of uncached) await cacheCoverFor(r);
     }).catch(console.error);
+  }, [useDb, userId, cacheCoverFor]);
+
+  // Background retry: any record still without a DB row is re-attempted every
+  // 25s while logged in. Transient failures -- an expired session mid-scan, a
+  // network drop -- become eventual consistency instead of silent loss. Stops
+  // at the first failure each tick (if one insert fails, e.g. session dead,
+  // the rest will too) and tries again next tick.
+  useEffect(() => {
+    if (!useDb) return;
+    const t = setInterval(async () => {
+      if (!dbLoadedRef.current) return;
+      const tombstones = loadTombstones();
+      const unsynced = collectionRef.current.filter(
+        r => r?.id && !dbIds.current[r.id] && !tombstones.has(r.id)
+      );
+      for (const r of unsynced) {
+        try {
+          const dbId = await dbInsert(userId, r);
+          dbIds.current[r.id] = dbId;
+          setSyncedIds(s => new Set([...(s || []), r.id]));
+          cacheCoverFor(r);
+        } catch { break; }
+      }
+    }, 25000);
+    return () => clearInterval(t);
   }, [useDb, userId, cacheCoverFor]);
 
   // Always persist to localStorage so logout never destroys local data.
@@ -259,11 +311,18 @@ export function useCollection(userId = null) {
       dbIds.current[record.id] = dbId;
       setSyncedIds(s => s ? new Set([...s, record.id]) : new Set([record.id]));
       cacheCoverFor(record);
+    }).catch(e => {
+      // Insert failed (dead session, offline): the record stays in state and
+      // localStorage as unsynced; the background retry will land it later.
+      console.error('Sync pending for', record.artist || '(unidentified)', e);
     });
   }, [useDb, userId, cacheCoverFor]);
 
   const removeRecord = useCallback((id) => {
     dispatch({ type: 'REMOVE', id });
+    // Tombstone the explicit delete so the local->cloud merge never
+    // resurrects it.
+    addTombstone(id);
     if (!useDb) return;
     if (dbIds.current[id]) {
       dbDelete(dbIds.current[id]).catch(console.error);
