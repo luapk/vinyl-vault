@@ -30,7 +30,7 @@ async function freshAccessToken(fallback) {
   try {
     const { data } = await Promise.race([
       supabase.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 4000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 8000)),
     ]);
     return data?.session?.access_token || fallback;
   } catch {
@@ -899,7 +899,7 @@ export default function VinylVault() {
       try {
         const { data } = await Promise.race([
           supabase.auth.refreshSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 4000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 8000)),
         ]);
         const refreshed = data?.session?.access_token;
         if (refreshed && refreshed !== token) response = await send(refreshed);
@@ -2893,7 +2893,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
       if (res.status === 401) {
         const { data } = await Promise.race([
           supabase.auth.refreshSession(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 4000)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('refresh timeout')), 8000)),
         ]).catch(() => ({ data: null }));
         const refreshed = data?.session?.access_token;
         if (refreshed && refreshed !== reidentToken) res = await sendReident(refreshed);

@@ -131,7 +131,7 @@ Each record is a JSON blob stored in the `data` jsonb column:
 
 ## Known quirks
 
-- **Auth lock**: `supabase.js` overrides the supabase-js cross-tab auth lock with a no-op. The default `navigator.locks` implementation can deadlock when a previous tab hangs during token refresh, freezing all DB queries. The trade-off is a possible duplicate refresh call from two tabs simultaneously (harmless).
+- **Auth lock**: `supabase.js` wraps the supabase-js cross-tab auth lock in a bounded-wait `navigator.locks` implementation (5s cap, then proceeds unlocked). Both extremes are broken: the library's default lock can deadlock forever when a tab hangs mid-refresh (freezing all DB queries), while a no-op lock (used previously) let two contexts sharing storage -- a Chrome tab plus the installed PWA window -- refresh the same rotated refresh token concurrently, tripping Supabase reuse detection and revoking the whole session ("session expired" sign-outs). Do not revert to either extreme.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
