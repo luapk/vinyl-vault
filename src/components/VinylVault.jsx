@@ -18,6 +18,7 @@ import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { parseImportRows } from '../lib/importParse.js';
 import { supabase } from '../lib/supabase.js';
 
 // A Supabase access token expires ~hourly. The cached token from useAuth stays
@@ -3391,6 +3392,93 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
     }
   }
 
+  // File import (CSV / text) state
+  const [fileImporting, setFileImporting] = useState(false);
+  const [fileProgress, setFileProgress] = useState({ done: 0, total: 0, matched: 0 });
+  const [fileResult, setFileResult] = useState(null);
+  const [fileError, setFileError] = useState('');
+  const cancelFileImport = useRef(false);
+  const importFileRef = useRef(null);
+
+  // Resolve each parsed row against Discogs (vinyl-only search) and bulk-add.
+  // Maximum-recall policy: a row is NEVER dropped. Best match wins (preferring
+  // one with cover art); a row with no match is still added as a draft record
+  // (identified: false) carrying the artist/title, which the user fine-tunes
+  // via Re-identify in the record detail panel. Matched rows use source
+  // 'discogs_import' so the existing lazy enrichment pulls their tracklist on
+  // first open.
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || fileImporting) return;
+    let rows;
+    try {
+      rows = parseImportRows(await file.text());
+    } catch {
+      setFileError('Could not read that file.');
+      return;
+    }
+    if (!rows.length) {
+      setFileError('No records found. Use CSV columns like artist,title or lines like "Artist - Title".');
+      return;
+    }
+    cancelFileImport.current = false;
+    setFileImporting(true);
+    setFileError('');
+    setFileResult(null);
+    setFileProgress({ done: 0, total: rows.length, matched: 0 });
+
+    let matched = 0, drafts = 0, added = 0, skipped = 0;
+    let batch = [];
+    const flush = async () => {
+      if (!batch.length) return;
+      const res = await onAddRecordsBulk(batch);
+      added += res.added;
+      skipped += res.skipped;
+      batch = [];
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+      if (cancelFileImport.current) break;
+      const row = rows[i];
+      let release = null;
+      try {
+        const res = await fetch('/api/discogs-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ artist: row.artist, title: row.title }),
+        });
+        const data = await res.json();
+        const m = (data.matches || []).find(x => x.coverUrl) || (data.matches || [])[0];
+        if (m) {
+          matched++;
+          release = {
+            id: m.id, artist: m.artist || row.artist, title: m.recordTitle || row.title,
+            label: m.label, catalogNumber: m.catalogNumber, year: m.year,
+            country: m.country, format: m.format, genres: [], tracklist: [],
+            coverUrl: m.coverUrl, source: 'discogs_import',
+          };
+        }
+      } catch { /* network hiccup: fall through to draft */ }
+      if (!release) {
+        drafts++;
+        release = {
+          id: null, artist: row.artist, title: row.title || '(untitled)',
+          genres: [], tracklist: [], coverUrl: null,
+          identified: false, confidence: 'low', source: 'file_import',
+        };
+      }
+      batch.push(release);
+      if (batch.length >= 10) await flush();
+      setFileProgress({ done: i + 1, total: rows.length, matched });
+      // Pace the Discogs fan-out to stay inside the shared rate limit.
+      if (i < rows.length - 1) await new Promise(r => setTimeout(r, 650));
+    }
+    await flush();
+    setFileResult({ added, skipped, matched, drafts });
+    setFileImporting(false);
+  }
+
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
   }
@@ -3750,6 +3838,71 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                   onClick={() => { setImportResult(null); setImportError(''); }}
                   style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Import again
+                </button>
+              </div>
+            )}
+          </AccountSection>
+
+          <AccountSection label="Import from file" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
+            {!fileImporting && !fileResult && (
+              <>
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>
+                  Upload a CSV or text file of records. Any list works: CSV columns like <span style={{ color: 'rgba(var(--fg),0.6)' }}>artist,title</span>, or plain lines like <span style={{ color: 'rgba(var(--fg),0.6)' }}>Artist - Title</span>.
+                </p>
+                <p style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 12 }}>
+                  Each row is matched to the most likely vinyl release. Rows with no match are still added as drafts to fine-tune with Re-identify.
+                </p>
+                <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
+                <button onClick={() => importFileRef.current?.click()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
+                    color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)',
+                    border: 'none', cursor: 'pointer',
+                  }}>
+                  <Upload size={15} />Choose file
+                </button>
+                {fileError && (
+                  <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginTop: 10 }}>{fileError}</p>
+                )}
+              </>
+            )}
+            {fileImporting && (
+              <div>
+                <div style={{ height: 6, borderRadius: 3, background: 'rgba(var(--fg),0.06)', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{
+                    height: '100%', borderRadius: 3, background: 'rgba(var(--fg),0.35)',
+                    width: fileProgress.total > 0 ? `${Math.min((fileProgress.done / fileProgress.total) * 100, 100)}%` : '0%',
+                    transition: 'width 0.3s',
+                  }} />
+                </div>
+                <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 10 }}>
+                  {fileProgress.done} / {fileProgress.total} · {fileProgress.matched} matched
+                </p>
+                <button onClick={() => { cancelFileImport.current = true; }}
+                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Stop here
+                </button>
+              </div>
+            )}
+            {!fileImporting && fileResult && (
+              <div>
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Check size={14} weight="bold" />Added {fileResult.added} record{fileResult.added === 1 ? '' : 's'}
+                </p>
+                {fileResult.drafts > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', marginBottom: 4 }}>
+                    {fileResult.drafts} added as drafts -- open the record and use Re-identify to pin the exact release
+                  </p>
+                )}
+                {fileResult.skipped > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>
+                    {fileResult.skipped} duplicates skipped
+                  </p>
+                )}
+                <button onClick={() => { setFileResult(null); setFileError(''); }}
+                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 6 }}>
+                  Import another file
                 </button>
               </div>
             )}
