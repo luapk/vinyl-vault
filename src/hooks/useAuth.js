@@ -23,11 +23,14 @@ export function useAuth() {
 
   const fetchProfile = useCallback(async (userId) => {
     if (!supabase || !userId) return null;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id, email, role, avatar_url, display_name, username, bio, is_public, preferences, subscription_tier, subscription_status, scans_this_period, scans_period_end')
       .eq('id', userId)
       .single();
+    // Don't swallow failures silently: the self-healing effect below retries
+    // on null, and the log makes cold-start failures diagnosable.
+    if (error) console.log('[profile] fetch failed:', error.message);
     return data || null;
   }, []);
 
@@ -76,6 +79,31 @@ export function useAuth() {
     );
     return () => subscription.unsubscribe();
   }, [fetchProfile, fetchProfileOnce]);
+
+  // Self-healing profile load. The boot-time fetch can fail silently on a
+  // cold start: the stored access token may be expired and the query races
+  // its refresh, or the first request dies on a flaky mobile connection.
+  // Without the profile the avatar, admin access and tier are missing until
+  // a manual refresh. While signed in with no profile (or a stale one from a
+  // previous account), retry with backoff until it lands. Purely additive:
+  // it does nothing whenever the normal path succeeds.
+  useEffect(() => {
+    if (!user?.id || profile?.id === user.id) return;
+    let cancelled = false;
+    let attempt = 0;
+    let timer;
+    const tryFetch = async () => {
+      if (cancelled) return;
+      const p = await fetchProfile(user.id).catch(() => null);
+      if (cancelled) return;
+      if (p) { setProfile(p); return; }
+      attempt++;
+      timer = setTimeout(tryFetch, Math.min(1000 * 2 ** attempt, 20000));
+    };
+    // Give the normal boot path a moment to land before the first retry.
+    timer = setTimeout(tryFetch, 800);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [user?.id, profile?.id, fetchProfile]);
 
   const signIn = useCallback(async (usernameOrEmail, password) => {
     if (!supabase) throw new Error('Supabase not configured');
