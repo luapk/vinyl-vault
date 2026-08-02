@@ -5684,6 +5684,17 @@ function CameraModal({ onCapture, onClose }) {
   const [flash, setFlash] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const startedRef = useRef(false);
+  // Viewfinder mode: 'label' (circular guide + centre crop, catno-optimised)
+  // or 'sleeve' (square corner-bracket guide + full-frame capture). Persisted
+  // so the preference sticks between scans.
+  const [scanMode, setScanMode] = useState(() => {
+    try { return localStorage.getItem('vv_scan_mode') === 'sleeve' ? 'sleeve' : 'label'; }
+    catch { return 'label'; }
+  });
+  const switchMode = (m) => {
+    setScanMode(m);
+    try { localStorage.setItem('vv_scan_mode', m); } catch { /* private mode */ }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -5746,21 +5757,30 @@ function CameraModal({ onCapture, onClose }) {
     setCapturing(true);
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
-    // Centre-square crop matching the circular viewfinder: the guide occupies
-    // <=82% of the smaller screen dimension and the video is object-cover, so
-    // a 90%-of-min-dimension square safely contains everything inside the
-    // circle while shedding background clutter -- the label fills more of the
-    // frame, which directly raises OCR accuracy on the catalogue number.
-    const side = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.9);
-    const sx = Math.round((v.videoWidth - side) / 2);
-    const sy = Math.round((v.videoHeight - side) / 2);
     // Cap the capture canvas: full-resolution iPhone sensors (up to ~4032x3024)
     // can spike memory enough to crash the tab. The scan pipeline downsizes again.
     const MAX = 1600;
-    const scale = Math.min(1, MAX / side);
     const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = Math.round(side * scale);
-    canvas.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+    if (scanMode === 'label') {
+      // Centre-square crop matching the circular viewfinder: the guide occupies
+      // <=82% of the smaller screen dimension and the video is object-cover, so
+      // a 90%-of-min-dimension square safely contains everything inside the
+      // circle while shedding background clutter -- the label fills more of the
+      // frame, which directly raises OCR accuracy on the catalogue number.
+      const side = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.9);
+      const sx = Math.round((v.videoWidth - side) / 2);
+      const sy = Math.round((v.videoHeight - side) / 2);
+      const scale = Math.min(1, MAX / side);
+      canvas.width = canvas.height = Math.round(side * scale);
+      canvas.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+    } else {
+      // Sleeve mode: full frame, as sleeves are framed loosely and Vision
+      // reads layout context from the whole shot.
+      const scale = Math.min(1, MAX / Math.max(v.videoWidth, v.videoHeight));
+      canvas.width = Math.round(v.videoWidth * scale);
+      canvas.height = Math.round(v.videoHeight * scale);
+      canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+    }
     // Keep the shared stream alive (don't stop tracks) so batch-scanning the next
     // record reopens the camera instantly without another permission prompt.
     if (v) v.srcObject = null;
@@ -5842,7 +5862,7 @@ function CameraModal({ onCapture, onClose }) {
             Labels carry the densest identity data (catalogue number above
             all), so the guide steers users to fill the circle with the
             label; the capture centre-crops to match. Acid ring = brand. */}
-        {ready && (
+        {ready && scanMode === 'label' && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div className="relative rounded-full" style={{ width: 'min(82vw, 68vh)', height: 'min(82vw, 68vh)' }}>
               {/* Dim everything outside the circle */}
@@ -5852,16 +5872,44 @@ function CameraModal({ onCapture, onClose }) {
             </div>
           </div>
         )}
+        {ready && scanMode === 'sleeve' && (
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="relative" style={{ width: 'min(82vw, 68vh)', height: 'min(82vw, 68vh)' }}>
+              <div className="absolute inset-0" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)' }} />
+              {[['top-0 left-0', 'border-t border-l'],
+                ['top-0 right-0', 'border-t border-r'],
+                ['bottom-0 left-0', 'border-b border-l'],
+                ['bottom-0 right-0', 'border-b border-r']].map(([pos, border]) => (
+                <div key={pos} className={`absolute ${pos} w-7 h-7 ${border}`}
+                  style={{ borderColor: 'rgba(202,254,4,0.9)', borderWidth: 2 }} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Capture button */}
       {ready && (
         <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 z-10">
+          {/* Label / Sleeve viewfinder toggle */}
+          <div className="flex rounded-full p-1" style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            {[['label', 'Label'], ['sleeve', 'Sleeve']].map(([m, txt]) => (
+              <button key={m} onClick={() => switchMode(m)}
+                className="px-4 py-1.5 rounded-full text-[12px] font-mono uppercase tracking-[0.12em] transition-all"
+                style={scanMode === m
+                  ? { background: '#cafe04', color: '#08080c', fontWeight: 700 }
+                  : { background: 'transparent', color: 'rgba(255,255,255,0.55)' }}>
+                {txt}
+              </button>
+            ))}
+          </div>
           <p className="text-[13px] tracking-[0.2em] uppercase font-mono px-6 text-center" style={{ color: 'rgba(202,254,4,0.85)' }}>
-            Centre the label in the circle
+            {scanMode === 'label' ? 'Centre the label in the circle' : 'Align the sleeve within the corners'}
           </p>
           <p className="text-[11px] font-mono text-white/40 px-6 text-center -mt-1.5">
-            The catalogue number is the key detail -- sleeves work too
+            {scanMode === 'label'
+              ? 'The catalogue number is the key detail'
+              : 'Front or back -- catalogue number and spine text help most'}
           </p>
           <button onClick={capture}
             className="w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95"
