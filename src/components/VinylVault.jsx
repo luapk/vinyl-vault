@@ -2735,7 +2735,15 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
   const [searchCatno, setSearchCatno] = useState(record.catalogNumber || '');
   const [reidentifyLoading, setReidentifyLoading] = useState(false);
   const [reidentifyResults, setReidentifyResults] = useState(null);
-  const [reidentifyPicking, setReidentifyPicking] = useState(false);
+  // Holds the id of the candidate being applied (truthy = replacement in
+  // flight); drives the per-card "Replacing..." overlay.
+  const [reidentifyPicking, setReidentifyPicking] = useState(null);
+  // Success feedback for a completed replacement: { prev, name }. `prev` is a
+  // full snapshot of the overwritten fields so Undo restores them exactly.
+  const [replaced, setReplaced] = useState(null);
+  const replacedTimer = useRef(null);
+  useEffect(() => { setReplaced(null); clearTimeout(replacedTimer.current); }, [record.id]);
+  useEffect(() => () => clearTimeout(replacedTimer.current), []);
   const [reidentifyError, setReidentifyError] = useState(null);
   const [enriching, setEnriching] = useState(false);
   const recordCrates = record.crates || [];
@@ -2877,7 +2885,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
   };
 
   const pickReidentifyCandidate = async (candidate) => {
-    setReidentifyPicking(true);
+    setReidentifyPicking(candidate.id);
     setReidentifyError(null);
     try {
       // freshAccessToken refreshes an expired token (timeout-guarded so it can
@@ -2904,6 +2912,22 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
       if (!data.release) throw new Error(data.error || 'No release data returned');
       if (onUpdate) {
         const r = data.release;
+        // Snapshot every field the replacement overwrites, so the success
+        // banner's Undo can restore the previous release exactly (including
+        // the old tracklist with its BPM/key data).
+        const prev = {
+          discogsId: record.discogsId ?? null,
+          artist: record.artist, title: record.title,
+          label: record.label ?? null, catalogNumber: record.catalogNumber ?? null,
+          year: record.year ?? null, country: record.country ?? null,
+          format: record.format ?? null,
+          genres: record.genres || [], tracklist: record.tracklist || [],
+          coverUrl: record.coverUrl || null, images: record.images || [],
+          identified: record.identified ?? true,
+          confidence: record.confidence || 'high',
+          source: record.source || 'discogs',
+          notes: record.notes || '',
+        };
         onUpdate(record.id, {
           discogsId: r.id || candidate.id,
           artist: r.artist || record.artist,
@@ -2923,6 +2947,13 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
           notes: r.notes || '',
         });
         if (r.coverUrl) extractDominantColor(r.coverUrl).then(setLocalAccent).catch(() => {});
+        setReplaced({
+          prev,
+          name: [r.artist || record.artist, r.title || record.title].filter(Boolean).join(' — ')
+            + (r.year ? ` (${r.year})` : ''),
+        });
+        clearTimeout(replacedTimer.current);
+        replacedTimer.current = setTimeout(() => setReplaced(null), 10000);
       }
       setReidentifying(false);
       setReidentifyResults(null);
@@ -2933,7 +2964,16 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
         ? 'Timed out pulling release data. Try again.'
         : 'Failed to load release details. Try again.');
     }
-    setReidentifyPicking(false);
+    setReidentifyPicking(null);
+  };
+
+  // Restore the release exactly as it was before the last re-identify pick.
+  const undoReplace = () => {
+    if (!replaced) return;
+    onUpdate?.(record.id, replaced.prev);
+    if (replaced.prev.coverUrl) extractDominantColor(replaced.prev.coverUrl).then(setLocalAccent).catch(() => {});
+    clearTimeout(replacedTimer.current);
+    setReplaced(null);
   };
 
   return (
@@ -3099,6 +3139,21 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
           </div>
         )}
 
+        {/* Replacement confirmation: names the new release and offers a full
+            Undo (restores the pre-replacement snapshot), which is what makes
+            an instant, confirmation-free swap safe. Auto-dismisses. */}
+        {replaced && (
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: '#cafe04', color: '#08080c', animation: 'fadeUp 0.3s ease-out' }}>
+            <Check size={16} weight="bold" className="shrink-0" />
+            <div className="flex-1 min-w-0 text-[13px] font-mono leading-snug">
+              <span style={{ fontWeight: 700 }}>Release replaced.</span> Now filed as {replaced.name}.
+            </div>
+            <button onClick={undoReplace} className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95" style={{ background: '#08080c', color: '#cafe04' }}>
+              Undo
+            </button>
+          </div>
+        )}
+
         {/* Re-identify -- promoted: correcting a wrong or draft match is the
             primary fix-up action, so it sits above the fold in brand acid
             (ink-on-acid reads in both themes). */}
@@ -3147,7 +3202,18 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             {reidentifyResults && reidentifyResults.length > 0 && (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {reidentifyResults.map(c => (
-                  <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={reidentifyPicking} className="text-left p-2.5 rounded-xl text-[13px] transition-all hover:bg-white/5 disabled:opacity-40" style={{ border: '1px solid rgba(var(--fg),0.07)' }}>
+                  <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={!!reidentifyPicking}
+                    className="relative text-left p-2.5 rounded-xl text-[13px] transition-all hover:bg-white/5"
+                    style={{
+                      border: reidentifyPicking === c.id ? '1px solid rgba(202,254,4,0.85)' : '1px solid rgba(var(--fg),0.07)',
+                      opacity: reidentifyPicking && reidentifyPicking !== c.id ? 0.35 : 1,
+                    }}>
+                    {reidentifyPicking === c.id && (
+                      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                        <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(202,254,4,0.35)', borderTopColor: '#cafe04' }} />
+                        <span className="text-[11px] font-mono uppercase tracking-[0.15em]" style={{ color: '#cafe04' }}>Replacing...</span>
+                      </div>
+                    )}
                     {c.coverUrl && <img src={c.coverUrl} alt="" loading="lazy" decoding="async" className="w-full aspect-square object-cover rounded-lg mb-1.5 opacity-80" />}
                     <div className="font-mono text-white/60 truncate">{c.artist}</div>
                     <div className="text-white/40 truncate">{c.recordTitle}</div>
