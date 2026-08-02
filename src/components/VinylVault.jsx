@@ -1618,7 +1618,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
             </div>
             <div>
               <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
-              <div className="text-lg font-display">Scan a sleeve</div>
+              <div className="text-lg font-display">Scan the label</div>
             </div>
           </div>
           {/* Primary: open camera viewfinder */}
@@ -3099,36 +3099,27 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
           </div>
         )}
 
-        {record.tracklist && record.tracklist.length > 0 && (
-          <div className="mb-5">
-            <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
-            <div className="space-y-0.5">
-              {record.tracklist.map((track, i) => (
-                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null, hot: localHots[i] ?? track.hot ?? false }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={toggleHot} />
-              ))}
+        {/* Re-identify -- promoted: correcting a wrong or draft match is the
+            primary fix-up action, so it sits above the fold in brand acid
+            (ink-on-acid reads in both themes). */}
+        <div className="mb-5">
+          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all active:scale-95"
+            style={{
+              background: reidentifying ? 'rgba(202,254,4,0.30)' : '#cafe04',
+              border: '1px solid rgba(8,8,12,0.18)',
+              color: '#08080c', fontWeight: 600,
+              boxShadow: reidentifying ? 'none' : '0 4px 18px -6px rgba(202,254,4,0.6)',
+            }}>
+            <Scan size={13} weight="bold" />
+            {reidentifying ? 'Close' : record.identified === false ? 'Identify this record' : 'Re-identify'}
+          </button>
+          {record.identified === false && !reidentifying && (
+            <div className="mt-2 text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.40)' }}>
+              This record is not matched to a release yet -- identify it to pull artwork and tracklist.
             </div>
-          </div>
-        )}
-
-        {/* Price check */}
-        {record.discogsId && (
-          <div className="mb-5">
-            {price === null && (
-              <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.45)", background: "rgba(var(--fg),0.025)" }}>
-                {priceLoading
-                  ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "rgba(var(--fg),0.3)", borderTopColor: "transparent" }} />Checking prices...</>
-                  : <><MagnifyingGlass size={12} />Check marketplace price</>
-                }
-              </button>
-            )}
-            {price === false && (
-              <div className="text-[14px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
-            )}
-            {price && typeof price === "object" && (
-              <PriceGraph price={price} accentRGB={localAccent} mediaCondition={record.mediaCondition || ''} onRefresh={checkPrice} refreshing={priceLoading} />
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Re-identify panel */}
         {reidentifying && (
@@ -3168,12 +3159,40 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
           </div>
         )}
 
+        {record.tracklist && record.tracklist.length > 0 && (
+          <div className="mb-5">
+            <div className="text-[13px] tracking-[0.2em] uppercase text-white/40 mb-3 font-mono">Tracklist</div>
+            <div className="space-y-0.5">
+              {record.tracklist.map((track, i) => (
+                <TrackRow key={i} track={{ ...track, bpm: track.bpm ?? localBpms[i] ?? null, hot: localHots[i] ?? track.hot ?? false }} index={i} accentRGB={accentRGB} playingPreview={playingPreview} onPlay={playPreview} bpmLoading={bpmDetecting.has(i)} onHotToggle={toggleHot} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Price check */}
+        {record.discogsId && (
+          <div className="mb-5">
+            {price === null && (
+              <button onClick={checkPrice} disabled={priceLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-50" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.45)", background: "rgba(var(--fg),0.025)" }}>
+                {priceLoading
+                  ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: "rgba(var(--fg),0.3)", borderTopColor: "transparent" }} />Checking prices...</>
+                  : <><MagnifyingGlass size={12} />Check marketplace price</>
+                }
+              </button>
+            )}
+            {price === false && (
+              <div className="text-[14px] font-mono text-white/25">No listings found on Discogs marketplace.</div>
+            )}
+            {price && typeof price === "object" && (
+              <PriceGraph price={price} accentRGB={localAccent} mediaCondition={record.mediaCondition || ''} onRefresh={checkPrice} refreshing={priceLoading} />
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-3 flex-wrap">
           <button onClick={() => { if (window.confirm('Remove this record from your collection?')) onRemove(); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all" style={{ color: "rgba(220,100,100,0.60)", border: "1px solid rgba(220,100,100,0.15)", background: "transparent" }}>
             <Trash size={12} />Remove from collection
-          </button>
-          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all" style={{ color: reidentifying ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.30)', border: reidentifying ? '1px solid rgba(var(--fg),0.18)' : '1px solid rgba(var(--fg),0.08)', background: 'transparent' }}>
-            <Scan size={12} />Re-identify
           </button>
         </div>
         </div>{/* end px-6 content wrapper */}
@@ -5661,14 +5680,21 @@ function CameraModal({ onCapture, onClose }) {
     setCapturing(true);
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
+    // Centre-square crop matching the circular viewfinder: the guide occupies
+    // <=82% of the smaller screen dimension and the video is object-cover, so
+    // a 90%-of-min-dimension square safely contains everything inside the
+    // circle while shedding background clutter -- the label fills more of the
+    // frame, which directly raises OCR accuracy on the catalogue number.
+    const side = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.9);
+    const sx = Math.round((v.videoWidth - side) / 2);
+    const sy = Math.round((v.videoHeight - side) / 2);
     // Cap the capture canvas: full-resolution iPhone sensors (up to ~4032x3024)
     // can spike memory enough to crash the tab. The scan pipeline downsizes again.
     const MAX = 1600;
-    const scale = Math.min(1, MAX / Math.max(v.videoWidth, v.videoHeight));
+    const scale = Math.min(1, MAX / side);
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(v.videoWidth * scale);
-    canvas.height = Math.round(v.videoHeight * scale);
-    canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+    canvas.width = canvas.height = Math.round(side * scale);
+    canvas.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
     // Keep the shared stream alive (don't stop tracks) so batch-scanning the next
     // record reopens the camera instantly without another permission prompt.
     if (v) v.srcObject = null;
@@ -5746,20 +5772,17 @@ function CameraModal({ onCapture, onClose }) {
           </div>
         )}
 
-        {/* Framing guide: corner brackets on a centred square */}
+        {/* Framing guide: circular viewfinder sized to the record label.
+            Labels carry the densest identity data (catalogue number above
+            all), so the guide steers users to fill the circle with the
+            label; the capture centre-crops to match. Acid ring = brand. */}
         {ready && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="relative" style={{ width: 'min(80vw, 80vh)', height: 'min(80vw, 80vh)' }}>
-              {/* Dimming outside the guide area */}
-              <div className="absolute inset-0" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)' }} />
-              {/* Corner brackets */}
-              {[['top-0 left-0', 'border-t border-l'],
-                ['top-0 right-0', 'border-t border-r'],
-                ['bottom-0 left-0', 'border-b border-l'],
-                ['bottom-0 right-0', 'border-b border-r']].map(([pos, border]) => (
-                <div key={pos} className={`absolute ${pos} w-7 h-7 ${border}`}
-                  style={{ borderColor: 'rgba(var(--fg),0.8)', borderWidth: 2 }} />
-              ))}
+            <div className="relative rounded-full" style={{ width: 'min(82vw, 68vh)', height: 'min(82vw, 68vh)' }}>
+              {/* Dim everything outside the circle */}
+              <div className="absolute inset-0 rounded-full" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)', border: '2px solid rgba(202,254,4,0.9)' }} />
+              {/* Spindle-hole hint: centre the label on the dot */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full" style={{ border: '2px solid rgba(202,254,4,0.55)' }} />
             </div>
           </div>
         )}
@@ -5768,8 +5791,11 @@ function CameraModal({ onCapture, onClose }) {
       {/* Capture button */}
       {ready && (
         <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 z-10">
-          <p className="text-[13px] tracking-[0.2em] uppercase font-mono text-white/40">
-            Align sleeve within the guide
+          <p className="text-[13px] tracking-[0.2em] uppercase font-mono px-6 text-center" style={{ color: 'rgba(202,254,4,0.85)' }}>
+            Centre the label in the circle
+          </p>
+          <p className="text-[11px] font-mono text-white/40 px-6 text-center -mt-1.5">
+            The catalogue number is the key detail -- sleeves work too
           </p>
           <button onClick={capture}
             className="w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95"

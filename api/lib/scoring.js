@@ -27,6 +27,22 @@ export function sim(a, b) {
   return hits / Math.max(wa.length, wb.length);
 }
 
+// Catalogue-number similarity, case- and separator-insensitive.
+// 1   = same code ("PM 012" / "pm-012" / "PM012")
+// 0.8 = one contains the other and the shorter side is specific enough
+//       (covers "AM12 93" printed vs "R&S AM12 93" catalogued)
+// 0   = both present but different
+// null = either side missing (no signal, no penalty)
+export function catnoSim(a, b) {
+  if (!a || !b) return null;
+  const na = String(a).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const nb = String(b).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!na || !nb) return null;
+  if (na === nb) return 1;
+  if ((na.includes(nb) || nb.includes(na)) && Math.min(na.length, nb.length) >= 4) return 0.8;
+  return 0;
+}
+
 // Score how well a Discogs candidate matches Vision-identified metadata.
 // Negative scores mean the candidate is likely a false catno collision.
 export function scoreCandidate(candidate, vision) {
@@ -50,6 +66,14 @@ export function scoreCandidate(candidate, vision) {
   if (artistSim !== null) score += artistSim >= 0.5 ? 4 : artistSim >= 0.2 ? 1 : -3;
   if (titleSim  !== null) score += titleSim  >= 0.5 ? 4 : titleSim  >= 0.2 ? 1 : -1;
   if (labelSim  !== null && labelSim >= 0.5) score += 1;
+
+  // Catalogue number is the strongest identity signal a label carries: an
+  // exact (or contained) match outweighs any other single field, which is
+  // what lets a catno-only white-label read beat fuzzy artist/title
+  // collisions. A mismatch is only a mild penalty -- other pressings of the
+  // right release legitimately carry different catnos.
+  const catSim = catnoSim(candidate.catalogNumber, vision.catalogNumber);
+  if (catSim !== null) score += catSim >= 0.8 ? 6 : -1;
 
   return score;
 }

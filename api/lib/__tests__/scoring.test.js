@@ -359,3 +359,70 @@ describe('extractRawCatnos()', () => {
     expect(result.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// catnoSim() + catalogue-number upweighting in scoreCandidate()
+// Labels carry the catalogue number as their most reliable identity signal;
+// these tests pin its dominance in ranking (the "scan label" flow).
+// ---------------------------------------------------------------------------
+
+import { catnoSim } from '../scoring.js';
+
+describe('catnoSim()', () => {
+  it('exact match is 1', () => expect(catnoSim('PM-012', 'PM-012')).toBe(1));
+  it('separator/case variants match (PM 012 / pm-012 / PM012)', () => {
+    expect(catnoSim('PM 012', 'PM-012')).toBe(1);
+    expect(catnoSim('pm012', 'PM-012')).toBe(1);
+    expect(catnoSim('R&S AM12', 'RS-AM12')).toBe(1);
+  });
+  it('containment counts when the shorter side is specific enough', () => {
+    expect(catnoSim('AM12 93', 'R&S AM12 93')).toBe(0.8);
+  });
+  it('short fragments do not match by containment', () => {
+    expect(catnoSim('12', 'PM-012')).toBe(0);
+  });
+  it('null signal when either side missing', () => {
+    expect(catnoSim(null, 'PM-012')).toBeNull();
+    expect(catnoSim('PM-012', '')).toBeNull();
+  });
+  it('clear mismatch is 0', () => expect(catnoSim('WAP63', 'PM-012')).toBe(0));
+});
+
+describe('scoreCandidate() -- catalogue number upweighted', () => {
+  const cCat = (catno, artist, title, label) =>
+    ({ artist: artist || '', recordTitle: title || '', label: label || null, catalogNumber: catno });
+  const vCat = (catno, artist, title, label) =>
+    ({ artist: artist || '', title: title || '', label: label || '', catalogNumber: catno || '' });
+
+  it('an exact catno match outweighs a strong title match on a rival', () => {
+    const rightPressing = cCat('PM-012', '', 'Untitled', 'Purpose Maker');
+    const titleRival    = cCat('XX-99', 'Someone', 'Deep Cuts', 'Other');
+    const vis = vCat('PM-012', '', 'Deep Cuts', '');
+    expect(scoreCandidate(rightPressing, vis)).toBeGreaterThan(scoreCandidate(titleRival, vis));
+  });
+
+  it('white label rescue: catno-only vision ranks the matching pressing first', () => {
+    const rightPressing = cCat('RS-AM12', '', '', 'R&S');
+    const collision     = cCat('OTHER-1', 'Ambient Artist', 'Ambient Works', 'Other');
+    const vis = vCat('R&S AM12', '', 'ambient', '');
+    const ranked = rankCandidates([collision, rightPressing], vis);
+    expect(ranked[0]).toBe(rightPressing);
+  });
+
+  it('catno mismatch is only a mild penalty (different pressings are legitimate)', () => {
+    const vis = vCat('PM-012', 'X', 'Y');
+    const mismatch = scoreCandidate(cCat('WAP63', 'X', 'Y'), vis);
+    const absent   = scoreCandidate(cCat(null, 'X', 'Y'), vis);
+    expect(mismatch).toBeLessThan(absent);
+    expect(absent - mismatch).toBeLessThanOrEqual(2);
+  });
+
+  it('no catno on either side leaves legacy scoring unchanged', () => {
+    const withNull = scoreCandidate(cCat(null, 'Aphex Twin', 'SAW', 'Apollo'), vCat('', 'Aphex Twin', 'SAW', 'Apollo'));
+    const legacy = scoreCandidate(
+      { artist: 'Aphex Twin', recordTitle: 'SAW', label: 'Apollo' },
+      { artist: 'Aphex Twin', title: 'SAW', label: 'Apollo' }
+    );
+    expect(withNull).toBe(legacy);
+  });
+});
