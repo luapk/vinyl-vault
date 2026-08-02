@@ -5904,7 +5904,7 @@ function CameraModal({ onCapture, onClose }) {
             ))}
           </div>
           <p className="text-[13px] tracking-[0.2em] uppercase font-mono px-6 text-center" style={{ color: 'rgba(202,254,4,0.85)' }}>
-            {scanMode === 'label' ? 'Centre the label in the circle' : 'Align the sleeve within the corners'}
+            {scanMode === 'label' ? 'Centre the label in the circle' : 'Align sleeve inside corners'}
           </p>
           <p className="text-[11px] font-mono text-white/40 px-6 text-center -mt-1.5">
             {scanMode === 'label'
