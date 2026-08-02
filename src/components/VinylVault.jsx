@@ -1855,10 +1855,13 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
         {release.notes && <div className="text-[14px] text-white/40 font-mono">{release.notes}</div>}
       </div>
 
-      {/* Cover + details */}
-      <div className="grid md:grid-cols-[auto_1fr] gap-6 md:gap-10">
+      {/* Cover + details. grid-cols-1 on mobile is load-bearing: with no
+          explicit template the auto track sizes to its items' max-content
+          (the image strip contributes its full unscrolled width), overflowing
+          the viewport on image-rich scans -- same fix as the detail modal. */}
+      <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 md:gap-10">
         {/* Image gallery */}
-        <div className="relative">
+        <div className="relative min-w-0">
           <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 90px -20px rgba(${accentRGB},0.45), 0 0 0 1px rgba(var(--fg),0.07)` }} onTouchStart={onImgTouchStart} onTouchEnd={onImgTouchEnd}>
             {displayImage ? (
               <img src={displayImage} alt={release.title} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { if (imageUrl && e.target.src !== imageUrl) e.target.src = imageUrl; }} />
@@ -2988,8 +2991,16 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
 
         <div className="px-6 md:px-8 pb-8">
 
-        <div className="grid sm:grid-cols-[140px_1fr] gap-5 mb-6">
-          <div>
+        {/* grid-cols-1 (minmax(0,1fr)) is load-bearing on mobile: without an
+            explicit template the single auto track sizes to its items'
+            max-content, and the thumbnail strip contributes its FULL content
+            width even though it is overflow-x-auto (8 thumbs = 362px). Fresh
+            scans carry big Discogs image galleries, so the track -- and the
+            cover above it -- blew out past the viewport; older records with
+            fewer images happened to fit. minmax(0,1fr) ignores content size
+            entirely; min-w-0 keeps long meta text in check too. */}
+        <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-5 mb-6">
+          <div className="min-w-0">
             <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${localAccent},0.35)` }}>
               {images[imgIdx] ? (
                 <img src={images[imgIdx]} alt={record.title} className="w-full h-full object-cover" />
@@ -3017,7 +3028,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
               </div>
             )}
           </div>
-          <div className="flex flex-col justify-center">
+          <div className="flex flex-col justify-center min-w-0">
             <div className="text-[13px] tracking-[0.2em] uppercase text-white/45 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
             <div className="text-xl leading-tight mb-0.5 font-display"><span className="italic">{record.artist}</span></div>
             <div className="text-base text-white/65 font-display mb-3">{record.title}</div>
