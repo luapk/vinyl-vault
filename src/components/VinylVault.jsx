@@ -2194,7 +2194,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
 
       {/* CRATES MODE */}
       {collectionMode === "crates" && (
-        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} />
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} onOpenCrate={(crate) => { setFilterCrate(crate); setCrateMenuOpen(false); setCollectionMode("stacks"); }} />
       )}
 
       {/* STATS MODE */}
@@ -4272,7 +4272,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 
 // ----- CratesTabView ---------------------------------------------------------
 
-function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [] }) {
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], onOpenCrate }) {
   const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
@@ -4338,6 +4338,9 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
                       <span className="text-[13px] font-mono truncate" style={{ color: 'rgba(var(--fg),0.80)' }}>{crate}</span>
                       <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'rgba(var(--fg),0.28)' }}>{crateCount}</span>
                     </div>
+                  )}
+                  {editingName !== crate && (
+                    <button onClick={() => onOpenCrate?.(crate)} title={`Open "${crate}" in Collection`} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: activeColor || 'rgba(var(--fg),0.45)' }} onMouseEnter={e => e.currentTarget.style.color = activeColor || 'rgba(var(--fg),0.85)'} onMouseLeave={e => e.currentTarget.style.color = activeColor || 'rgba(var(--fg),0.45)'}><ArrowUpRight size={14} weight="bold" /></button>
                   )}
                   {editingName === crate ? (
                     <button onClick={commitRename} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.55)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.9)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.55)'}><Check size={12} weight="bold" /></button>
