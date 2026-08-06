@@ -125,8 +125,9 @@ Each record is a JSON blob stored in the `data` jsonb column:
 - `savedAt` -- timestamp
 
 ### Sync behaviour
-- Always writes to localStorage on every state change (local-first)
-- On login, `dbLoad` pulls Supabase records, migrates any local-only records up, then sets state to the merged result
+- Always writes to localStorage on every state change (local-first); new records and edits are additionally persisted immediately (not just via the 800ms debounce)
+- On login, `dbLoad` merges cloud + local via `planLoadMerge` (`src/lib/collectionMerge.js`, unit-tested). Invariants: a record on this device only leaves the collection via an explicit user delete (tombstoned in `vinylvault_deleted_ids`); a record with an unconfirmed local **edit** (flagged in `vinylvault_dirty_ids`) beats the cloud copy and is re-pushed. Otherwise the cloud copy wins for records it has.
+- A 25s background retry re-attempts failed inserts (unsynced records) and failed updates (dirty records) until confirmed -- an expired session or offline period costs latency, never data
 - `syncedIds` Set tracks which records are confirmed in Supabase; unsynced records show an amber `!` badge
 
 ## Known quirks

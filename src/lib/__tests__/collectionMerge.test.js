@@ -73,3 +73,46 @@ describe('planLoadMerge -- the no-data-loss invariant', () => {
     expect(plan.records).toHaveLength(0);
   });
 });
+
+describe('planLoadMerge -- unconfirmed local edits (dirty records) beat the cloud copy', () => {
+  it('a dirty local record replaces the DB version and is queued for upload', () => {
+    const dbRow = row('x', 'db-1', { artist: 'Wrong Pressing', savedAt: 1 });
+    const localEdited = rec('x', { artist: 'Right Pressing', savedAt: 2 });
+    const plan = planLoadMerge([dbRow], [localEdited], new Set(), new Set(['x']));
+    expect(plan.records).toHaveLength(1);
+    expect(plan.records[0].artist).toBe('Right Pressing');
+    expect(plan.toUpdate.map(r => r.id)).toEqual(['x']);
+    expect(plan.dbIdMap.x).toBe('db-1');
+  });
+
+  it('the exact incident: 20 re-identified records survive a reload after failed syncs', () => {
+    const dbRows = Array.from({ length: 20 }, (_, i) => row(`r${i}`, `db-${i}`, { artist: 'Draft', title: `T${i}` }));
+    const locals = Array.from({ length: 20 }, (_, i) => rec(`r${i}`, { artist: 'Fine-Tuned', title: `T${i}` }));
+    const dirty = new Set(locals.map(l => l.id));
+    const plan = planLoadMerge(dbRows, locals, new Set(), dirty);
+    expect(plan.records.every(r => r.artist === 'Fine-Tuned')).toBe(true);
+    expect(plan.toUpdate).toHaveLength(20);
+  });
+
+  it('a non-dirty local copy still defers to the DB version (normal cross-device sync)', () => {
+    const plan = planLoadMerge(
+      [row('x', 'db-1', { artist: 'Cloud Newer' })],
+      [rec('x', { artist: 'Local Stale' })],
+      new Set(), new Set()
+    );
+    expect(plan.records[0].artist).toBe('Cloud Newer');
+    expect(plan.toUpdate).toHaveLength(0);
+  });
+
+  it('dirty record with no DB row goes through toInsert, not toUpdate', () => {
+    const plan = planLoadMerge([], [rec('only-local')], new Set(), new Set(['only-local']));
+    expect(plan.toInsert).toHaveLength(1);
+    expect(plan.toUpdate).toHaveLength(0);
+  });
+
+  it('an explicit delete (tombstone) still wins over a dirty flag', () => {
+    const plan = planLoadMerge([], [rec('gone')], new Set(['gone']), new Set(['gone']));
+    expect(plan.records).toHaveLength(0);
+    expect(plan.toUpdate).toHaveLength(0);
+  });
+});

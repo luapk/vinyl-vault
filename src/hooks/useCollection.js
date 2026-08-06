@@ -25,6 +25,22 @@ function addTombstone(id) {
   } catch { /* storage full */ }
 }
 
+// Ids of records with local edits not yet confirmed written to Supabase.
+// Persisted so an edit that failed to sync (expired session, offline) still
+// beats the stale cloud copy after a reload -- see planLoadMerge. Cleared only
+// when a dbUpdate/dbInsert for that record succeeds.
+const DIRTY_KEY = 'vinylvault_dirty_ids';
+function loadDirty() {
+  try { return new Set(JSON.parse(localStorage.getItem(DIRTY_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveDirty(set) {
+  try { localStorage.setItem(DIRTY_KEY, JSON.stringify([...set].slice(-400))); }
+  catch { /* storage full */ }
+}
+function markDirty(id) { const d = loadDirty(); if (!d.has(id)) { d.add(id); saveDirty(d); } }
+function clearDirty(id) { const d = loadDirty(); if (d.has(id)) { d.delete(id); saveDirty(d); } }
+
 function recordFromRelease(release, crates) {
   const tags = [
     ...(release.suggestedBoxes || []),
@@ -206,7 +222,7 @@ export function useCollection(userId = null) {
       // (tombstone). Trade-off, chosen deliberately: a record deleted on
       // another device can reappear here (annoying, recoverable) rather than
       // an unsynced record being destroyed (catastrophic, unrecoverable).
-      const plan = planLoadMerge(rows, [...collectionRef.current, ...load()], loadTombstones());
+      const plan = planLoadMerge(rows, [...collectionRef.current, ...load()], loadTombstones(), loadDirty());
       const dbRecords = plan.records;
       Object.assign(dbIds.current, plan.dbIdMap);
       for (const rowId of plan.spareRowIds) dbDelete(rowId).catch(() => {});
@@ -219,8 +235,19 @@ export function useCollection(userId = null) {
           const dbId = await dbInsert(userId, record);
           dbIds.current[record.id] = dbId;
           confirmed.add(record.id);
+          clearDirty(record.id);
         } catch (e) {
           console.error('Sync pending for', record.artist || '(unidentified)', record.title || '', e);
+        }
+      }
+      // Re-push unconfirmed local edits over their stale cloud rows; failures
+      // stay dirty and the background retry keeps trying.
+      for (const record of plan.toUpdate) {
+        try {
+          await dbUpdate(dbIds.current[record.id], record);
+          clearDirty(record.id);
+        } catch (e) {
+          console.error('Edit sync pending for', record.artist || '(unidentified)', e);
         }
       }
 
@@ -267,7 +294,20 @@ export function useCollection(userId = null) {
           const dbId = await dbInsert(userId, r);
           dbIds.current[r.id] = dbId;
           setSyncedIds(s => new Set([...(s || []), r.id]));
+          clearDirty(r.id);
           cacheCoverFor(r);
+        } catch { break; }
+      }
+      // Re-push edits whose dbUpdate failed earlier (expired session, network
+      // drop). The record stays flagged dirty until a write is confirmed.
+      for (const id of loadDirty()) {
+        const r = collectionRef.current.find(x => x.id === id);
+        if (!r) { clearDirty(id); continue; } // removed since
+        const dbId = dbIds.current[id];
+        if (!dbId) continue; // insert path above owns it
+        try {
+          await dbUpdate(dbId, r);
+          clearDirty(id);
         } catch { break; }
       }
     }, 25000);
@@ -321,8 +361,9 @@ export function useCollection(userId = null) {
   const removeRecord = useCallback((id) => {
     dispatch({ type: 'REMOVE', id });
     // Tombstone the explicit delete so the local->cloud merge never
-    // resurrects it.
+    // resurrects it; a removed record has no edits left to sync.
     addTombstone(id);
+    clearDirty(id);
     if (!useDb) return;
     if (dbIds.current[id]) {
       dbDelete(dbIds.current[id]).catch(console.error);
@@ -342,6 +383,17 @@ export function useCollection(userId = null) {
 
   const updateRecord = useCallback((id, patch) => {
     dispatch({ type: 'UPDATE', id, patch });
+    // Edits are as unlosable as adds: flag dirty BEFORE attempting the cloud
+    // write and persist the edited state to localStorage immediately (the
+    // debounced writer could lose it to a crash within its window). The flag
+    // clears only when a write is confirmed; until then the local version
+    // beats the cloud copy on load and the background retry keeps pushing.
+    markDirty(id);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(
+        collectionRef.current.map(r => r.id === id ? { ...r, ...patch } : r)
+      ));
+    } catch { /* storage full */ }
     if (useDb && dbIds.current[id]) {
       const dbId = dbIds.current[id];
       // dbUpdate replaces the whole jsonb `data` column, so we must send the
@@ -349,7 +401,9 @@ export function useCollection(userId = null) {
       // wiping fields not included in the patch.
       const current = collectionRef.current.find(r => r.id === id) || {};
       const merged = { ...current, ...patch };
-      dbUpdate(dbId, merged).catch(console.error);
+      dbUpdate(dbId, merged)
+        .then(() => clearDirty(id))
+        .catch(e => console.error('Edit sync pending for', id, e));
     }
   }, [useDb]);
 
@@ -359,10 +413,11 @@ export function useCollection(userId = null) {
     collectionRef.current
       .filter(r => (r.crates || []).includes(from))
       .forEach(r => {
+        markDirty(r.id);
         const dbId = dbIds.current[r.id];
         if (!dbId) return;
         const merged = { ...r, crates: r.crates.map(c => c === from ? to : c) };
-        dbUpdate(dbId, merged).catch(console.error);
+        dbUpdate(dbId, merged).then(() => clearDirty(r.id)).catch(console.error);
       });
   }, [useDb]);
 
@@ -372,10 +427,11 @@ export function useCollection(userId = null) {
     collectionRef.current
       .filter(r => (r.crates || []).includes(name))
       .forEach(r => {
+        markDirty(r.id);
         const dbId = dbIds.current[r.id];
         if (!dbId) return;
         const merged = { ...r, crates: r.crates.filter(c => c !== name) };
-        dbUpdate(dbId, merged).catch(console.error);
+        dbUpdate(dbId, merged).then(() => clearDirty(r.id)).catch(console.error);
       });
   }, [useDb]);
 
