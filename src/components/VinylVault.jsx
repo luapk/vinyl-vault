@@ -3170,14 +3170,14 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             (ink-on-acid reads in both themes). */}
         <div className="mb-5">
           <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all active:scale-95"
             style={{
               background: reidentifying ? 'rgba(202,254,4,0.30)' : '#cafe04',
               border: '1px solid rgba(8,8,12,0.18)',
-              color: '#08080c', fontWeight: 600,
-              boxShadow: reidentifying ? 'none' : '0 4px 18px -6px rgba(202,254,4,0.6)',
+              color: '#08080c', fontWeight: 700,
+              boxShadow: reidentifying ? 'none' : '0 4px 14px -6px rgba(202,254,4,0.6)',
             }}>
-            <Scan size={13} weight="bold" />
+            <Scan size={11} weight="bold" />
             {reidentifying ? 'Close' : record.identified === false ? 'Identify this record' : 'Re-identify'}
           </button>
           {record.identified === false && !reidentifying && (
@@ -3942,12 +3942,17 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           <AccountSection label="Import from file" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
             {!fileImporting && !fileResult && (
               <>
-                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 6 }}>
-                  Upload a CSV or text file of records. Any list works: CSV columns like <span style={{ color: 'rgba(var(--fg),0.6)' }}>artist,title</span>, or plain lines like <span style={{ color: 'rgba(var(--fg),0.6)' }}>Artist - Title</span>.
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', lineHeight: 1.6, marginBottom: 12 }}>
+                  Upload a list of records. Each row is matched to the most likely vinyl release; anything unmatched is added as a draft to fine-tune with Re-identify.
                 </p>
-                <p style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)', marginBottom: 12 }}>
-                  Each row is matched to the most likely vinyl release. Rows with no match are still added as drafts to fine-tune with Re-identify.
-                </p>
+                <div style={{ borderRadius: 10, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', padding: '10px 14px', marginBottom: 14 }}>
+                  {[['CSV', 'artist,title'], ['Text', 'Artist - Title']].map(([kind, example]) => (
+                    <div key={kind} style={{ display: 'flex', alignItems: 'baseline', gap: 12, padding: '3px 0' }}>
+                      <span style={{ fontSize: 10, letterSpacing: '0.18em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', width: 40, flexShrink: 0 }}>{kind}</span>
+                      <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.65)' }}>{example}</span>
+                    </div>
+                  ))}
+                </div>
                 <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
                 <button onClick={() => importFileRef.current?.click()}
                   style={{
