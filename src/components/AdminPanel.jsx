@@ -202,8 +202,78 @@ export default function AdminPanel({ onBack }) {
         )}
       </div>
 
+      {/* Users list */}
+      <div className="rounded-2xl overflow-hidden mb-6"
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <h2 className="text-sm font-semibold text-white/70 flex items-center gap-2">
+            <UserCircle size={16} className="text-cyan-400" />
+            Users ({users.length})
+          </h2>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-white/30 text-sm">Loading...</div>
+        ) : users.length === 0 ? (
+          <div className="py-12 text-center text-white/30 text-sm">No users yet</div>
+        ) : (
+          <ul className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+            {users.map(u => (
+              <li key={u.id} className="flex items-start gap-3 px-4 sm:px-5 py-3.5 flex-wrap">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: u.role === 'admin' ? 'rgba(251,191,36,0.15)' : 'rgba(139,92,246,0.15)' }}>
+                  {u.role === 'admin'
+                    ? <Crown size={14} className="text-amber-400" weight="duotone" />
+                    : <UserCircle size={14} className="text-violet-400" weight="duotone" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-white truncate">
+                      {u.display_name || u.email}
+                    </p>
+                    {u.username && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{ background: u.is_public ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: u.is_public ? '#86efac' : 'rgba(255,255,255,0.3)', border: `1px solid ${u.is_public ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+                        @{u.username}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/40 truncate">{u.email}</p>
+                  <p className="text-[11px] text-white/30">
+                    {u.role === 'admin' ? 'Admin' : 'User'} &middot; {u.recordCount} record{u.recordCount !== 1 ? 's' : ''} &middot; joined {new Date(u.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                {/* Tier control: inline on the right at sm+, wraps to its own
+                    indented line on narrow (9:16 mobile) screens */}
+                <div className="w-full sm:w-auto pl-11 sm:pl-0">
+                  <select
+                    value={u.subscription_tier || 'digger'}
+                    onChange={e => changeTier(u.id, e.target.value, u.display_name || u.email)}
+                    disabled={savingId === u.id}
+                    title="Access tier"
+                    className="text-xs rounded-lg pl-2.5 pr-6 py-1.5 outline-none cursor-pointer transition-opacity"
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${TIER_COLORS[u.subscription_tier] || TIER_COLORS.digger}`,
+                      color: TIER_COLORS[u.subscription_tier] || 'rgba(255,255,255,0.75)',
+                      opacity: savingId === u.id ? 0.4 : 1,
+                      appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                      backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23888\' stroke-width=\'3\'><path d=\'M6 9l6 6 6-6\'/></svg>")',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 7px center',
+                    }}>
+                    <option value="digger"   style={{ color: '#000' }}>Digger (free)</option>
+                    <option value="selector" style={{ color: '#000' }}>Selector</option>
+                    <option value="resident" style={{ color: '#000' }}>Resident</option>
+                  </select>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {/* Bulk restore records to a user */}
-      <div className="rounded-2xl p-5 mb-6"
+      <div className="rounded-2xl p-5"
         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
         <h2 className="text-sm font-semibold text-white/70 mb-1 flex items-center gap-2">
           <Stack size={16} className="text-emerald-400" />
@@ -289,76 +359,6 @@ export default function AdminPanel({ onBack }) {
         )}
       </div>
 
-      {/* Users list */}
-      <div className="rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          <h2 className="text-sm font-semibold text-white/70 flex items-center gap-2">
-            <UserCircle size={16} className="text-cyan-400" />
-            Users ({users.length})
-          </h2>
-        </div>
-
-        {loading ? (
-          <div className="py-12 text-center text-white/30 text-sm">Loading...</div>
-        ) : users.length === 0 ? (
-          <div className="py-12 text-center text-white/30 text-sm">No users yet</div>
-        ) : (
-          <ul className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-            {users.map(u => (
-              <li key={u.id} className="flex items-center gap-3 px-5 py-3.5">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                  style={{ background: u.role === 'admin' ? 'rgba(251,191,36,0.15)' : 'rgba(139,92,246,0.15)' }}>
-                  {u.role === 'admin'
-                    ? <Crown size={14} className="text-amber-400" weight="duotone" />
-                    : <UserCircle size={14} className="text-violet-400" weight="duotone" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-white truncate">
-                      {u.display_name || u.email}
-                    </p>
-                    {u.username && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{ background: u.is_public ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: u.is_public ? '#86efac' : 'rgba(255,255,255,0.3)', border: `1px solid ${u.is_public ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
-                        @{u.username}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-white/30 truncate">
-                    {u.email} &middot; {u.role === 'admin' ? 'Admin' : 'User'} &middot; {u.recordCount} record{u.recordCount !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <select
-                    value={u.subscription_tier || 'digger'}
-                    onChange={e => changeTier(u.id, e.target.value, u.display_name || u.email)}
-                    disabled={savingId === u.id}
-                    title="Access tier"
-                    className="text-xs rounded-lg pl-2.5 pr-6 py-1.5 outline-none cursor-pointer transition-opacity"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${TIER_COLORS[u.subscription_tier] || TIER_COLORS.digger}`,
-                      color: TIER_COLORS[u.subscription_tier] || 'rgba(255,255,255,0.75)',
-                      opacity: savingId === u.id ? 0.4 : 1,
-                      appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
-                      backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23888\' stroke-width=\'3\'><path d=\'M6 9l6 6 6-6\'/></svg>")',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 7px center',
-                    }}>
-                    <option value="digger"   style={{ color: '#000' }}>Digger (free)</option>
-                    <option value="selector" style={{ color: '#000' }}>Selector</option>
-                    <option value="resident" style={{ color: '#000' }}>Resident</option>
-                  </select>
-                  <span className="text-[10px] text-white/20">
-                    {new Date(u.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );
 }
