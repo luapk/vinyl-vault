@@ -1275,7 +1275,7 @@ export default function VinylVault() {
             {phase === "result" && release && (
               <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
             )}
-            {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} />}
+            {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} onSignOut={signOut} />}
           </>
         )}
         {appView === "collection" && (
@@ -1285,7 +1285,7 @@ export default function VinylVault() {
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
         )}
         {appView === "batch" && (
-          <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} onStop={stopBatch} accentRGB={accentRGB} />
+          <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} onStop={stopBatch} accentRGB={accentRGB} onSignOut={signOut} />
         )}
         {appView === "community" && (
           <CommunityView
@@ -3412,6 +3412,36 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
+// Live per-row status list for the file import: a green tick lands on each
+// row as it is saved; drafts and skipped duplicates are labelled inline.
+function ImportStatusList({ items, listRef }) {
+  const statusIcon = (s) => {
+    if (s === 'added') return <Check size={13} weight="bold" style={{ color: 'rgb(74,222,128)' }} />;
+    if (s === 'draft') return <Check size={13} weight="bold" style={{ color: 'rgba(240,190,80,0.9)' }} />;
+    if (s === 'skipped') return <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', lineHeight: 1 }}>--</span>;
+    if (s === 'searching') return <div className="animate-spin" style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(var(--fg),0.12)', borderTopColor: 'rgba(var(--fg),0.5)' }} />;
+    return <span style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(var(--fg),0.12)', display: 'inline-block' }} />;
+  };
+  return (
+    <div ref={listRef} style={{ maxHeight: 210, overflowY: 'auto', borderRadius: 10, border: '1px solid rgba(var(--fg),0.08)', background: 'rgba(var(--fg),0.03)', padding: '7px 12px', marginBottom: 10 }}>
+      {items.map((it, i) => (
+        <div key={i} data-active={it.status === 'searching' ? '1' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '3px 0', minWidth: 0 }}>
+          <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{statusIcon(it.status)}</span>
+          <span style={{ fontSize: 13, fontFamily: 'monospace', color: it.status === 'skipped' ? 'rgba(var(--fg),0.3)' : 'rgba(var(--fg),0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+            {it.artist ? `${it.artist} - ${it.title}` : (it.title || '(untitled)')}
+          </span>
+          {it.status === 'draft' && (
+            <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(240,190,80,0.75)', flexShrink: 0 }}>draft</span>
+          )}
+          {it.status === 'skipped' && (
+            <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', flexShrink: 0 }}>duplicate</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
@@ -3496,8 +3526,23 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
   const [fileProgress, setFileProgress] = useState({ done: 0, total: 0, matched: 0 });
   const [fileResult, setFileResult] = useState(null);
   const [fileError, setFileError] = useState('');
+  // Per-row live status: 'pending' | 'searching' | 'added' | 'draft' | 'skipped'
+  const [fileItems, setFileItems] = useState([]);
   const cancelFileImport = useRef(false);
   const importFileRef = useRef(null);
+  const importListRef = useRef(null);
+
+  // Keep the row currently being processed visible in the scrolling list.
+  useEffect(() => {
+    const active = importListRef.current?.querySelector('[data-active="1"]');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }, [fileProgress.done]);
+
+  function resetFileImport() {
+    setFileResult(null);
+    setFileItems([]);
+    setFileError('');
+  }
 
   // Resolve each parsed row against Discogs (vinyl-only search) and bulk-add.
   // Maximum-recall policy: a row is NEVER dropped. Best match wins (preferring
@@ -3525,21 +3570,20 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
     setFileImporting(true);
     setFileError('');
     setFileResult(null);
+    setFileItems(rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })));
     setFileProgress({ done: 0, total: rows.length, matched: 0 });
 
-    let matched = 0, drafts = 0, added = 0, skipped = 0;
-    let batch = [];
-    const flush = async () => {
-      if (!batch.length) return;
-      const res = await onAddRecordsBulk(batch);
-      added += res.added;
-      skipped += res.skipped;
-      batch = [];
-    };
+    const setItemStatus = (idx, status) => setFileItems(prev => {
+      const next = [...prev];
+      if (next[idx]) next[idx] = { ...next[idx], status };
+      return next;
+    });
 
+    let matched = 0, drafts = 0, added = 0, skipped = 0, stopped = false;
     for (let i = 0; i < rows.length; i++) {
-      if (cancelFileImport.current) break;
+      if (cancelFileImport.current) { stopped = true; break; }
       const row = rows[i];
+      setItemStatus(i, 'searching');
       let release = null;
       try {
         const res = await fetch('/api/discogs-search', {
@@ -3559,7 +3603,8 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           };
         }
       } catch { /* network hiccup: fall through to draft */ }
-      if (!release) {
+      const isDraft = !release;
+      if (isDraft) {
         drafts++;
         release = {
           id: null, artist: row.artist, title: row.title || '(untitled)',
@@ -3567,14 +3612,17 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           identified: false, confidence: 'low', source: 'file_import',
         };
       }
-      batch.push(release);
-      if (batch.length >= 10) await flush();
+      // Add one row at a time so each tick in the list reflects a record that
+      // is genuinely saved (and so duplicates are flagged on the right row).
+      const res = await onAddRecordsBulk([release]);
+      added += res.added;
+      skipped += res.skipped;
+      setItemStatus(i, res.skipped ? 'skipped' : (isDraft ? 'draft' : 'added'));
       setFileProgress({ done: i + 1, total: rows.length, matched });
       // Pace the Discogs fan-out to stay inside the shared rate limit.
       if (i < rows.length - 1) await new Promise(r => setTimeout(r, 650));
     }
-    await flush();
-    setFileResult({ added, skipped, matched, drafts });
+    setFileResult({ added, skipped, matched, drafts, stopped });
     setFileImporting(false);
   }
 
@@ -3943,6 +3991,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
           </AccountSection>
 
           <AccountSection label="Import from file" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
+            <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
             {!fileImporting && !fileResult && (
               <>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', lineHeight: 1.6, marginBottom: 12 }}>
@@ -3956,7 +4005,6 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                     </div>
                   ))}
                 </div>
-                <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
                 <button onClick={() => importFileRef.current?.click()}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -3980,9 +4028,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
                     transition: 'width 0.3s',
                   }} />
                 </div>
-                <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 10 }}>
+                <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 8 }}>
                   {fileProgress.done} / {fileProgress.total} · {fileProgress.matched} matched
                 </p>
+                <ImportStatusList items={fileItems} listRef={importListRef} />
                 <button onClick={() => { cancelFileImport.current = true; }}
                   style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Stop here
@@ -3992,22 +4041,42 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
             {!fileImporting && fileResult && (
               <div>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Check size={14} weight="bold" />Added {fileResult.added} record{fileResult.added === 1 ? '' : 's'}
+                  <Check size={14} weight="bold" />
+                  {fileResult.stopped ? `Stopped -- ${fileResult.added} of ${fileProgress.total} added` : `Added ${fileResult.added} record${fileResult.added === 1 ? '' : 's'}`}
                 </p>
                 {fileResult.drafts > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.45)', marginBottom: 4 }}>
-                    {fileResult.drafts} added as drafts -- open the record and use Re-identify to pin the exact release
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
+                    {fileResult.drafts} couldn't be matched -- added as drafts, marked amber below. Open each and use Re-identify to pin the exact release.
                   </p>
                 )}
                 {fileResult.skipped > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 10 }}>
-                    {fileResult.skipped} duplicates skipped
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
+                    {fileResult.skipped} already in your collection -- skipped as duplicates
                   </p>
                 )}
-                <button onClick={() => { setFileResult(null); setFileError(''); }}
-                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 6 }}>
-                  Import another file
-                </button>
+                <div style={{ marginTop: 8 }}>
+                  <ImportStatusList items={fileItems} listRef={importListRef} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button onClick={() => { resetFileImport(); setOpenSection(null); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600,
+                      color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)',
+                      border: 'none', cursor: 'pointer',
+                    }}>
+                    Done
+                  </button>
+                  <button onClick={() => { resetFileImport(); importFileRef.current?.click(); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 14px', borderRadius: 9, fontSize: 15,
+                      color: 'rgba(var(--fg),0.6)', background: 'rgba(var(--fg),0.05)',
+                      border: '1px solid rgba(var(--fg),0.1)', cursor: 'pointer',
+                    }}>
+                    <Upload size={14} />Import another file
+                  </button>
+                </div>
               </div>
             )}
           </AccountSection>
@@ -4386,7 +4455,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
 
 // ----- BatchView -------------------------------------------------------------
 
-function BatchView({ queue, processing, onResolve, onBatch, onStop, accentRGB }) {
+function BatchView({ queue, processing, onResolve, onBatch, onStop, accentRGB, onSignOut }) {
   if (queue.length === 0) {
     return (
       <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
@@ -4426,6 +4495,16 @@ function BatchView({ queue, processing, onResolve, onBatch, onStop, accentRGB })
           </button>
         )}
       </div>
+
+      {queue.some((i) => i.status === "error" && /session expired/i.test(i.errorMsg || "")) && (
+        <div className="mb-5 p-4 rounded-2xl" style={{ background: "rgba(202,254,4,0.05)", border: "1px solid rgba(202,254,4,0.22)" }}>
+          <div className="text-[13px] tracking-[0.2em] uppercase mb-1 font-mono" style={{ color: "rgba(202,254,4,0.7)" }}>Session expired</div>
+          <p className="text-sm text-white/40 mb-3">Your login needs a refresh. Sign out, sign straight back in, then rescan the failed items -- everything saved so far is safe.</p>
+          <button onClick={onSignOut} className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-mono font-semibold transition-all hover:opacity-85" style={{ background: "#cafe04", color: "#08080c", border: "none" }}>
+            <SignOut size={12} weight="bold" />Sign out now
+          </button>
+        </div>
+      )}
 
       {needsReview.length > 0 && (
         <div className="mb-5 p-4 rounded-2xl" style={{ background: "rgba(240,190,80,0.05)", border: "1px solid rgba(240,190,80,0.18)" }}>
@@ -5596,7 +5675,25 @@ function ConfidenceBadge({ confidence, identified, accentRGB }) {
   );
 }
 
-function ErrorView({ message, onReset, onManual }) {
+function ErrorView({ message, onReset, onManual, onSignOut }) {
+  const sessionExpired = /session expired/i.test(message || "");
+  if (sessionExpired) {
+    return (
+      <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "rgba(202,254,4,0.08)", border: "1px solid rgba(202,254,4,0.25)" }}>
+          <SignOut size={22} weight="light" style={{ color: "#cafe04" }} />
+        </div>
+        <h2 className="text-2xl mb-2 font-display"><span className="italic">Session</span> expired</h2>
+        <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">Your login needs a refresh. Sign out below, then sign straight back in -- your collection is safe and nothing is lost.</p>
+        <div className="flex items-center gap-2.5 flex-wrap justify-center">
+          <button onClick={onSignOut} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-mono font-semibold transition-all hover:opacity-85" style={{ background: "#cafe04", color: "#08080c", border: "none" }}>
+            <SignOut size={13} weight="bold" />Sign out now
+          </button>
+          <button onClick={onReset} className="px-5 py-2.5 rounded-full text-sm font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.12)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.03)" }}>Not now</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="pt-20 flex flex-col items-center text-center max-w-sm mx-auto">
       <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "rgba(220,80,80,0.08)", border: "1px solid rgba(220,80,80,0.22)" }}>

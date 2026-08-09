@@ -142,7 +142,22 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    // supabase-js contacts the server on signOut even for scope 'local'. A
+    // dead session (revoked refresh token) responds 401/403, which the
+    // library swallows and still clears storage -- fine. But when the server
+    // is unreachable the call errors WITHOUT clearing storage, leaving the
+    // user stuck "signed in" on a broken session. In that case clear the
+    // Supabase auth keys ourselves and reload to the login screen.
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (!error) return;
+    } catch { /* fall through to manual clear */ }
+    try {
+      Object.keys(localStorage)
+        .filter(k => /^sb-.+-auth-token/.test(k))
+        .forEach(k => localStorage.removeItem(k));
+    } catch { /* storage unavailable */ }
+    window.location.reload();
   }, []);
 
   const updateDisplayName = useCallback(async (name) => {
