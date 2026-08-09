@@ -5,3 +5,7 @@ dist/
 .vercel
 *.log
 .claude/
+
+# Playwright
+test-results/
+playwright-report/

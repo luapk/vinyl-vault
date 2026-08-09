@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
+import { initSentry, reportError } from "./lib/sentry.js";
+
+// Error tracking: inert unless VITE_SENTRY_DSN is configured (see lib/sentry.js).
+initSentry();
 
 // Wipe the service worker + all caches, then hard-reload. This is the escape
 // hatch when a bad or stale cached bundle would otherwise trap the user on a
@@ -27,6 +31,9 @@ class ErrorBoundary extends React.Component {
   }
   static getDerivedStateFromError(error) {
     return { error };
+  }
+  componentDidCatch(error, info) {
+    reportError(error, { componentStack: info?.componentStack });
   }
   render() {
     if (this.state.error) {

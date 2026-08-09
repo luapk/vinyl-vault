@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
+import { setSentryUser } from '../lib/sentry.js';
 
 // "admin" is a convenience alias for the real admin account.
 const ADMIN_EMAIL = 'admin@vault.local';
@@ -61,15 +62,25 @@ export function useAuth() {
       }).catch(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         setUser(session?.user ?? null);
         setAccessToken(session?.access_token ?? null);
         if (session?.user) {
           // For INITIAL_SESSION, reuse any in-flight getSession fetch.
           // For subsequent events (TOKEN_REFRESHED, SIGNED_IN) always re-fetch.
-          const fetch = event === 'INITIAL_SESSION' ? fetchProfileOnce : fetchProfile;
-          const p = await fetch(session.user.id);
-          setProfile(p);
+          const fetchFn = event === 'INITIAL_SESSION' ? fetchProfileOnce : fetchProfile;
+          // DEADLOCK GUARD -- do not await supabase calls inside this callback.
+          // supabase-js awaits these callbacks while holding its auth lock (and
+          // during initialize()); a query here calls getSession(), which waits
+          // for initialize() to finish -> circular wait. When the emission
+          // fires during a with-session boot the whole client wedges: profile,
+          // admin and connections never load until a lucky reload wins the
+          // race. Dispatching after the emission (per supabase's own docs)
+          // breaks the cycle. Found by stress/session.spec.mjs.
+          setTimeout(async () => {
+            const p = await fetchFn(session.user.id);
+            setProfile(p);
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
           // Only clear profile on explicit sign-out, not on token refresh edge cases
           // where session is briefly null before a new token arrives.
@@ -79,6 +90,10 @@ export function useAuth() {
     );
     return () => subscription.unsubscribe();
   }, [fetchProfile, fetchProfileOnce]);
+
+  // Tag error reports with the (anonymous) user id so a tester's repeated
+  // crashes group together. No-op without a Sentry DSN.
+  useEffect(() => { setSentryUser(user); }, [user?.id]);
 
   // Self-healing profile load. The boot-time fetch can fail silently on a
   // cold start: the stored access token may be expired and the query races
@@ -145,11 +160,14 @@ export function useAuth() {
     // supabase-js contacts the server on signOut even for scope 'local'. A
     // dead session (revoked refresh token) responds 401/403, which the
     // library swallows and still clears storage -- fine. But when the server
-    // is unreachable the call errors WITHOUT clearing storage, leaving the
-    // user stuck "signed in" on a broken session. In that case clear the
-    // Supabase auth keys ourselves and reload to the login screen.
+    // is unreachable the call errors WITHOUT clearing storage, and it can sit
+    // for 25s+ behind an in-flight refresh retry loop that holds the auth
+    // lock. A user tapping Sign out must not stare at a dead button: cap the
+    // graceful attempt at 3.5s, then clear the Supabase auth keys ourselves
+    // and reload to the login screen. (Timing verified by stress/session.spec.mjs.)
     try {
-      const { error } = await supabase.auth.signOut();
+      const capped = new Promise((resolve) => setTimeout(() => resolve({ error: new Error('sign-out timed out') }), 3500));
+      const { error } = await Promise.race([supabase.auth.signOut(), capped]);
       if (!error) return;
     } catch { /* fall through to manual clear */ }
     try {

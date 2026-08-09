@@ -15,7 +15,25 @@ A vinyl record collection manager. Scan a record sleeve photo, identify it via A
 npm install
 npm run dev      # localhost:5173
 npm run build    # production build
+npm test         # unit tests (vitest)
+npm run stress   # fault-injection E2E suite (Playwright; see stress/README.md)
+npm run test:all # both
 ```
+
+### Stress suite
+`stress/` contains the fault-injection E2E tests: the real app in a real
+browser against a mock Supabase (`stress/mock-supabase.mjs`) that faithfully
+models refresh-token rotation + reuse revocation. It covers the session
+lifecycle (revoked sessions, unreachable auth server, sign-out always works),
+the no-data-loss sync invariant under database faults, and the PWA + tab
+concurrent-refresh race that guards the auth lock. CI runs it on every push
+(`.github/workflows/test.yml`). When touching auth, sync, or session code,
+run `npm run stress` before shipping.
+
+### Error tracking (Sentry)
+`src/lib/sentry.js` -- inert unless the Vercel env var `VITE_SENTRY_DSN` is
+set (create a free React project at sentry.io and paste its DSN). No PII is
+sent; users are tagged by Supabase user id only.
 
 ## Project structure
 
@@ -132,7 +150,8 @@ Each record is a JSON blob stored in the `data` jsonb column:
 
 ## Known quirks
 
-- **Auth lock**: `supabase.js` uses a **re-entrant, bounded-wait** `navigator.locks` auth lock (verified in-browser). Cross-context serialisation prevents refresh-token reuse revocation (the "session expired" sign-outs when a PWA window + tab share storage); a module-level depth counter short-circuits supabase-js's re-entrant acquires (a naive lock self-deadlocks -- do not simplify this away); a 5s cap means a hung holder degrades one refresh instead of freezing the app. Same-tab parallel acquires run unlocked deliberately: one client instance dedupes concurrent refreshes internally.
+- **Auth lock**: `supabase.js` uses a **strictly serialising, bounded-wait** `navigator.locks` auth lock. Cross-context serialisation prevents refresh-token reuse revocation (the "session expired" sign-outs when a PWA window + tab share storage); a 5s cap means a hung holder degrades one call instead of freezing the app. supabase-js never re-enters an injected lock (its `_acquireLock` queues nested acquires internally), so no re-entrancy short-circuit is needed -- and an earlier same-tab short-circuit let refreshes bypass serialisation and replay stale tokens (caught by `stress/race.spec.mjs`; do not reintroduce it).
+- **onAuthStateChange deadlock guard**: never `await` a supabase call inside the `onAuthStateChange` callback (`useAuth.js`). supabase-js awaits these callbacks while holding its auth lock; a query there calls `getSession()`, which waits on `initialize()`, which waits on the callback -- a circular wait that wedges the whole client on with-session boots (the historic "profile/admin/community missing until refresh" hydration bug). Dispatch follow-up work with `setTimeout(..., 0)`. Regression-tested by `stress/session.spec.mjs`.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
