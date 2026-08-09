@@ -915,6 +915,7 @@ export default function VinylVault() {
     const base64Data = dataUrl.split(",")[1];
     const response = await scanFetch({ image: base64Data, mediaType: "image/jpeg" }, signal);
     if (response.status === 402) throw new Error("scan_limit_reached");
+    if (response.status === 401) throw new Error("Your session expired. Sign out and back in, then try again.");
     if (!response.ok) {
       const errorBody = await response.text();
       throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
@@ -2880,9 +2881,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
         body: JSON.stringify({ artist: searchArtist, title: searchTitle, catalogNumber: searchCatno }),
       });
       const data = await res.json();
+      // Never show a failed search as "no results" (rate limits, hiccups).
+      if (!res.ok) throw new Error(data.error || `Search failed (${res.status})`);
       setReidentifyResults(data.matches || []);
     } catch (err) {
-      setReidentifyError('Search failed. Check your connection.');
+      setReidentifyError(`Search failed: ${err.message || 'connection error'}. Try again in a moment.`);
     }
     setReidentifyLoading(false);
   };
@@ -4817,9 +4820,12 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
         body: JSON.stringify({ artist: artist.trim(), title: title.trim(), catalogNumber: catno.trim() }),
       });
       const data = await res.json();
+      // A failed search must never masquerade as "no matches" -- rate limits
+      // and Discogs hiccups were being shown as not-found.
+      if (!res.ok) throw new Error(data.error || `Search failed (${res.status})`);
       setResults(data.matches || []);
-    } catch {
-      setError('Search failed. Check your connection and try again.');
+    } catch (err) {
+      setError(`Search failed: ${err.message}. Try again in a moment.`);
     }
     setLoading(false);
   };
