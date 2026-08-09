@@ -4901,7 +4901,6 @@ const SPLASH_V = '4';
 const SPLASH_CLIPS = [
   { src: `/splash.webp?v=${SPLASH_V}`, dur: 5 },
   { src: `/splash2.webp?v=${SPLASH_V}`, dur: 5 },
-  { src: `/splash3.webp?v=${SPLASH_V}`, dur: 8 },
   { src: `/splash4.webp?v=${SPLASH_V}`, dur: 6 },
 ];
 
