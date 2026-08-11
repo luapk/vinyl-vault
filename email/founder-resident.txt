@@ -1,0 +1,63 @@
+Subject: You're on the first pressing
+Preview: Resident, free, with our thanks.
+
+---
+
+VINYL VAULT * FOUNDER PRESSING * FIRST EDITION
+
+YOU'RE ON THE FIRST PRESSING
+
+Every record you love had a first pressing. A small run, done before
+anyone knew if the thing would fly. Hand-scratched matrix numbers. The
+odd wobble in the vinyl. Worth more than every pressing that came after,
+because it was there first.
+
+That's you. You scanned sleeves in bad light, fine-tuned wrong matches,
+told us when your records vanished (twice, sorry), and generally treated
+a half-built app like it deserved your collection.
+
+It does now, because of you.
+
+BEFORE THE DOORS OPEN
+
+RESIDENT. Our top tier is yours. Free.
+Not a trial. Not a year. Yours.
+
+SIDE A: WHILE YOU WERE TESTING
+
+A1  Label scanner
+    Point the camera at the label. It reads the catalogue number and
+    finds your exact pressing, not just the album.
+
+A2  Key and BPM on every track
+    Your sets mix in key before you have touched a fader.
+
+A3  The list view
+    Your whole collection as a sortable table. Artist, cat no., country,
+    year, label. One tap to CSV.
+
+A4  Bulk import
+    Upload any old list, even a scruffy text file, and it builds the
+    records for you.
+
+A5  What it is worth
+    Real Discogs sale prices for your copy, broken down by condition.
+
+A6  The Beatles
+    Now file under B. As they should.
+
+Launch is close. When the new diggers arrive, they will be walking into
+a shop you helped build.
+
+Thanks for crossing the threshold first.
+
+OPEN YOUR VAULT: https://vinyl-vault-teal.vercel.app/
+Resident is already on your account. No code, no catch.
+
+Paul
+Vinyl Vault
+
+VV-001-A * For the ones who were here first
+
+You are getting this because you tested Vinyl Vault.
+Unsubscribe: {{unsubscribe_url}}
