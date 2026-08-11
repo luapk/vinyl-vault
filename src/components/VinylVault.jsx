@@ -5,7 +5,7 @@ import {
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
-  MusicNotes, Waveform, Export, DeviceMobile,
+  MusicNotes, Waveform, Export, DeviceMobile, Rows,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -2047,8 +2047,10 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
   // Carousel vs grid is a personal preference: remember the last choice so
   // the collection reopens the way the user left it.
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem('vv_view_mode') === 'grid' ? 'grid' : 'carousel'; }
-    catch { return 'carousel'; }
+    try {
+      const stored = localStorage.getItem('vv_view_mode');
+      return stored === 'grid' || stored === 'list' ? stored : 'carousel';
+    } catch { return 'carousel'; }
   });
   useEffect(() => {
     try { localStorage.setItem('vv_view_mode', viewMode); } catch { /* storage unavailable */ }
@@ -2220,7 +2222,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
               <PredictiveSearch value={search} onChange={setSearch} collection={collection} accentRGB={accentRGB} />
             </div>
             <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(var(--fg),0.08)" }}>
-              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }].map(({ id, Icon }) => (
+              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }, { id: "list", Icon: Rows }].map(({ id, Icon }) => (
                 <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(var(--fg),0.09)" : "transparent", color: viewMode === id ? "rgba(var(--fg),0.85)" : "rgba(var(--fg),0.50)" }}>
                   <Icon size={14} />
                 </button>
@@ -2322,6 +2324,9 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
           {viewMode === "carousel" && sortedFiltered.length > 0 && (
             <VinylCarousel records={sortedFiltered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
           )}
+          {viewMode === "list" && sortedFiltered.length > 0 && (
+            <RecordListView records={sortedFiltered} onSelect={(r) => setDetailRecordId(r.id)} onDownloadCSV={onDownloadCSV} accentRGB={accentRGB} />
+          )}
           {viewMode === "grid" && sortedFiltered.length > 0 && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -2353,6 +2358,103 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
           onClose={() => onShowBatchLabelModal(false)}
         />
       )}
+    </div>
+  );
+}
+
+// ----- RecordListView --------------------------------------------------------
+
+// Text table of the collection: sortable by clicking any column header, with
+// a CSV export at the top. Search/crate filters from the toolbar above apply
+// (records arrive pre-filtered); header sorting overrides the incoming order.
+const LIST_COLS = [
+  { key: 'artist', label: 'Artist' },
+  { key: 'title', label: 'Release' },
+  { key: 'catalogNumber', label: 'Cat No.' },
+  { key: 'country', label: 'Country' },
+  { key: 'year', label: 'Year' },
+  { key: 'label', label: 'Label' },
+];
+
+function RecordListView({ records, onSelect, onDownloadCSV, accentRGB }) {
+  const [sort, setSort] = useState({ key: null, dir: 1 });
+
+  const sorted = useMemo(() => {
+    if (!sort.key) return records;
+    const { key, dir } = sort;
+    return [...records].sort((a, b) => {
+      const av = a[key], bv = b[key];
+      // Blanks always sink to the bottom regardless of direction.
+      if (av == null || av === '') return bv == null || bv === '' ? 0 : 1;
+      if (bv == null || bv === '') return -1;
+      if (key === 'year') return (Number(av) - Number(bv)) * dir;
+      return String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' }) * dir;
+    });
+  }, [records, sort]);
+
+  const toggleSort = (key) => {
+    setSort(prev => prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[12px] font-mono" style={{ color: 'rgba(var(--fg),0.35)' }}>
+          {sorted.length} record{sorted.length === 1 ? '' : 's'}
+        </span>
+        <button onClick={onDownloadCSV}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[11px] tracking-[0.12em] uppercase font-mono transition-all hover:opacity-80"
+          style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.1)', color: 'rgba(var(--fg),0.65)' }}>
+          <DownloadSimple size={13} />Export CSV
+        </button>
+      </div>
+      <div className="rounded-2xl" style={{ border: '1px solid rgba(var(--fg),0.08)', overflowX: 'auto' }}>
+        <table className="w-full" style={{ minWidth: 640, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid rgba(var(--fg),0.1)' }}>
+              <th style={{ width: 44 }} />
+              {LIST_COLS.map(({ key, label }) => (
+                <th key={key} className="text-left px-3 py-2.5">
+                  <button onClick={() => toggleSort(key)}
+                    className="inline-flex items-center gap-1.5 text-[10px] tracking-[0.16em] uppercase font-mono transition-all hover:opacity-80"
+                    style={{ color: sort.key === key ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.45)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    {label}
+                    <CaretDown size={10} weight="bold"
+                      style={{ opacity: sort.key === key ? 1 : 0.25, transform: sort.key === key && sort.dir === -1 ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                  </button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((r) => (
+              <tr key={r.id} onClick={() => onSelect?.(r)}
+                className="cursor-pointer transition-colors"
+                style={{ borderBottom: '1px solid rgba(var(--fg),0.05)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(var(--fg),0.04)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <td className="pl-3 py-1.5">
+                  <div className="w-7 h-7 rounded-md overflow-hidden" style={{ border: '1px solid rgba(var(--fg),0.07)', background: 'rgba(var(--fg),0.04)' }}>
+                    {r.coverUrl && <img src={r.coverUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />}
+                  </div>
+                </td>
+                <td className="px-3 py-1.5 text-[13px] font-mono" style={{ color: 'rgba(var(--fg),0.8)', maxWidth: 200 }}>
+                  <span className="block truncate">{r.artist || '-'}</span>
+                </td>
+                <td className="px-3 py-1.5 text-[13px]" style={{ color: 'rgba(var(--fg),0.65)', maxWidth: 240 }}>
+                  <span className="block truncate">{r.title || '-'}</span>
+                </td>
+                <td className="px-3 py-1.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'rgba(var(--fg),0.5)' }}>{r.catalogNumber || '-'}</td>
+                <td className="px-3 py-1.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'rgba(var(--fg),0.5)' }}>{r.country || '-'}</td>
+                <td className="px-3 py-1.5 text-[12px] font-mono whitespace-nowrap" style={{ color: 'rgba(var(--fg),0.5)' }}>{r.year || '-'}</td>
+                <td className="px-3 py-1.5 text-[12px] font-mono" style={{ color: 'rgba(var(--fg),0.5)', maxWidth: 180 }}>
+                  <span className="block truncate">{r.label || '-'}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
