@@ -7,6 +7,21 @@
 <meta name="color-scheme" content="light" />
 <meta name="supported-color-schemes" content="light" />
 <title>You're on the first pressing</title>
+<!--
+  SENDING SETTINGS (set these in the ESP, they are not part of the HTML)
+    From name .... Vinyl Vault
+    From address . something@ a domain you control, e.g. hello@vinylvault.app
+                   Never a bare gmail.com address: it fails DMARC alignment
+                   and lands in spam.
+    Reply-to ..... a monitored inbox, replies to this one are worth reading
+    Subject ...... You're on the first pressing
+    Preheader .... Resident, free, with our thanks.
+    Auth ......... SPF, DKIM and DMARC on the sending domain before the send
+  Set every recipient to the Resident tier in the admin panel BEFORE sending,
+  so "already on your account" is true when they click through.
+-->
+<!-- Sender identity, used by some clients in the inbox list -->
+<meta name="author" content="Vinyl Vault" />
 <!--[if mso]>
 <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
 <![endif]-->
@@ -65,7 +80,7 @@
     <!-- ============ HERO ============ -->
     <tr>
       <td align="center" style="padding:14px 20px 0 20px;">
-        <img class="hero-img" src="https://vinyl-vault-teal.vercel.app/email/founder-still.png" width="340" alt="A record flight case holding up a record for you" style="display:block; width:340px; max-width:100%; height:auto; margin:0 auto;" />
+        <img class="hero-img" src="https://vinyl-vault-teal.vercel.app/email/founder-walk.png" width="230" alt="The Vinyl Vault record case, walking along happily" style="display:block; width:230px; max-width:100%; height:auto; margin:0 auto;" />
       </td>
     </tr>
 
@@ -98,18 +113,16 @@
       <td class="px" align="center" style="padding:34px 48px 0 48px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #08080c; border-radius:14px;">
           <tr>
-            <td align="center" style="padding:22px 18px 24px 18px;">
-              <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace; font-size:10px; letter-spacing:0.26em; text-transform:uppercase; color:#42520a; padding-bottom:10px;">
+            <td align="center" style="padding:20px 18px 24px 18px;">
+              <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace; font-size:10px; letter-spacing:0.26em; text-transform:uppercase; color:#42520a; padding-bottom:12px;">
                 Before the doors open
               </div>
-              <div class="stamp-word" style="font-family:'Instrument Serif',Georgia,'Times New Roman',serif; font-size:56px; line-height:56px; letter-spacing:0.06em; text-transform:uppercase; color:#08080c; padding-bottom:8px;">
-                Resident
-              </div>
-              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif; font-size:17px; line-height:26px; color:#08080c; font-weight:600;">
+              <img src="https://vinyl-vault-teal.vercel.app/email/founder-resident-label.png" width="440" alt="Resident tier. Thirty nine pounds a year, scratched out. Free for founder members." style="display:block; width:440px; max-width:100%; height:auto; margin:0 auto; padding-bottom:14px;" />
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif; font-size:18px; line-height:26px; color:#08080c; font-weight:700;">
                 Our top tier is yours. Free.
               </div>
-              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif; font-size:15px; line-height:24px; color:#42520a; padding-top:2px;">
-                Not a trial. Not a year. Yours.
+              <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Helvetica,Arial,sans-serif; font-size:15px; line-height:24px; color:#42520a; padding-top:3px;">
+                Normally &pound;39 a year. Not a trial, not a promo. Yours for good.
               </div>
             </td>
           </tr>
@@ -269,7 +282,7 @@
         </table>
         <!--<![endif]-->
         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace; font-size:11px; letter-spacing:0.1em; color:#42520a; padding-top:12px;">
-          Resident is already on your account. No code, no catch.
+          Already on your account. No code, no catch.
         </div>
       </td>
     </tr>

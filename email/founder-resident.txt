@@ -1,3 +1,4 @@
+From name: Vinyl Vault
 Subject: You're on the first pressing
 Preview: Resident, free, with our thanks.
 
@@ -21,7 +22,7 @@ It does now, because of you.
 BEFORE THE DOORS OPEN
 
 RESIDENT. Our top tier is yours. Free.
-Not a trial. Not a year. Yours.
+Normally GBP 39 a year. Not a trial, not a promo. Yours for good.
 
 SIDE A: WHILE YOU WERE TESTING
 
@@ -52,7 +53,7 @@ a shop you helped build.
 Thanks for crossing the threshold first.
 
 OPEN YOUR VAULT: https://vinyl-vault-teal.vercel.app/
-Resident is already on your account. No code, no catch.
+Already on your account. No code, no catch.
 
 Paul
 Vinyl Vault
