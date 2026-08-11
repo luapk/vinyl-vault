@@ -30,8 +30,8 @@ A1  Label scanner
     Point the camera at the label. It reads the catalogue number and
     finds your exact pressing, not just the album.
 
-A2  Key and BPM on every track
-    Your sets mix in key before you have touched a fader.
+A2  BPM selection tool
+    Mix your sets silky smooth before you even touch a fader.
 
 A3  The list view
     Your whole collection as a sortable table. Artist, cat no., country,
@@ -43,9 +43,6 @@ A4  Bulk import
 
 A5  What it is worth
     Real Discogs sale prices for your copy, broken down by condition.
-
-A6  The Beatles
-    Now file under B. As they should.
 
 Launch is close. When the new diggers arrive, they will be walking into
 a shop you helped build.
