@@ -10,11 +10,15 @@ create table if not exists public.profiles (
   email       text not null,
   role        text not null default 'user' check (role in ('user', 'admin')),
   avatar_url  text,
+  -- Campaign email only. Account mail (password resets and the like) ignores
+  -- this flag. Set by /api/unsubscribe; the send script filters on it.
+  marketing_opt_out boolean not null default false,
   created_at  timestamptz not null default now()
 );
 
--- Migration for existing databases:
+-- Migrations for existing databases:
 -- alter table public.profiles add column if not exists avatar_url text;
+-- alter table public.profiles add column if not exists marketing_opt_out boolean not null default false;
 
 alter table public.profiles enable row level security;
 

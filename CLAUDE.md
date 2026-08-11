@@ -63,6 +63,13 @@ api/                   # Vercel serverless functions (all secret keys live here)
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
 
+email/                 # founder campaign email
+  founder-resident.html  # the build (also .txt for the plain-text part)
+  README.md              # send runbook: domain auth, env vars, dry run, send
+
+scripts/
+  send-campaign.mjs    # CSV -> Resend batch send, signed unsubscribe per recipient
+
 supabase/
   schema.sql           # full schema (run on a fresh project)
   storage.sql          # storage buckets: avatars (profile photos), covers (cached cover art)
@@ -81,6 +88,7 @@ supabase/
 - `DISCOGS_TOKEN` -- Discogs API
 - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` -- Spotify BPM/key lookup
 - `GETSONGBPM_API_KEY` -- GetSongBPM (first-pass BPM by artist + title). Free key from getsongbpm.com/api. Requires a visible dofollow backlink to getsongbpm.com (rendered in the Tracks view) or the account is suspended.
+- `UNSUBSCRIBE_SECRET` -- HMAC secret for campaign unsubscribe links (`/api/unsubscribe`). Must match the value used by `scripts/send-campaign.mjs` at send time.
 
 ### Vercel (client-side, exposed to browser)
 - `VITE_SUPABASE_URL` -- Supabase project URL
@@ -114,6 +122,10 @@ create policy "profiles_select" on public.profiles
   for select using (auth.uid() = id or public.is_admin());
 create policy "profiles_admin_update" on public.profiles
   for update using (public.is_admin());
+
+-- Campaign email opt-out (set by /api/unsubscribe)
+alter table public.profiles
+  add column if not exists marketing_opt_out boolean not null default false;
 
 -- Allow users to update their own profile row
 drop policy if exists "profiles_self_update" on public.profiles;

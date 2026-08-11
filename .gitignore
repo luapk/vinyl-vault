@@ -9,3 +9,6 @@ dist/
 # Playwright
 test-results/
 playwright-report/
+
+# Campaign send log: contains real recipient addresses, never commit
+email/.sent-*.log
