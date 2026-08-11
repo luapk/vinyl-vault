@@ -61,7 +61,7 @@ const TIERS = [
     comingSoon: false,
     priceEnvKey: 'VITE_STRIPE_PRICE_RESIDENT_YEAR',
     features: [
-      'Harmonic and key sorting',
+      'Individual BPM track detection for set building',
       'Saved, reorderable set crates',
       'Offline booth mode',
       'Priority support and early access',
