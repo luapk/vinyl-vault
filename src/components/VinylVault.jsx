@@ -2042,6 +2042,10 @@ function RotatingCube({ color, size = 9 }) {
 
 // ----- CollectionView --------------------------------------------------------
 
+// Record-shop filing rule: a leading "The " is silent when sorting artist
+// names, so The Beatles files under B and The Cure under C.
+const artistSortKey = (v) => String(v || '').replace(/^the\s+/i, '');
+
 function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   // Carousel vs grid is a personal preference: remember the last choice so
@@ -2126,7 +2130,8 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
   const sortedFiltered = useMemo(() => {
     if (sortBy === 'added') return filtered;
     const col = sortBy === 'artist' ? 'artist' : sortBy === 'title' ? 'title' : 'label';
-    return [...filtered].sort((a, b) => (a[col] || '').localeCompare(b[col] || ''));
+    const keyOf = (r) => col === 'artist' ? artistSortKey(r[col]) : (r[col] || '');
+    return [...filtered].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
   }, [filtered, sortBy]);
 
   useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate, sortBy]);
@@ -2388,7 +2393,9 @@ function RecordListView({ records, onSelect, onDownloadCSV, accentRGB }) {
       if (av == null || av === '') return bv == null || bv === '' ? 0 : 1;
       if (bv == null || bv === '') return -1;
       if (key === 'year') return (Number(av) - Number(bv)) * dir;
-      return String(av).localeCompare(String(bv), undefined, { sensitivity: 'base' }) * dir;
+      const as = key === 'artist' ? artistSortKey(av) : String(av);
+      const bs = key === 'artist' ? artistSortKey(bv) : String(bv);
+      return as.localeCompare(bs, undefined, { sensitivity: 'base' }) * dir;
     });
   }, [records, sort]);
 
