@@ -1355,10 +1355,12 @@ export default function VinylVault() {
         <div className="fixed inset-0 z-50 flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
           onClick={() => setShowPricingModal(false)}>
-          <div style={{ width: '100%', maxWidth: 420, padding: '0 16px' }} onClick={e => e.stopPropagation()}>
+          {/* Acid card on the scrim: the tier panels are drawn as ink keylines
+              on acid, so they need the acid ground to read at all. */}
+          <div className="vv-pricing-wrap" style={{ width: '100%', padding: '20px 16px 18px', margin: '0 16px', borderRadius: 24, background: '#cafe04', maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <TierCarousel onGetStarted={() => setShowPricingModal(false)} onCheckout={startCheckout} />
             <button onClick={() => setShowPricingModal(false)}
-              style={{ display: 'block', margin: '16px auto 0', fontSize: 13, fontFamily: 'monospace', color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ display: 'block', margin: '16px auto 0', fontSize: 13, fontFamily: 'monospace', color: 'rgba(8,8,12,0.55)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               Close
             </button>
           </div>

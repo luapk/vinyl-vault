@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Check, CaretLeft, CaretRight } from '@phosphor-icons/react';
+import { Check, CaretRight } from '@phosphor-icons/react';
 import {
   PRICE_SELECTOR_YEAR,
   PRICE_RESIDENT_YEAR,
@@ -81,14 +81,20 @@ function anim(delay = 0) {
 
 // ---- Compact tier card -------------------------------------------------------
 
-const ROUNDEL = 168; // px -- visible roundel diameter
-const OVERLAP = 68;  // px -- how much roundel hangs above the glass card
-// How much of the roundel sits inside the card (= ROUNDEL - OVERLAP)
-const ROUNDEL_INSIDE = ROUNDEL - OVERLAP; // 100px
+const ROUNDEL = 150; // px -- visible roundel diameter
+const OVERLAP = 62;  // px -- how much roundel hangs above the panel
+// How much of the roundel sits inside the panel (= ROUNDEL - OVERLAP)
+const ROUNDEL_INSIDE = ROUNDEL - OVERLAP;
 
-function TierCard({ tier, onGetStarted, onCheckout }) {
-  const { image, name, price, billing, accentRGB, comingSoon, founding, features, priceEnvKey, foundingPriceEnvKey } = tier;
-  const ctaOnDark = accentRGB === '201,255,0' || accentRGB === '96,237,214';
+// What the next tier up buys you. Named, not vague: the panel edge peeking at
+// the right says "there is more", this says what the more actually is.
+const UPSELL = {
+  Digger:   'Selector adds unlimited scans',
+  Selector: 'Resident adds set crates and booth mode',
+};
+
+function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {
+  const { image, name, price, billing, comingSoon, founding, features, priceEnvKey, foundingPriceEnvKey } = tier;
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const handleCta = async () => {
@@ -108,32 +114,31 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
     try { await onCheckout(priceId); } catch { setCheckoutLoading(false); }
   };
 
+  const upsell = UPSELL[name];
+
   return (
     // Outer wrapper provides space for the overhanging roundel
-    <div style={{ paddingTop: OVERLAP, width: '100%', boxSizing: 'border-box' }}>
-      {/* Dark card -- a solid near-black chip so it pops on the acid page.
-          Interior colours are hardcoded white so the card never flips with the
-          app theme (the page is always acid here). */}
+    <div style={{ paddingTop: OVERLAP, width: '100%', height: '100%', boxSizing: 'border-box' }}>
+      {/* Panel: acid page showing through, described by an ink keyline. No
+          fill, no shadow -- the shape is the drawing. */}
       <div style={{
         position: 'relative',
-        borderRadius: 22,
-        background: comingSoon
-          ? '#131217'
-          : `linear-gradient(145deg, rgba(${accentRGB},0.20) 0%, rgba(${accentRGB},0.06) 55%, rgba(255,255,255,0.02) 100%), #121116`,
-        border: `1px solid ${comingSoon ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.14)'}`,
-        boxShadow: comingSoon
-          ? '0 10px 30px -12px rgba(0,0,0,0.5)'
-          : `0 22px 50px -14px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.14)`,
-        opacity: comingSoon ? 0.72 : 1,
+        height: '100%',
+        borderRadius: 20,
+        background: 'transparent',
+        border: `2px ${comingSoon ? 'dashed' : 'solid'} ${INK}`,
+        opacity: comingSoon ? 0.5 : 1,
         // Top padding makes room for the roundel that overlaps from above
-        paddingTop: ROUNDEL_INSIDE + 14,
-        paddingBottom: 18,
-        paddingLeft: 20,
-        paddingRight: 20,
+        paddingTop: ROUNDEL_INSIDE + 12,
+        paddingBottom: 16,
+        paddingLeft: 18,
+        paddingRight: 18,
         boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
 
-        {/* Roundel -- floats above the card top edge */}
+        {/* Roundel -- floats over the top keyline like a sticker on a frame */}
         <img src={image} alt={name} style={{
           position: 'absolute',
           top: -OVERLAP,
@@ -142,28 +147,28 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
           width: ROUNDEL,
           height: ROUNDEL,
           objectFit: 'contain',
-          filter: comingSoon ? 'grayscale(0.4) brightness(0.75)' : 'none',
+          filter: comingSoon ? 'grayscale(1) opacity(0.6)' : 'none',
           pointerEvents: 'none',
         }} />
 
         {/* Tier name */}
-        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.5)', marginBottom: 3, textAlign: 'center' }}>
           {name}
         </div>
 
         {/* Price row */}
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5, marginBottom: founding ? 3 : 12 }}>
-          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: comingSoon ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.95)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 5, marginBottom: founding ? 2 : 12 }}>
+          <span style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: INK }}>
             {price}
           </span>
           {billing && (
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>{billing}</span>
+            <span style={{ fontSize: 11, color: 'rgba(8,8,12,0.5)', fontFamily: 'monospace' }}>{billing}</span>
           )}
         </div>
 
         {/* Founding note */}
         {founding && (
-          <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: `rgb(${accentRGB})`, fontFamily: 'monospace', fontWeight: 600, opacity: 0.9 }}>
+          <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: 'rgba(8,8,12,0.7)', fontFamily: 'monospace', fontWeight: 600 }}>
             {foundingPriceEnvKey && import.meta.env[foundingPriceEnvKey]
               ? <button onClick={handleFounding} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>{founding}</button>
               : founding}
@@ -171,135 +176,127 @@ function TierCard({ tier, onGetStarted, onCheckout }) {
         )}
 
         {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.1)', marginBottom: 11 }} />
+        <div style={{ height: 1, background: 'rgba(8,8,12,0.18)', marginBottom: 11 }} />
 
         {/* Features */}
         {features.map(f => (
           <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 7 }}>
-            <Check size={11} weight="bold" style={{ color: `rgba(${accentRGB},0.9)`, marginTop: 2, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', lineHeight: 1.4 }}>{f}</span>
+            <Check size={11} weight="bold" style={{ color: INK, marginTop: 2, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'rgba(8,8,12,0.78)', lineHeight: 1.4 }}>{f}</span>
           </div>
         ))}
 
-        {/* CTA */}
+        {/* CTA -- ink with white type, the one solid mass on the panel */}
         <button
           onClick={handleCta}
           disabled={comingSoon || checkoutLoading}
+          className="vv-tier-cta"
           style={{
             width: '100%',
-            marginTop: 14,
-            padding: '11px 0',
-            borderRadius: 13,
+            marginTop: 'auto',
+            padding: '12px 0',
+            borderRadius: 12,
             fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: '0.01em',
+            fontWeight: 700,
+            letterSpacing: '0.02em',
             cursor: comingSoon || checkoutLoading ? 'default' : 'pointer',
-            border: comingSoon ? '1px solid rgba(255,255,255,0.08)' : `1px solid rgba(${accentRGB},0.45)`,
-            background: comingSoon
-              ? 'rgba(255,255,255,0.05)'
-              : `linear-gradient(160deg, rgba(${accentRGB},0.92) 0%, rgba(${accentRGB},0.65) 100%)`,
-            color: comingSoon ? 'rgba(255,255,255,0.25)' : ctaOnDark ? '#000' : '#fff',
-            boxShadow: comingSoon ? 'none' : `0 4px 20px rgba(${accentRGB},0.28), inset 0 1px 0 rgba(255,255,255,0.18)`,
-            transition: 'all 0.15s',
+            border: 'none',
+            background: comingSoon ? 'rgba(8,8,12,0.25)' : INK,
+            color: '#ffffff',
+            transition: 'opacity 0.15s',
             opacity: checkoutLoading ? 0.7 : 1,
           }}>
           {checkoutLoading ? 'Redirecting...' : comingSoon ? 'Coming soon' : 'Get started'}
         </button>
+
+        {/* Where the ladder goes next. Reserves its line on every panel so the
+            panels stay the same height whether or not there is a tier above. */}
+        <div className="vv-tier-upsell" style={{ minHeight: 16, marginTop: 9, textAlign: 'center' }}>
+          {upsell && (
+            <button onClick={onUpsell}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.04em', color: 'rgba(8,8,12,0.55)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              {upsell}
+              <CaretRight size={9} weight="bold" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ---- Swipe carousel ----------------------------------------------------------
+// ---- Tier row ----------------------------------------------------------------
 
+// Three named tiers do not need dots. On narrow screens the row is a
+// scroll-snap track where the next panel is deliberately left peeking at the
+// right edge: the cut-off shape is what says "there is another tier", with no
+// animation to wait for and nothing to discover. Wide screens drop the
+// scrolling entirely and show all three at once (see .vv-tier-* in index.css).
+// Below the row, the tier NAMES act as the control, so you can always read
+// what your options are instead of decoding anonymous dots.
 export function TierCarousel({ onGetStarted, onCheckout }) {
   const [idx, setIdx] = useState(0);
-  const startXRef   = useRef(null);
-  const startTRef   = useRef(null);
-  const didDragRef  = useRef(false);
-  const [dragging, setDragging]     = useState(false);
-  const [dragDelta, setDragDelta]   = useState(0);
-  const mouseDownX = useRef(null);
+  const rowRef = useRef(null);
+  const cellRefs = useRef([]);
 
-  const goTo = i => setIdx(Math.max(0, Math.min(TIERS.length - 1, i)));
-
-  const onTouchStart = e => {
-    startXRef.current = e.touches[0].clientX;
-    startTRef.current = performance.now();
-    didDragRef.current = false;
-    setDragging(true); setDragDelta(0);
-  };
-  const onTouchMove = e => {
-    if (startXRef.current === null) return;
-    const d = e.touches[0].clientX - startXRef.current;
-    if (Math.abs(d) > 6) didDragRef.current = true;
-    if (didDragRef.current) setDragDelta(d);
-  };
-  const onTouchEnd = e => {
-    if (startXRef.current === null) return;
-    const d = e.changedTouches[0].clientX - startXRef.current;
-    const v = d / Math.max(performance.now() - startTRef.current, 1);
-    startXRef.current = null;
-    setDragging(false); setDragDelta(0);
-    if (!didDragRef.current) return;
-    if (d < -40 || v < -0.22) goTo(idx + 1);
-    else if (d > 40 || v > 0.22) goTo(idx - 1);
-  };
-  const onMouseDown = e => { mouseDownX.current = e.clientX; didDragRef.current = false; setDragging(true); };
-  const onMouseMove = e => {
-    if (mouseDownX.current === null) return;
-    const d = e.clientX - mouseDownX.current;
-    if (Math.abs(d) > 6) didDragRef.current = true;
-    if (didDragRef.current) setDragDelta(d);
-  };
-  const onMouseUp = e => {
-    if (mouseDownX.current === null) return;
-    const d = e.clientX - mouseDownX.current;
-    mouseDownX.current = null;
-    setDragging(false); setDragDelta(0);
-    if (!didDragRef.current) return;
-    if (d < -40) goTo(idx + 1); else if (d > 40) goTo(idx - 1);
+  const goTo = (i) => {
+    const clamped = Math.max(0, Math.min(TIERS.length - 1, i));
+    setIdx(clamped);
+    cellRefs.current[clamped]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   };
 
-  const clampedDelta = Math.sign(dragDelta) * Math.min(Math.abs(dragDelta), 60);
+  // Keep the name buttons in step with wherever the user has scrolled to.
+  const onScroll = () => {
+    const row = rowRef.current;
+    if (!row) return;
+    const centre = row.scrollLeft + row.clientWidth / 2;
+    let best = 0, bestDist = Infinity;
+    cellRefs.current.forEach((cell, i) => {
+      if (!cell) return;
+      const cellCentre = cell.offsetLeft + cell.offsetWidth / 2;
+      const dist = Math.abs(cellCentre - centre);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    setIdx(best);
+  };
 
   return (
     <div style={{ width: '100%' }}>
-      <div style={{ overflow: 'hidden', cursor: dragging ? 'grabbing' : 'grab', userSelect: 'none' }}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
-        <div style={{
-          display: 'flex',
-          transform: `translateX(calc(${-idx * 100}% + ${clampedDelta}px))`,
-          transition: dragging ? 'none' : 'transform 0.35s cubic-bezier(0.25,1.1,0.5,1)',
-          willChange: 'transform',
-        }}>
-          {TIERS.map(tier => (
-            <div key={tier.name} style={{ minWidth: '100%', paddingLeft: 2, paddingRight: 2, boxSizing: 'border-box' }}>
-              <TierCard tier={tier} onGetStarted={onGetStarted} onCheckout={onCheckout} />
-            </div>
-          ))}
-        </div>
+      <div ref={rowRef} className="vv-tier-row" onScroll={onScroll}>
+        {TIERS.map((tier, i) => (
+          <div key={tier.name} className="vv-tier-cell" ref={el => { cellRefs.current[i] = el; }}>
+            <TierCard
+              tier={tier}
+              onGetStarted={onGetStarted}
+              onCheckout={onCheckout}
+              onUpsell={() => goTo(i + 1)}
+            />
+          </div>
+        ))}
       </div>
 
-      {/* Dots + arrows -- dark, sitting on the acid page */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 16 }}>
-        <button onClick={() => goTo(idx - 1)} disabled={idx === 0}
-          style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: `rgba(8,8,12,${idx === 0 ? '0.2' : '0.55'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
-          <CaretLeft size={14} weight="bold" />
-        </button>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {TIERS.map((_, i) => (
-            <button key={i} onClick={() => goTo(i)}
-              style={{ width: i === idx ? 18 : 5, height: 5, borderRadius: 3, border: 'none', cursor: 'pointer', padding: 0,
-                background: i === idx ? 'rgba(8,8,12,0.7)' : 'rgba(8,8,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.25,1.1,0.5,1)' }} />
-          ))}
-        </div>
-        <button onClick={() => goTo(idx + 1)} disabled={idx === TIERS.length - 1}
-          style={{ background: 'none', border: 'none', cursor: idx === TIERS.length - 1 ? 'default' : 'pointer', color: `rgba(8,8,12,${idx === TIERS.length - 1 ? '0.2' : '0.55'})`, padding: 4, display: 'flex', transition: 'color 0.15s' }}>
-          <CaretRight size={14} weight="bold" />
-        </button>
+      {/* Names, not dots. Hidden on wide screens where all three are visible. */}
+      <div className="vv-tier-nav">
+        {TIERS.map((tier, i) => (
+          <button key={tier.name} onClick={() => goTo(i)}
+            style={{
+              flex: '0 1 auto',
+              padding: '7px 14px',
+              borderRadius: 100,
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              border: `1.5px solid ${INK}`,
+              background: i === idx ? INK : 'transparent',
+              color: i === idx ? ACID : INK,
+              transition: 'background 0.2s, color 0.2s',
+            }}>
+            {tier.name}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -312,7 +309,7 @@ export default function PricingScreen({ onGetStarted, onSignIn }) {
     <div className="min-h-screen flex flex-col items-center justify-center px-5 py-8 overflow-y-auto"
       style={{ background: ACID }}>
 
-      <div style={{ width: '100%', maxWidth: 400, position: 'relative' }}>
+      <div className="vv-pricing-wrap" style={{ width: '100%', position: 'relative' }}>
 
         {/* Logo -- black logotype on acid */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, ...anim(0) }}>

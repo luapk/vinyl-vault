@@ -223,3 +223,52 @@ body {
   color: #08080c;
   box-shadow: none;
 }
+
+/* ---- Pricing tiers ---------------------------------------------------------
+   Narrow screens: a scroll-snap track with the next panel left peeking at the
+   right edge, which is what signals "there is another tier" without dots or
+   an animation. Wide screens: no scrolling, all three panels side by side, and
+   the name buttons hide because they have nothing left to do. */
+.vv-tier-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0 2px 4px;
+}
+.vv-tier-row::-webkit-scrollbar { display: none; }
+
+.vv-tier-cell {
+  flex: 0 0 84%;
+  scroll-snap-align: center;
+  display: flex;
+}
+
+.vv-tier-nav {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.vv-tier-cta:not(:disabled):hover { opacity: 0.85; }
+.vv-tier-cta:not(:disabled):active { transform: scale(0.99); }
+
+@media (min-width: 880px) {
+  .vv-tier-row { overflow: visible; gap: 18px; }
+  .vv-tier-cell { flex: 1 1 0; }
+  /* All three panels are on screen: the name buttons and the "next tier up"
+     line have nothing left to point at. */
+  .vv-tier-nav { display: none; }
+  .vv-tier-upsell { visibility: hidden; }
+}
+
+/* Pricing page column: single panel on phones, wide enough for all three
+   side by side once the row stops scrolling. */
+.vv-pricing-wrap { max-width: 400px; margin: 0 auto; }
+@media (min-width: 880px) { .vv-pricing-wrap { max-width: 1040px; } }
