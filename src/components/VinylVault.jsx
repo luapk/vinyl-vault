@@ -3177,17 +3177,12 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
         )}
 
         {/* Re-identify -- promoted: correcting a wrong or draft match is the
-            primary fix-up action, so it sits above the fold in brand acid
-            (ink-on-acid reads in both themes). */}
+            primary fix-up action, so it sits above the fold. Theme-aware via
+            .vv-reid-btn (index.css): acid in dark mode, ink/white in light. */}
         <div className="mb-5">
           <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all active:scale-95"
-            style={{
-              background: reidentifying ? 'rgba(202,254,4,0.30)' : '#cafe04',
-              border: '1px solid rgba(8,8,12,0.18)',
-              color: '#08080c', fontWeight: 700,
-              boxShadow: reidentifying ? 'none' : '0 4px 14px -6px rgba(202,254,4,0.6)',
-            }}>
+            data-open={reidentifying ? 'true' : undefined}
+            className="vv-reid-btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all active:scale-95">
             <Scan size={11} weight="bold" />
             {reidentifying ? 'Close' : record.identified === false ? 'Identify this record' : 'Re-identify'}
           </button>

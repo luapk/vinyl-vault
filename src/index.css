@@ -197,3 +197,29 @@ body {
 }
 .bpm-range::-webkit-slider-runnable-track { background: transparent; border: none; }
 .bpm-range::-moz-range-track { background: transparent; border: none; }
+
+/* Re-identify pill: brand acid in dark mode; solid ink with white text in
+   light mode (acid-on-light lacked contrast). data-open marks the panel-open
+   "Close" state. */
+.vv-reid-btn {
+  background: #cafe04;
+  color: #08080c;
+  border: 1px solid rgba(8, 8, 12, 0.18);
+  font-weight: 700;
+  box-shadow: 0 4px 14px -6px rgba(202, 254, 4, 0.6);
+}
+.vv-reid-btn[data-open="true"] {
+  background: rgba(202, 254, 4, 0.3);
+  box-shadow: none;
+}
+[data-theme="light"] .vv-reid-btn {
+  background: #08080c;
+  color: #ffffff;
+  border-color: rgba(8, 8, 12, 0.3);
+  box-shadow: 0 4px 14px -6px rgba(8, 8, 12, 0.4);
+}
+[data-theme="light"] .vv-reid-btn[data-open="true"] {
+  background: rgba(8, 8, 12, 0.1);
+  color: #08080c;
+  box-shadow: none;
+}
