@@ -2044,7 +2044,15 @@ function RotatingCube({ color, size = 9 }) {
 
 function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
-  const [viewMode, setViewMode] = useState("carousel");
+  // Carousel vs grid is a personal preference: remember the last choice so
+  // the collection reopens the way the user left it.
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('vv_view_mode') === 'grid' ? 'grid' : 'carousel'; }
+    catch { return 'carousel'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('vv_view_mode', viewMode); } catch { /* storage unavailable */ }
+  }, [viewMode]);
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
   const [crateMenuOpen, setCrateMenuOpen] = useState(false);

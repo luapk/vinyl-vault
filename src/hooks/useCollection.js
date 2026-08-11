@@ -194,13 +194,19 @@ export function useCollection(userId = null) {
   // on any failure the record keeps its original hotlinked URL.
   const cacheCoverFor = useCallback(async (record) => {
     if (!useDb || !record?.coverUrl || isCachedCover(record.coverUrl)) return;
-    const url = await cacheCover(userId, record.id, record.coverUrl);
+    const sourceUrl = record.coverUrl;
+    const url = await cacheCover(userId, record.id, sourceUrl);
     if (!url) return;
-    const patch = { coverUrl: url, sourceCoverUrl: record.coverUrl };
+    // The upload takes seconds and `record` is a snapshot. If the cover
+    // changed meanwhile (re-identify, manual cover pick), applying the
+    // result would clobber the user's new cover with the cached old one --
+    // the "old cover comes back after re-identify" bug. Discard instead.
+    const current = collectionRef.current.find(r => r.id === record.id);
+    if (!current || current.coverUrl !== sourceUrl) return;
+    const patch = { coverUrl: url, sourceCoverUrl: sourceUrl };
     dispatch({ type: 'UPDATE', id: record.id, patch });
     const dbId = dbIds.current[record.id];
     if (dbId) {
-      const current = collectionRef.current.find(r => r.id === record.id) || record;
       dbUpdate(dbId, { ...current, ...patch }).catch(() => {});
     }
   }, [useDb, userId]);
