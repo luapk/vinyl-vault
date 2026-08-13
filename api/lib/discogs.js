@@ -48,7 +48,7 @@ function buildSearchUrl(params) {
   return `${BASE}/database/search?${new URLSearchParams({ type: 'release', format: 'Vinyl', per_page: '5', ...params })}`;
 }
 
-export async function searchDiscogs({ catalogNumber, artist, title, label, rawText, manual = false }) {
+export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, rawText, manual = false }) {
   const headers = authHeaders();
 
   // Run search strategies in parallel. Vision sometimes misassigns fields
@@ -56,6 +56,14 @@ export async function searchDiscogs({ catalogNumber, artist, title, label, rawTe
   // Manual searches (user-typed fields) use a smaller targeted set to preserve
   // Discogs rate-limit quota for the subsequent fetchDiscogsRelease detail fetch.
   const urls = new Set();
+
+  // Barcode first: it identifies a single pressing outright, where a catalogue
+  // number can be shared across repressings and territories. Digits only, and
+  // long enough to be a real UPC/EAN, so a stray number never fires a search.
+  const cleanBarcode = String(barcode || '').replace(/\D/g, '');
+  if (cleanBarcode.length >= 8) {
+    urls.add(buildSearchUrl({ barcode: cleanBarcode }));
+  }
 
   if (catalogNumber) {
     // Broad catno-only search (may return false collisions from other labels)

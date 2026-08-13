@@ -291,6 +291,7 @@ export default async function handler(req, res) {
         const refinedMatches = (vision.catalogNumber || vision.artist || vision.title)
           ? await searchDiscogs({
               catalogNumber: vision.catalogNumber,
+              barcode: vision.barcode,
               artist: vision.artist,
               title: vision.title,
               label: vision.label,
@@ -315,6 +316,7 @@ export default async function handler(req, res) {
         const dt = Date.now();
         textMatches = await searchDiscogs({
           catalogNumber: vision.catalogNumber,
+          barcode: vision.barcode,
           artist: vision.artist,
           title: vision.title,
           label: vision.label,
@@ -338,6 +340,7 @@ export default async function handler(req, res) {
       const dt = Date.now();
       textMatches = await searchDiscogs({
         catalogNumber: vision.catalogNumber,
+        barcode: vision.barcode,
         artist: vision.artist,
         title: vision.title,
         label: vision.label,
@@ -346,7 +349,7 @@ export default async function handler(req, res) {
       console.log(`[scan] t=${Date.now() - t0}ms discogs: ${Date.now() - dt}ms matches=${textMatches.length}`);
     }
 
-    console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber }));
+    console.log('[scan] vision:', JSON.stringify({ artist: vision.artist, title: vision.title, label: vision.label, catalogNumber: vision.catalogNumber, barcode: vision.barcode }));
 
     trimmedGoogleIds = trimmedGoogleIds.slice(0, 3).map(String);
     console.log('[scan] text matches:', textMatches.length, textMatches.map(m => `${m.id} ${m.artist} - ${m.recordTitle} (${m.catalogNumber})`));

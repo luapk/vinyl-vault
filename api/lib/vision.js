@@ -7,6 +7,7 @@ const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONL
   "title": string,
   "label": string | null,
   "catalogNumber": string | null,
+  "barcode": string | null,
   "year": number | null,
   "country": string | null,
   "genres": [string],
@@ -18,6 +19,8 @@ const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONL
 rawText: Transcribe every character of text visible in the image EXACTLY as printed. Read numbers digit by digit — if you see "012" write "012" not "02" or "002", if you see "PM-012" write "PM-012" not "PM-002". Include everything: release title, individual track names, label name, catalogue number, matrix text, side markings, all other text. Space-separate. This is the primary search input — character accuracy matters more than anything else.
 
 catalogNumber: The alphanumeric release code on the label, e.g. "WAP63", "PM-012", "DOM-001", "R&S AM12 93". Often printed small near the edge or centre hole. Read it character by character — do not skip or round digits. If found, it is the single most reliable search key.
+
+barcode: The digits printed beneath a barcode (EAN-13 or UPC-A), if a barcode is visible. Return digits only, no spaces or hyphens, e.g. "5021392123455". Read every digit individually and only return it if you can read all of them clearly; a half-read barcode is worse than none, so return null when unsure. Do not confuse it with the catalogue number or a matrix code.
 
 title: The EP or LP name — NOT individual track names. Vinyl labels typically list several track titles (side A tracks, side B tracks). Those are tracks on the record, not the release title. The release title is the main EP/LP heading distinct from the track listing.
 
@@ -129,6 +132,7 @@ Return ONLY valid JSON (no markdown fences) in this exact shape:
   "title": string,
   "label": string | null,
   "catalogNumber": string | null,
+  "barcode": string | null,
   "year": number | null,
   "country": string | null,
   "genres": [string],
@@ -141,6 +145,7 @@ title: The EP or LP name. Track names listed on labels are individual tracks, no
 artist: The performing artist. Label imprint names (e.g. "PURPOSE MAKER", "WARP") are labels, not artists. Mix or remix credits (e.g. "C. Craig's Mind Mix", "remixed by X", "X's edit") are NOT the artist. Return "" if no artist is clearly labeled separately from any mix credit.
 label: The record label or imprint.
 catalogNumber: The alphanumeric release code, e.g. "PM-012", "WAP63". Read digits exactly as given.
+barcode: A run of 12 or 13 digits from a barcode, if the OCR text contains one. Digits only, no spaces. Return null if unsure.
 rawText: Copy the OCR text verbatim.
 
 Use your knowledge to identify the release if you recognise it. Context: electronic music archive — house, techno, ambient, IDM, electro, drum & bass, dub, downtempo.

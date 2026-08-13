@@ -866,7 +866,7 @@ export default function VinylVault() {
   // animation reads even when the session restores instantly.
   if (isSupabaseEnabled && (authLoading || splashHold)) {
     if (showWalkthrough) {
-      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} accentRGB="200,200,200" />;
+      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} />;
     }
     return <SplashScreen />;
   }
@@ -1321,7 +1321,7 @@ export default function VinylVault() {
         <WalkthroughOverlay onDismiss={() => {
           localStorage.setItem('walkthroughSeen', '1');
           setShowWalkthrough(false);
-        }} accentRGB={accentRGB} />
+        }} />
       )}
 
       {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
@@ -5923,7 +5923,10 @@ function CameraModal({ onCapture, onClose }) {
   // or 'sleeve' (square corner-bracket guide + full-frame capture). Persisted
   // so the preference sticks between scans.
   const [scanMode, setScanMode] = useState(() => {
-    try { return localStorage.getItem('vv_scan_mode') === 'sleeve' ? 'sleeve' : 'label'; }
+    try {
+      const m = localStorage.getItem('vv_scan_mode');
+      return m === 'sleeve' || m === 'barcode' ? m : 'label';
+    }
     catch { return 'label'; }
   });
   const switchMode = (m) => {
@@ -6008,6 +6011,19 @@ function CameraModal({ onCapture, onClose }) {
       const scale = Math.min(1, MAX / side);
       canvas.width = canvas.height = Math.round(side * scale);
       canvas.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+    } else if (scanMode === 'barcode') {
+      // Barcode mode: crop to a wide letterbox around the guide. Barcode digits
+      // are small, so cropping away the rest of the sleeve means those digits
+      // survive the downscale at a readable size -- the whole point, since a
+      // half-read barcode is useless.
+      const w = Math.round(v.videoWidth * 0.92);
+      const h = Math.round(Math.min(v.videoHeight * 0.5, w * 0.42));
+      const sx = Math.round((v.videoWidth - w) / 2);
+      const sy = Math.round((v.videoHeight - h) / 2);
+      const scale = Math.min(1, MAX / w);
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.getContext('2d').drawImage(v, sx, sy, w, h, 0, 0, canvas.width, canvas.height);
     } else {
       // Sleeve mode: full frame, as sleeves are framed loosely and Vision
       // reads layout context from the whole shot.
@@ -6121,16 +6137,33 @@ function CameraModal({ onCapture, onClose }) {
             </div>
           </div>
         )}
+        {/* Barcode: a wide letterbox shaped like the barcode itself, with a
+            centre scan line and faint stripes so the target reads instantly. */}
+        {ready && scanMode === 'barcode' && (
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="relative" style={{ width: 'min(86vw, 78vh)', height: 'min(46vw, 40vh)' }}>
+              <div className="absolute inset-0 rounded-lg" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: '2px solid rgba(202,254,4,0.9)' }} />
+              {/* Stripe hint: the shape a barcode makes */}
+              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-6 overflow-hidden" style={{ opacity: 0.25 }}>
+                {[3, 1, 2, 1, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1].map((w, i) => (
+                  <div key={i} style={{ width: w, height: '46%', background: '#cafe04', flexShrink: 0 }} />
+                ))}
+              </div>
+              {/* Scan line down the middle of the digits */}
+              <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2" style={{ height: 2, background: 'rgba(202,254,4,0.9)' }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Capture button */}
       {ready && (
         <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-3 z-10">
-          {/* Label / Sleeve viewfinder toggle */}
+          {/* Label / Sleeve / Barcode viewfinder toggle */}
           <div className="flex rounded-full p-1" style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)' }}>
-            {[['label', 'Label'], ['sleeve', 'Sleeve']].map(([m, txt]) => (
+            {[['label', 'Label'], ['sleeve', 'Sleeve'], ['barcode', 'Barcode']].map(([m, txt]) => (
               <button key={m} onClick={() => switchMode(m)}
-                className="px-4 py-1.5 rounded-full text-[12px] font-mono uppercase tracking-[0.12em] transition-all"
+                className="px-3.5 py-1.5 rounded-full text-[12px] font-mono uppercase tracking-[0.1em] transition-all"
                 style={scanMode === m
                   ? { background: '#cafe04', color: '#08080c', fontWeight: 700 }
                   : { background: 'transparent', color: 'rgba(255,255,255,0.55)' }}>
@@ -6139,11 +6172,15 @@ function CameraModal({ onCapture, onClose }) {
             ))}
           </div>
           <p className="text-[13px] tracking-[0.2em] uppercase font-mono px-6 text-center" style={{ color: 'rgba(202,254,4,0.85)' }}>
-            {scanMode === 'label' ? 'Centre the label in the circle' : 'Align sleeve inside corners'}
+            {scanMode === 'label' ? 'Centre the label in the circle'
+              : scanMode === 'barcode' ? 'Fill the box with the barcode'
+              : 'Align sleeve inside corners'}
           </p>
           <p className="text-[11px] font-mono text-white/40 px-6 text-center -mt-1.5">
             {scanMode === 'label'
               ? 'The catalogue number is the key detail'
+              : scanMode === 'barcode'
+              ? 'Get close: the digits underneath must be readable'
               : 'Front or back -- catalogue number and spine text help most'}
           </p>
           <button onClick={capture}
@@ -6435,93 +6472,103 @@ function LabelModal({ record, accentRGB, onClose }) {
 
 // ----- WalkthroughOverlay ----------------------------------------------------
 
-function WalkthroughOverlay({ onDismiss, accentRGB }) {
-  const steps = [
-    {
-      icon: Camera,
-      title: 'Scan',
-      body: 'Photograph a sleeve or upload from your library. We read the label and find the exact pressing on Discogs.',
-    },
-    {
-      icon: Check,
-      title: 'Confirm',
-      body: 'Review the match, tweak the details, mark your hot tracks with the fire emoji.',
-    },
-    {
-      icon: Stack,
-      title: 'Organise',
-      body: 'File records into crates, sort them with Smart Crates AI, or dig through the carousel.',
-    },
-    {
-      icon: Printer,
-      title: 'Print',
-      body: 'Select records and print sleeve labels in one batch. Download or send to print.',
-    },
-  ];
+// Four steps, acid and ink, matching the splash and pricing screens. Each step
+// has a mascot clip in /walkthrough (see public/walkthrough/BRIEFS.md for the
+// animation briefs); until a clip is dropped in, the step falls back to its
+// Phosphor icon, so this ships and looks right either way.
+const WALKTHROUGH_STEPS = [
+  {
+    icon: Camera,
+    clip: '/walkthrough/step-scan.webp',
+    title: 'Scan the record',
+    body: 'Point the camera at the label, the sleeve or the barcode. It reads the catalogue number and finds your exact pressing, not just the album.',
+  },
+  {
+    icon: Check,
+    clip: '/walkthrough/step-confirm.webp',
+    title: 'Check the pressing',
+    body: 'Wrong repress? Hit Re-identify and pick the right one. Tracklist, year and cover art come along with it.',
+  },
+  {
+    icon: Stack,
+    clip: '/walkthrough/step-file.webp',
+    title: 'File it in crates',
+    body: 'Sort by hand or let Smart Crates group the collection for you. Browse as a carousel, a grid, or a sortable list you can export.',
+  },
+  {
+    icon: MusicNotes,
+    clip: '/walkthrough/step-play.webp',
+    title: 'Play out',
+    body: 'Every track gets a BPM for building sets, and you can print sleeve labels for the records you are taking to the booth.',
+  },
+];
 
+function WalkthroughOverlay({ onDismiss }) {
+  const steps = WALKTHROUGH_STEPS;
   const [step, setStep] = useState(0);
+  const [clipFailed, setClipFailed] = useState({});
   const isLast = step === steps.length - 1;
-  const StepIcon = steps[step].icon;
+  const current = steps[step];
+  const StepIcon = current.icon;
+  const showClip = !clipFailed[step];
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      style={{ background: 'rgba(8,8,12,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
     >
       <div
-        className="w-full max-w-sm rounded-3xl p-8 flex flex-col items-center text-center"
-        style={{
-          background: 'rgba(var(--bg),0.97)',
-          boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.10), 0 32px 64px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(var(--fg),0.10)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          animation: 'fadeUp 0.3s ease-out',
-        }}
+        className="w-full max-w-sm rounded-3xl px-7 pt-7 pb-6 flex flex-col items-center text-center"
+        style={{ background: '#cafe04', animation: 'fadeUp 0.3s ease-out' }}
         key={step}
       >
-        {/* Icon */}
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
-          style={{
-            background: `linear-gradient(145deg, rgba(139,92,246,0.35), rgba(139,92,246,0.08))`,
-            boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.2), 0 4px 16px rgba(0,0,0,0.4)',
-          }}
-        >
-          <StepIcon size={28} weight="light" className="text-violet-300" />
+        {/* Mascot clip, or the icon while the clips are still being made */}
+        <div className="flex items-center justify-center mb-4" style={{ height: 168, width: '100%' }}>
+          {showClip ? (
+            <img
+              src={current.clip}
+              alt=""
+              onError={() => setClipFailed(f => ({ ...f, [step]: true }))}
+              style={{ maxHeight: 168, maxWidth: '100%', objectFit: 'contain' }}
+            />
+          ) : (
+            <div className="rounded-2xl flex items-center justify-center"
+              style={{ width: 84, height: 84, border: '2px solid #08080c' }}>
+              <StepIcon size={36} weight="light" style={{ color: '#08080c' }} />
+            </div>
+          )}
         </div>
 
-        {/* Title */}
-        <h2 className="text-xl font-display mb-3">{steps[step].title}</h2>
+        {/* Step counter */}
+        <div className="font-mono mb-2" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'rgba(8,8,12,0.5)' }}>
+          {String(step + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
+        </div>
 
-        {/* Body */}
-        <p className="text-white/55 text-sm leading-relaxed mb-8">{steps[step].body}</p>
+        <h2 className="text-2xl font-display mb-2.5" style={{ color: '#08080c' }}>{current.title}</h2>
 
-        {/* Progress dots */}
-        <div className="flex items-center gap-2 mb-8">
+        <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(8,8,12,0.7)' }}>{current.body}</p>
+
+        {/* Progress rail */}
+        <div className="flex w-full gap-1.5 mb-6">
           {steps.map((_, i) => (
-            <div
-              key={i}
-              className="rounded-full transition-all"
-              style={{
-                width: i === step ? 20 : 6,
-                height: 6,
-                background: i === step ? 'rgba(139,92,246,0.9)' : 'rgba(var(--fg),0.2)',
-              }}
-            />
+            <div key={i} className="flex-1 rounded-full transition-all" style={{
+              height: 3,
+              background: i <= step ? '#08080c' : 'rgba(8,8,12,0.18)',
+            }} />
           ))}
         </div>
 
-        {/* Actions */}
         <button
           onClick={() => { if (isLast) { onDismiss(); } else { setStep(s => s + 1); } }}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white mb-3 transition-all"
-          style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.8), rgba(6,182,212,0.6))', border: '1px solid rgba(139,92,246,0.4)' }}
+          className="w-full py-3 rounded-xl text-sm mb-2.5 transition-opacity hover:opacity-85"
+          style={{ background: '#08080c', color: '#ffffff', fontWeight: 700, letterSpacing: '0.02em', border: 'none' }}
         >
-          {isLast ? "Let's go" : 'Next'}
+          {isLast ? "Start digging" : 'Next'}
         </button>
         <button
           onClick={onDismiss}
-          className="text-xs font-mono text-white/30 hover:text-white/55 transition-colors"
+          className="text-xs font-mono transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(8,8,12,0.45)' }}
         >
           Skip
         </button>
