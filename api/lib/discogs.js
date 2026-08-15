@@ -48,6 +48,20 @@ function buildSearchUrl(params) {
   return `${BASE}/database/search?${new URLSearchParams({ type: 'release', format: 'Vinyl', per_page: '5', ...params })}`;
 }
 
+// The same product carries different barcode strings depending on where it was
+// catalogued: a 12-digit UPC-A is the same code as the 13-digit EAN-13 with a
+// leading zero, and contributors enter them either way (and often with the
+// printed spacing). Search every equivalent form so a correct read is not lost
+// to a formatting difference.
+export function barcodeVariants(barcode) {
+  const digits = String(barcode || '').replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 14) return [];
+  const out = new Set([digits]);
+  if (digits.length === 12) out.add(`0${digits}`);            // UPC-A -> EAN-13
+  if (digits.length === 13 && digits.startsWith('0')) out.add(digits.slice(1)); // EAN-13 -> UPC-A
+  return [...out];
+}
+
 export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, rawText, manual = false }) {
   const headers = authHeaders();
 
@@ -60,9 +74,11 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   // Barcode first: it identifies a single pressing outright, where a catalogue
   // number can be shared across repressings and territories. Digits only, and
   // long enough to be a real UPC/EAN, so a stray number never fires a search.
-  const cleanBarcode = String(barcode || '').replace(/\D/g, '');
-  if (cleanBarcode.length >= 8) {
-    urls.add(buildSearchUrl({ barcode: cleanBarcode }));
+  const barcodeUrls = new Set();
+  for (const variant of barcodeVariants(barcode)) {
+    const u = buildSearchUrl({ barcode: variant });
+    urls.add(u);
+    barcodeUrls.add(u);
   }
 
   if (catalogNumber) {
@@ -135,8 +151,9 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   // 3-5s range, so 3s was cutting off valid responses. 5s keeps failure fast
   // while catching the long tail. Worst case per URL: 5+1+5 = 11s, but all
   // URLs run in parallel so the batch ceiling stays ~11s.
+  const urlList = [...urls];
   const batches = await Promise.all(
-    [...urls].map(async url => {
+    urlList.map(async url => {
       try {
         const res = await fetchWithRetry(url, { headers }, 1, 5000);
         if (!res.ok) return [];
@@ -147,6 +164,13 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
       }
     })
   );
+  // Which releases came back from a barcode query. A barcode search is exact:
+  // a misread digit returns nothing rather than the wrong record, so a hit here
+  // is the highest-confidence signal available and scoring leans on it.
+  const barcodeHitIds = new Set();
+  urlList.forEach((url, i) => {
+    if (barcodeUrls.has(url)) for (const r of batches[i]) barcodeHitIds.add(r.id);
+  });
 
   // Merge and deduplicate — earlier strategies (catNo first) win on ordering.
   // Safety net for the format=Vinyl query filter: drop anything whose format is
@@ -183,6 +207,7 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
       country: r.country || null,
       format: Array.isArray(r.format) ? r.format.join(', ') : (r.format || null),
       coverUrl: r.cover_image || null,
+      viaBarcode: barcodeHitIds.has(r.id) || undefined,
     };
   });
 }

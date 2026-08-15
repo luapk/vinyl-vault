@@ -352,10 +352,15 @@ function streamIsLive(s) {
   return !!s && s.getVideoTracks().some(t => t.readyState === 'live');
 }
 
+// Ask for the highest practical sensor resolution. In a portrait viewport the
+// preview is object-cover, so only a narrow slice of a landscape frame is ever
+// on screen; the pixels behind the guide box are what limit barcode and
+// catalogue-number legibility. These are `ideal` constraints, so a device that
+// cannot deliver simply returns the closest it has.
 async function acquireCameraStream() {
   if (streamIsLive(_sharedCamStream)) return _sharedCamStream;
   _sharedCamStream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 } },
     audio: false,
   });
   return _sharedCamStream;
@@ -5916,6 +5921,8 @@ function CameraModal({ onCapture, onClose }) {
   const videoRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  // Measured at capture time to crop exactly what the guide frames on screen.
+  const guideRef = useRef(null);
   const [flash, setFlash] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const startedRef = useRef(false);
@@ -6012,18 +6019,45 @@ function CameraModal({ onCapture, onClose }) {
       canvas.width = canvas.height = Math.round(side * scale);
       canvas.getContext('2d').drawImage(v, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
     } else if (scanMode === 'barcode') {
-      // Barcode mode: crop to a wide letterbox around the guide. Barcode digits
-      // are small, so cropping away the rest of the sleeve means those digits
-      // survive the downscale at a readable size -- the whole point, since a
-      // half-read barcode is useless.
-      const w = Math.round(v.videoWidth * 0.92);
-      const h = Math.round(Math.min(v.videoHeight * 0.5, w * 0.42));
-      const sx = Math.round((v.videoWidth - w) / 2);
-      const sy = Math.round((v.videoHeight - h) / 2);
-      const scale = Math.min(1, MAX / w);
-      canvas.width = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
-      canvas.getContext('2d').drawImage(v, sx, sy, w, h, 0, 0, canvas.width, canvas.height);
+      // Barcode mode: crop to exactly what the guide box frames on screen.
+      //
+      // The naive "fraction of the video" crop is wrong on a phone: the preview
+      // is object-cover, so with a landscape stream in a portrait viewport most
+      // of the frame width is off-screen. Cropping 92% of the video then
+      // included a load of sleeve the user never saw, and the barcode ended up
+      // a small fraction of the sent image -- the opposite of what this mode is
+      // for. Mapping the guide rect through the cover transform means the
+      // barcode fills the frame, which is what makes the digits readable.
+      const guide = guideRef.current?.getBoundingClientRect();
+      const box = v.getBoundingClientRect();
+      let sx, sy, sw, sh;
+      if (guide && box.width && v.videoWidth) {
+        const cover = Math.max(box.width / v.videoWidth, box.height / v.videoHeight);
+        // Where the (overflowing) video actually sits, in page coordinates
+        const originX = box.left + (box.width - v.videoWidth * cover) / 2;
+        const originY = box.top + (box.height - v.videoHeight * cover) / 2;
+        // A little margin so a barcode aligned slightly outside the box survives
+        const pad = 0.08;
+        sw = (guide.width / cover) * (1 + pad * 2);
+        sh = (guide.height / cover) * (1 + pad * 2);
+        sx = (guide.left - originX) / cover - (guide.width / cover) * pad;
+        sy = (guide.top - originY) / cover - (guide.height / cover) * pad;
+        // Clamp inside the frame
+        sw = Math.min(sw, v.videoWidth); sh = Math.min(sh, v.videoHeight);
+        sx = Math.max(0, Math.min(sx, v.videoWidth - sw));
+        sy = Math.max(0, Math.min(sy, v.videoHeight - sh));
+      } else {
+        sw = v.videoWidth; sh = Math.min(v.videoHeight, sw * 0.42);
+        sx = 0; sy = (v.videoHeight - sh) / 2;
+      }
+      // The crop is a thin band, so its pixel area stays small even at a
+      // generous width. Keep native resolution where possible: every pixel
+      // across the bars is a pixel of barcode legibility.
+      const BARCODE_MAX = 2200;
+      const scale = Math.min(1, BARCODE_MAX / sw);
+      canvas.width = Math.max(1, Math.round(sw * scale));
+      canvas.height = Math.max(1, Math.round(sh * scale));
+      canvas.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     } else {
       // Sleeve mode: full frame, as sleeves are framed loosely and Vision
       // reads layout context from the whole shot.
@@ -6137,20 +6171,30 @@ function CameraModal({ onCapture, onClose }) {
             </div>
           </div>
         )}
-        {/* Barcode: a wide letterbox shaped like the barcode itself, with a
-            centre scan line and faint stripes so the target reads instantly. */}
+        {/* Barcode: a wide letterbox shaped like the barcode itself, with
+            corner brackets matching sleeve mode, a centre scan line and faint
+            stripes so the target reads instantly. guideRef drives the capture
+            crop, so what is inside this box is exactly what gets sent. */}
         {ready && scanMode === 'barcode' && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="relative" style={{ width: 'min(86vw, 78vh)', height: 'min(46vw, 40vh)' }}>
-              <div className="absolute inset-0 rounded-lg" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: '2px solid rgba(202,254,4,0.9)' }} />
+            <div ref={guideRef} className="relative" style={{ width: 'min(86vw, 78vh)', height: 'min(46vw, 40vh)' }}>
+              <div className="absolute inset-0 rounded-lg" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: '1px solid rgba(202,254,4,0.35)' }} />
               {/* Stripe hint: the shape a barcode makes */}
-              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-6 overflow-hidden" style={{ opacity: 0.25 }}>
+              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-6 overflow-hidden" style={{ opacity: 0.22 }}>
                 {[3, 1, 2, 1, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1].map((w, i) => (
-                  <div key={i} style={{ width: w, height: '46%', background: '#cafe04', flexShrink: 0 }} />
+                  <div key={i} style={{ width: w, height: '42%', background: '#cafe04', flexShrink: 0 }} />
                 ))}
               </div>
-              {/* Scan line down the middle of the digits */}
-              <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2" style={{ height: 2, background: 'rgba(202,254,4,0.9)' }} />
+              {/* Scan line across the middle */}
+              <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2" style={{ height: 2, background: 'rgba(202,254,4,0.85)' }} />
+              {/* Corner brackets */}
+              {[['top-0 left-0', 'border-t border-l'],
+                ['top-0 right-0', 'border-t border-r'],
+                ['bottom-0 left-0', 'border-b border-l'],
+                ['bottom-0 right-0', 'border-b border-r']].map(([pos, border]) => (
+                <div key={pos} className={`absolute ${pos} w-7 h-7 ${border}`}
+                  style={{ borderColor: 'rgba(202,254,4,0.95)', borderWidth: 2 }} />
+              ))}
             </div>
           </div>
         )}

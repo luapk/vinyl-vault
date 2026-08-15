@@ -75,6 +75,12 @@ export function scoreCandidate(candidate, vision) {
   const catSim = catnoSim(candidate.catalogNumber, vision.catalogNumber);
   if (catSim !== null) score += catSim >= 0.8 ? 6 : -1;
 
+  // A barcode search is an exact lookup: a misread digit returns nothing rather
+  // than the wrong record, so anything that comes back from one is almost
+  // certainly the pressing in the user's hands. Outranks catalogue number,
+  // which repressings and territories legitimately share.
+  if (candidate.viaBarcode) score += 8;
+
   return score;
 }
 
