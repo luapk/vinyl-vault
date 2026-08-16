@@ -1641,9 +1641,14 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
             : <>Stack your wax<br /><span className="text-white/35">the easy way.</span></>
           }
         </h1>
-        <p className="text-white/45 text-sm md:text-base max-w-lg leading-relaxed">
-          Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM data attached, and the record filed exactly where you want it.
-        </p>
+        {/* Explains the app to someone who has not used it yet. Once they have
+            saved their first record they know what it does, so it retires
+            itself rather than taking up the top of the screen forever. */}
+        {collection.length === 0 && (
+          <p className="text-white/45 text-sm md:text-base max-w-lg leading-relaxed">
+            Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM data attached, and the record filed exactly where you want it.
+          </p>
+        )}
       </div>
 
       {/* Cards grid - centred */}
