@@ -2067,6 +2067,38 @@ const CRATE_PALETTE = [
 // Palette RGB strings for use in rgba() — matches CRATE_PALETTE order
 const PALETTE_RGB = CRATE_PALETTE.map(c => c.rgb);
 
+// ---- Crate colour helpers ---------------------------------------------------
+// Used where a crate colour becomes a filled surface rather than an accent, so
+// whatever sits on top has to stay legible against it.
+
+function hexToRgb(hex) {
+  const h = String(hex || '').replace('#', '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  return Number.isNaN(n) ? null : { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+// Ink or paper, whichever the eye can actually read on this colour. Most of the
+// palette takes black; the deep purple does not, and guessing would leave that
+// one crate unreadable.
+function contrastInk(hex) {
+  const c = hexToRgb(hex);
+  if (!c) return '#08080c';
+  const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+  const onBlack = (L + 0.05) / 0.05;
+  const onWhite = 1.05 / (L + 0.05);
+  return onBlack >= onWhite ? '#08080c' : '#ffffff';
+}
+
+// Same hue, a shade deeper, for the far end of the gradient.
+function shade(hex, amount = 0.18) {
+  const c = hexToRgb(hex);
+  if (!c) return hex;
+  const f = (v) => Math.max(0, Math.round(v * (1 - amount)));
+  return `rgb(${f(c.r)}, ${f(c.g)}, ${f(c.b)})`;
+}
+
 function pillGlassStyle(col, extraStyle = {}) {
   return {
     background: `linear-gradient(135deg, ${col}d8 0%, ${col}88 100%)`,
@@ -4538,6 +4570,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 // ----- CratesTabView ---------------------------------------------------------
 
 function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], onOpenCrate }) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const [showSmartCrates, setShowSmartCrates] = useState(false);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
@@ -4591,28 +4624,41 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
           {allCrates.map((crate) => {
             const activeColor = crateColors[crate] || null;
             const crateCount = collection.filter(r => (r.crates || []).includes(crate)).length;
+            // In light mode a crate that has been given a colour wears it: the
+            // whole lozenge fills with that colour as a gradient. While the row
+            // is being edited it drops back to plain, so the colour swatches
+            // stay readable against it.
+            const filled = isLight && !!activeColor && editingName !== crate;
+            const ink = filled ? contrastInk(activeColor) : null;
+            const inkFade = (a) => (ink === '#ffffff' ? `rgba(255,255,255,${a})` : `rgba(8,8,12,${a})`);
             return (
-              <div key={crate} className="rounded-xl overflow-hidden" style={{ background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '33' : 'rgba(var(--fg),0.07)'}`, boxShadow: activeColor ? `0 0 20px -6px ${activeColor}66` : 'none' }}>
+              <div key={crate} className="rounded-xl overflow-hidden"
+                style={filled
+                  ? { background: `linear-gradient(135deg, ${activeColor} 0%, ${shade(activeColor, 0.22)} 100%)`, border: `1px solid ${shade(activeColor, 0.3)}`, boxShadow: `0 2px 10px -4px ${activeColor}99` }
+                  : { background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '33' : 'rgba(var(--fg),0.07)'}`, boxShadow: activeColor ? `0 0 20px -6px ${activeColor}66` : 'none' }}>
                 <div className="flex items-center gap-3 px-3.5 py-3">
-                  {/* Solid colour circle */}
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: activeColor || 'rgba(var(--fg),0.28)', display: 'inline-block' }} />
+                  {/* Solid colour circle. Redundant once the row itself is the
+                      colour, so it steps aside. */}
+                  {!filled && (
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: activeColor || 'rgba(var(--fg),0.28)', display: 'inline-block' }} />
+                  )}
                   {editingName === crate ? (
                     <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditingName(null); }} className="flex-1 rounded-lg px-3 py-1 text-[13px] font-mono outline-none" style={{ background: "rgba(var(--fg),0.07)", border: "1px solid rgba(var(--fg),0.14)" }} />
                   ) : (
                     <div className="flex-1 flex items-baseline gap-2 min-w-0">
-                      <span className="text-[13px] font-mono truncate" style={{ color: 'rgba(var(--fg),0.80)' }}>{crate}</span>
-                      <span className="text-[11px] font-mono flex-shrink-0" style={{ color: 'rgba(var(--fg),0.28)' }}>{crateCount}</span>
+                      <span className="text-[13px] font-mono truncate" style={{ color: filled ? ink : 'rgba(var(--fg),0.80)', fontWeight: filled ? 600 : 400 }}>{crate}</span>
+                      <span className="text-[11px] font-mono flex-shrink-0" style={{ color: filled ? inkFade(0.6) : 'rgba(var(--fg),0.28)' }}>{crateCount}</span>
                     </div>
                   )}
                   {editingName !== crate && (
-                    <button onClick={() => onOpenCrate?.(crate)} title={`Open "${crate}" in Collection`} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: activeColor || 'rgba(var(--fg),0.45)' }} onMouseEnter={e => e.currentTarget.style.color = activeColor || 'rgba(var(--fg),0.85)'} onMouseLeave={e => e.currentTarget.style.color = activeColor || 'rgba(var(--fg),0.45)'}><ArrowUpRight size={14} weight="bold" /></button>
+                    <button onClick={() => onOpenCrate?.(crate)} title={`Open "${crate}" in Collection`} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: filled ? ink : (activeColor || 'rgba(var(--fg),0.45)') }} onMouseEnter={e => e.currentTarget.style.opacity = '0.7'} onMouseLeave={e => e.currentTarget.style.opacity = '1'}><ArrowUpRight size={14} weight="bold" /></button>
                   )}
                   {editingName === crate ? (
                     <button onClick={commitRename} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.55)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.9)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.55)'}><Check size={12} weight="bold" /></button>
                   ) : (
-                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: 'rgba(var(--fg),0.35)' }} onMouseEnter={e => e.currentTarget.style.color='rgba(var(--fg),0.75)'} onMouseLeave={e => e.currentTarget.style.color='rgba(var(--fg),0.35)'}><PencilSimple size={13} /></button>
+                    <button onClick={() => { setEditingName(crate); setNewName(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: filled ? inkFade(0.75) : 'rgba(var(--fg),0.35)' }} onMouseEnter={e => { e.currentTarget.style.color = filled ? ink : 'rgba(var(--fg),0.75)'; }} onMouseLeave={e => { e.currentTarget.style.color = filled ? inkFade(0.75) : 'rgba(var(--fg),0.35)'; }}><PencilSimple size={13} /></button>
                   )}
-                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: "rgba(220,100,100,0.35)" }} onMouseEnter={e => e.currentTarget.style.color='rgba(220,100,100,0.75)'} onMouseLeave={e => e.currentTarget.style.color='rgba(220,100,100,0.35)'}><Trash size={13} /></button>
+                  <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: filled ? inkFade(0.55) : "rgba(220,100,100,0.35)" }} onMouseEnter={e => { e.currentTarget.style.color = filled ? ink : 'rgba(220,100,100,0.75)'; }} onMouseLeave={e => { e.currentTarget.style.color = filled ? inkFade(0.55) : 'rgba(220,100,100,0.35)'; }}><Trash size={13} /></button>
                 </div>
                 {editingName === crate && (
                   <div className="flex items-center gap-2 px-3 pb-3 pt-0">
