@@ -1674,7 +1674,7 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
             </div>
             <div>
               <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
-              <div className="text-lg font-display">Scan the label</div>
+              <div className="text-lg font-display">Scan label, barcode or sleeve</div>
             </div>
           </div>
           {/* Primary: open camera viewfinder */}
