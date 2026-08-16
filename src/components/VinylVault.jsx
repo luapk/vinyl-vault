@@ -912,6 +912,14 @@ export default function VinylVault() {
         if (refreshed && refreshed !== token) response = await send(refreshed);
       } catch { /* fall through with the original 401 */ }
     }
+    // 503 means the auth service could not answer, not that the session is
+    // dead. Back off briefly and try again rather than troubling the user:
+    // scanning a stack of records in quick succession is exactly when this
+    // happens, and it clears within a second.
+    for (let attempt = 0; attempt < 2 && response.status === 503; attempt++) {
+      await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+      response = await send(await freshAccessToken(accessToken));
+    }
     return response;
   };
 
@@ -922,6 +930,7 @@ export default function VinylVault() {
     const response = await scanFetch({ image: base64Data, mediaType: "image/jpeg" }, signal);
     if (response.status === 402) throw new Error("scan_limit_reached");
     if (response.status === 401) throw new Error("Your session expired. Sign out and back in, then try again.");
+    if (response.status === 503) throw new Error("The server is busy. Your records are safe. Wait a moment and scan again.");
     if (!response.ok) {
       const errorBody = await response.text();
       throw new Error(`API ${response.status}: ${errorBody.slice(0, 200)}`);
@@ -940,6 +949,7 @@ export default function VinylVault() {
       const response = await scanFetch({ barcode: code }, undefined);
       if (response.status === 402) { setPhase("idle"); setShowPricingModal(true); return; }
       if (response.status === 401) throw new Error("Your session expired. Sign out and back in, then try again.");
+      if (response.status === 503) throw new Error("The server is busy. Your records are safe. Wait a moment and scan again.");
       if (!response.ok) throw new Error(`API ${response.status}`);
       const data = await response.json();
       if (data.status === "complete") {
@@ -5861,7 +5871,10 @@ function ErrorView({ message, onReset, onManual, onSignOut }) {
           <SignOut size={22} weight="light" style={{ color: "#cafe04" }} />
         </div>
         <h2 className="text-2xl mb-2 font-display"><span className="italic">Session</span> expired</h2>
-        <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">Your login needs a refresh. Sign out below, then sign straight back in -- your collection is safe and nothing is lost.</p>
+        <p className="text-white/35 text-sm mb-6 break-words leading-relaxed">Your login needs a refresh. Sign out below, then sign straight back in.</p>
+        <p className="text-white/50 text-sm mb-6 break-words leading-relaxed" style={{ background: 'rgba(202,254,4,0.08)', border: '1px solid rgba(202,254,4,0.25)', borderRadius: 12, padding: '10px 14px' }}>
+          Everything you have scanned is already saved on this device. The collection may look empty for a second while you sign back in, then it all comes back.
+        </p>
         <div className="flex items-center gap-2.5 flex-wrap justify-center">
           <button onClick={onSignOut} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-mono font-semibold transition-all hover:opacity-85" style={{ background: "#cafe04", color: "#08080c", border: "none" }}>
             <SignOut size={13} weight="bold" />Sign out now
