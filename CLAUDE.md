@@ -17,6 +17,7 @@ npm run dev      # localhost:5173
 npm run build    # production build
 npm test         # unit tests (vitest)
 npm run stress   # fault-injection E2E suite (Playwright; see stress/README.md)
+npm run bench:barcode # 100-barcode on-device decode benchmark
 npm run test:all # both
 ```
 
@@ -29,6 +30,17 @@ the no-data-loss sync invariant under database faults, and the PWA + tab
 concurrent-refresh race that guards the auth lock. CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
+
+### Barcode scanning
+The camera's Barcode mode decodes on-device from the live preview (no shutter,
+no upload): `src/lib/barcodeScanner.js` uses the native `BarcodeDetector` where
+it exists and otherwise a lazily-loaded ZXing WASM build, served from our own
+origin (`public/zxing_reader.wasm`, not the library's default CDN). Reads are
+checksum-validated (`src/lib/ean13.js`) before being sent, so a partial read is
+dropped rather than looked up. The decoded number goes to `/api/scan` as
+`{ barcode }`, which skips Claude entirely and does a single Discogs barcode
+search. `npm run bench:barcode` renders 100 barcodes under camera-like
+degradation and reports read rate and decode time.
 
 ### Error tracking (Sentry)
 `src/lib/sentry.js` -- inert unless the Vercel env var `VITE_SENTRY_DSN` is

@@ -183,7 +183,7 @@ export default async function handler(req, res) {
   const authUser = await requireAuth(req, res);
   if (!authUser) return;
 
-  const { image, mediaType, discogsId, vision: clientVision } = req.body || {};
+  const { image, mediaType, discogsId, barcode, vision: clientVision } = req.body || {};
 
   // Enforce scan limits on image scans only -- disambiguation resolutions are
   // part of the same scan the user already paid for, so don't count them twice.
@@ -220,8 +220,42 @@ export default async function handler(req, res) {
     }
   }
 
+  // BARCODE FAST PATH. The client decodes the barcode on the device, so the
+  // number is already known and exact -- there is nothing for the vision model
+  // to read. Skipping Claude entirely turns a multi-second scan into a single
+  // Discogs lookup, which is what makes barcode scanning feel instant.
+  if (barcode) {
+    if (!hasDiscogs) return res.status(503).json({ error: 'Discogs not configured' });
+    const bt = Date.now();
+    try {
+      const matches = await searchDiscogs({ barcode });
+      console.log(`[scan] barcode=${barcode} search: ${Date.now() - bt}ms matches=${matches.length}`);
+      if (!matches.length) {
+        // No pressing carries this barcode on Discogs. Say so plainly: the
+        // client offers the photo scan as the next step.
+        return res.status(200).json({ status: 'not_found', barcode });
+      }
+      // One release, or several pressings sharing a barcode. A single hit goes
+      // straight through; anything else is a genuine choice for the user.
+      if (matches.length === 1) {
+        const discogsRelease = await fetchDiscogsRelease(matches[0].id);
+        const release = await buildRelease(discogsRelease, null, hasSpotify, apiKey);
+        console.log(`[scan] barcode complete: ${Date.now() - bt}ms`);
+        return res.status(200).json({ status: 'complete', release });
+      }
+      return res.status(200).json({
+        status: 'disambiguation',
+        candidates: matches.slice(0, 6),
+        vision: { barcode },
+      });
+    } catch (err) {
+      console.log(`[scan] barcode path error: ${err.message}`);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
   // Image scan path
-  if (!image) return res.status(400).json({ error: 'image or discogsId required' });
+  if (!image) return res.status(400).json({ error: 'image, barcode or discogsId required' });
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   const t0 = Date.now();

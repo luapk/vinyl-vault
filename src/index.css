@@ -272,3 +272,31 @@ body {
    side by side once the row stops scrolling. */
 .vv-pricing-wrap { max-width: 400px; margin: 0 auto; }
 @media (min-width: 880px) { .vv-pricing-wrap { max-width: 1040px; } }
+
+/* ---- Action buttons ---------------------------------------------------------
+   These used to take their colour from the artwork's dominant hue, so the same
+   button changed colour record to record and could land on an unreadable
+   combination in light mode. They are fixed values now. */
+.vv-save-btn {
+  background: rgba(var(--fg), 0.10);
+  border: 1px solid rgba(var(--fg), 0.22);
+  color: #ffffff;
+}
+[data-theme="light"] .vv-save-btn {
+  background: #08080c;
+  border-color: #08080c;
+  color: #ffffff;
+}
+.vv-save-btn:hover { opacity: 0.88; }
+
+.vv-search-btn {
+  background: rgba(var(--fg), 0.08);
+  border: 1px solid rgba(var(--fg), 0.20);
+  color: rgba(var(--fg), 0.85);
+}
+[data-theme="light"] .vv-search-btn {
+  background: #ffffff;
+  border-color: rgba(8, 8, 12, 0.28);
+  color: #08080c;
+}
+.vv-search-btn:hover:not(:disabled) { opacity: 0.85; }

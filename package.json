@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "stress": "playwright test",
-    "test:all": "vitest run && playwright test"
+    "test:all": "vitest run && playwright test",
+    "bench:barcode": "node scripts/barcode-bench.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.106.1",
+    "barcode-detector": "^3.2.2",
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

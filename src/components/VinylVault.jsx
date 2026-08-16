@@ -19,6 +19,7 @@ import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { parseImportRows } from '../lib/importParse.js';
+import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { supabase } from '../lib/supabase.js';
 
 // A Supabase access token expires ~hourly. The cached token from useAuth stays
@@ -928,6 +929,43 @@ export default function VinylVault() {
     return response.json();
   };
 
+  // Barcode scans skip the vision model entirely: the number was decoded on the
+  // device, so the server only has to look it up. One Discogs call, no upload.
+  const processBarcode = async (code) => {
+    setPhase("processing");
+    setStatus("Looking up barcode");
+    setErrorMsg("");
+    setImageUrl(null);
+    try {
+      const response = await scanFetch({ barcode: code }, undefined);
+      if (response.status === 402) { setPhase("idle"); setShowPricingModal(true); return; }
+      if (response.status === 401) throw new Error("Your session expired. Sign out and back in, then try again.");
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      const data = await response.json();
+      if (data.status === "complete") {
+        setRelease(data.release);
+        setPendingCrates([]);
+        setPhase("result");
+        if (data.release.coverUrl) { const c = await extractDominantColor(data.release.coverUrl); setAccent(c); }
+      } else if (data.status === "disambiguation") {
+        setCandidates(data.candidates);
+        setVisionData(data.vision);
+        setPhase("disambiguation");
+      } else if (data.status === "not_found") {
+        // The barcode read fine, Discogs simply has no pressing carrying it --
+        // common for older and underground vinyl. Point at the photo scan.
+        setErrorMsg(`No release on Discogs carries barcode ${data.barcode}. Try scanning the label instead.`);
+        setPhase("error");
+      } else {
+        throw new Error(data.error || "Unexpected response");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message || "Barcode lookup failed");
+      setPhase("error");
+    }
+  };
+
   const processImage = async (file) => {
     const controller = new AbortController();
     scanAbortRef.current = controller;
@@ -1262,7 +1300,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView onUpload={processImage} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
@@ -1533,7 +1571,7 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onManual }) {
+function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collection = [], onManual }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const [showCamera, setShowCamera] = useState(false);
   const [recs, setRecs] = useState([]);
@@ -1585,6 +1623,11 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
   const handleCapture = (file) => {
     setShowCamera(false);
     onUpload(file);
+  };
+
+  const handleBarcode = (code) => {
+    setShowCamera(false);
+    onBarcode?.(code);
   };
 
   return (
@@ -1662,7 +1705,7 @@ function IdleView({ onUpload, onBatch, accentRGB, greeting, collection = [], onM
         )}
       </div>
 
-      {showCamera && <CameraModal onCapture={handleCapture} onClose={() => setShowCamera(false)} />}
+      {showCamera && <CameraModal onCapture={handleCapture} onBarcode={handleBarcode} onClose={() => setShowCamera(false)} />}
 
       {/* Recommendations */}
       {recs.length > 0 && (
@@ -1968,10 +2011,11 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             </div>
           )}
 
-          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })} className="w-full py-3 rounded-xl text-[15px] tracking-[0.2em] uppercase font-mono transition-all"
+          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })}
+            className={`w-full py-3 rounded-xl text-[15px] tracking-[0.2em] uppercase font-mono transition-all${saved ? '' : ' vv-save-btn'}`}
             style={saved
               ? { background: "rgba(100,210,120,0.18)", border: "1px solid rgba(100,210,120,0.50)", color: "rgb(140,230,160)", boxShadow: "0 0 24px -8px rgba(100,210,120,0.4)" }
-              : { background: "rgba(var(--fg),0.10)", border: "1px solid rgba(var(--fg),0.22)", color: "#fff", boxShadow: `0 0 24px -8px rgba(${accentRGB},0.5)` }}>
+              : undefined}>
             {saved
               ? <span className="flex items-center justify-center gap-2"><Check size={14} weight="bold" />Saved to collection</span>
               : "Save to collection"}
@@ -2069,7 +2113,17 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
   const [crateMenuOpen, setCrateMenuOpen] = useState(false);
-  const [sortBy, setSortBy] = useState('added');
+  // Sort choice is a personal preference like the view mode: remember it so the
+  // collection comes back the way the user left it.
+  const [sortBy, setSortBy] = useState(() => {
+    try {
+      const v = localStorage.getItem('vv_sort_by');
+      return ['added', 'artist', 'title', 'label'].includes(v) ? v : 'added';
+    } catch { return 'added'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('vv_sort_by', sortBy); } catch { /* storage unavailable */ }
+  }, [sortBy]);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   // Grid renders in pages of GRID_PAGE; an IntersectionObserver sentinel grows
@@ -3325,7 +3379,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
                 </div>
               ))}
             </div>
-            <button onClick={doReidentifySearch} disabled={reidentifyLoading} className="flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-40" style={{ background: `rgba(${localAccent},0.12)`, border: `1px solid rgba(${localAccent},0.25)`, color: `rgb(${localAccent})` }}>
+            <button onClick={doReidentifySearch} disabled={reidentifyLoading} className="vv-search-btn flex items-center gap-2 px-4 py-2 rounded-full text-[14px] font-mono transition-all disabled:opacity-40">
               {reidentifyLoading ? <><div className="w-3 h-3 rounded-full border border-t-transparent animate-spin" style={{ borderColor: `rgba(${localAccent},0.4)`, borderTopColor: 'transparent' }} />Searching...</> : <><MagnifyingGlass size={12} />Search Discogs</>}
             </button>
             {reidentifyError && <div className="mt-2 text-[13px] font-mono text-red-400/70">{reidentifyError}</div>}
@@ -5056,8 +5110,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
         </div>
         <div className="flex items-center gap-3 mt-2">
           <button type="submit" disabled={!canSearch || loading}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] tracking-[0.1em] uppercase font-mono transition-all disabled:opacity-40"
-            style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})` }}>
+            className="vv-search-btn inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] tracking-[0.1em] uppercase font-mono transition-all disabled:opacity-40">
             <MagnifyingGlass size={14} weight="bold" />{loading ? "Searching..." : "Search Discogs"}
           </button>
           <button type="button" onClick={onCancel} className="text-[14px] font-mono text-white/35 hover:text-white/60 transition-colors px-3 py-2">
@@ -5917,7 +5970,7 @@ function ExploreView({ collection, accentRGB, onSelectRecord }) {
   );
 }
 
-function CameraModal({ onCapture, onClose }) {
+function CameraModal({ onCapture, onBarcode, onClose }) {
   const videoRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -5992,6 +6045,60 @@ function CameraModal({ onCapture, onClose }) {
       if (videoRef.current) videoRef.current.srcObject = null;
     };
   }, []);
+
+  // Live barcode decoding. While barcode mode is open the guide region is
+  // decoded on-device a few times a second; the first checksum-valid read wins
+  // and fires immediately, so there is no shutter press and no upload. Every
+  // result is validated, so a partial read is dropped and the next frame tried
+  // (measured: failures are always no-reads, never wrong values).
+  const [barcodeLocked, setBarcodeLocked] = useState(false);
+  useEffect(() => {
+    if (scanMode !== 'barcode' || !ready || !onBarcode) return;
+    let stop = false;
+    let busy = false;
+    const work = document.createElement('canvas');
+    setBarcodeLocked(false);
+
+    const tick = async () => {
+      if (stop || busy) return;
+      const v = videoRef.current;
+      const guide = guideRef.current;
+      if (!v?.videoWidth || !guide) return;
+      busy = true;
+      try {
+        // Decode only what the guide frames: smaller image, faster decode, and
+        // a barcode elsewhere on the sleeve cannot hijack the scan.
+        const box = v.getBoundingClientRect();
+        const g = guide.getBoundingClientRect();
+        const cover = Math.max(box.width / v.videoWidth, box.height / v.videoHeight);
+        const originX = box.left + (box.width - v.videoWidth * cover) / 2;
+        const originY = box.top + (box.height - v.videoHeight * cover) / 2;
+        const sw = Math.min(g.width / cover, v.videoWidth);
+        const sh = Math.min(g.height / cover, v.videoHeight);
+        const sx = Math.max(0, Math.min((g.left - originX) / cover, v.videoWidth - sw));
+        const sy = Math.max(0, Math.min((g.top - originY) / cover, v.videoHeight - sh));
+        const scale = Math.min(1, 900 / sw);
+        work.width = Math.max(1, Math.round(sw * scale));
+        work.height = Math.max(1, Math.round(sh * scale));
+        work.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, work.width, work.height);
+        const code = await detectBarcode(work);
+        if (code && !stop) {
+          stop = true;
+          setBarcodeLocked(true);
+          if (navigator.vibrate) { try { navigator.vibrate(30); } catch { /* unsupported */ } }
+          onBarcode(code);
+        }
+      } finally {
+        busy = false;
+      }
+    };
+
+    // Warm the decoder up front so the first frame is not the one that pays
+    // for loading the WASM.
+    loadBarcodeDetector().catch(() => {});
+    const id = setInterval(tick, 140);
+    return () => { stop = true; clearInterval(id); work.width = 0; work.height = 0; };
+  }, [scanMode, ready, onBarcode]);
 
   const capture = () => {
     const v = videoRef.current;
@@ -6178,7 +6285,7 @@ function CameraModal({ onCapture, onClose }) {
         {ready && scanMode === 'barcode' && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div ref={guideRef} className="relative" style={{ width: 'min(86vw, 78vh)', height: 'min(46vw, 40vh)' }}>
-              <div className="absolute inset-0 rounded-lg" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: '1px solid rgba(202,254,4,0.35)' }} />
+              <div className="absolute inset-0 rounded-lg transition-all" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: barcodeLocked ? '2px solid #cafe04' : '1px solid rgba(202,254,4,0.35)', background: barcodeLocked ? 'rgba(202,254,4,0.18)' : 'transparent' }} />
               {/* Stripe hint: the shape a barcode makes */}
               <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-6 overflow-hidden" style={{ opacity: 0.22 }}>
                 {[3, 1, 2, 1, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1].map((w, i) => (
@@ -6217,14 +6324,14 @@ function CameraModal({ onCapture, onClose }) {
           </div>
           <p className="text-[13px] tracking-[0.2em] uppercase font-mono px-6 text-center" style={{ color: 'rgba(202,254,4,0.85)' }}>
             {scanMode === 'label' ? 'Centre the label in the circle'
-              : scanMode === 'barcode' ? 'Fill the box with the barcode'
+              : scanMode === 'barcode' ? (barcodeLocked ? 'Got it, looking it up' : 'Hold the barcode in the box')
               : 'Align sleeve inside corners'}
           </p>
           <p className="text-[11px] font-mono text-white/40 px-6 text-center -mt-1.5">
             {scanMode === 'label'
               ? 'The catalogue number is the key detail'
               : scanMode === 'barcode'
-              ? 'Get close: the digits underneath must be readable'
+              ? 'Reads by itself, no need to press the button'
               : 'Front or back -- catalogue number and spine text help most'}
           </p>
           <button onClick={capture}
