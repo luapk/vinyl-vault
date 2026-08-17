@@ -20,6 +20,7 @@ import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCo
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { parseImportRows } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
+import { safeSetItem } from '../lib/localCache.js';
 import { supabase } from '../lib/supabase.js';
 
 // A Supabase access token expires ~hourly. The cached token from useAuth stays
@@ -734,6 +735,10 @@ export default function VinylVault() {
   }
   const greeting = user ? greetingRef.current.text : null;
   const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
+  // Owned here rather than inside the scan view: tapping NEW SCAN must open
+  // the camera whether that view is already mounted or not, and closing the
+  // camera should leave the user on the scan screen.
+  const [cameraOpen, setCameraOpen] = useState(false);
   // Pricing screen: always shown to unauthenticated visitors before auth.
   // Dismissed in-session only -- no localStorage needed.
   const [pricingSeen, setPricingSeen] = useState(false);
@@ -872,7 +877,7 @@ export default function VinylVault() {
   // animation reads even when the session restores instantly.
   if (isSupabaseEnabled && (authLoading || splashHold)) {
     if (showWalkthrough) {
-      return <WalkthroughOverlay onDismiss={() => { localStorage.setItem('walkthroughSeen', '1'); setShowWalkthrough(false); }} />;
+      return <WalkthroughOverlay onDismiss={() => { safeSetItem(localStorage, 'walkthroughSeen', '1'); setShowWalkthrough(false); }} />;
     }
     return <SplashScreen />;
   }
@@ -1255,7 +1260,12 @@ export default function VinylVault() {
               onClick={() => {
                 if (id === "community") { openCommunityHome(); return; }
                 setAppView(id);
-                if (id === "scan" && appView !== "scan") reset();
+                if (id === "scan") {
+                  if (appView !== "scan") reset();
+                  // Straight to the viewfinder, where the label / sleeve /
+                  // barcode toggle lives. Closing it lands on the scan screen.
+                  setCameraOpen(true);
+                }
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
@@ -1310,7 +1320,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
@@ -1332,7 +1342,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); localStorage.setItem('vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); safeSetItem(localStorage, 'vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "tracks" && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
@@ -1372,7 +1382,7 @@ export default function VinylVault() {
 
       {showWalkthrough && appView === 'scan' && (
         <WalkthroughOverlay onDismiss={() => {
-          localStorage.setItem('walkthroughSeen', '1');
+          safeSetItem(localStorage, 'walkthroughSeen', '1');
           setShowWalkthrough(false);
         }} />
       )}
@@ -1581,9 +1591,8 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collection = [], onManual }) {
+function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const [showCamera, setShowCamera] = useState(false);
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
 
@@ -2205,25 +2214,29 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
     cloudSyncedRef.current = true;
     setCrateColorsState(prev => {
       const merged = { ...prev, ...cloudColors };
-      localStorage.setItem('vinylvault_crate_colors', JSON.stringify(merged));
+      safeSetItem(localStorage, 'vinylvault_crate_colors', JSON.stringify(merged));
       return merged;
     });
   }, [profile]);
 
   const setCrateColor = (name, hex) => {
-    setCrateColorsState(prev => {
-      const next = { ...prev };
-      if (hex) next[name] = hex; else delete next[name];
-      localStorage.setItem('vinylvault_crate_colors', JSON.stringify(next));
-      // Debounce cloud save by 1 s so rapid palette changes don't spam Supabase.
-      if (onUpdatePreferences) {
-        clearTimeout(colorSaveTimerRef.current);
-        colorSaveTimerRef.current = setTimeout(() => {
-          onUpdatePreferences({ crate_colors: next });
-        }, 1000);
-      }
-      return next;
-    });
+    // The write and the cloud save happen OUTSIDE the state updater. A state
+    // updater must be pure: when this ran inside it and localStorage was full,
+    // the QuotaExceededError surfaced during the update and took the whole app
+    // down with the crash screen instead of just failing to save a colour.
+    const next = { ...crateColors };
+    if (hex) next[name] = hex; else delete next[name];
+    setCrateColorsState(next);
+    if (!safeSetItem(localStorage, 'vinylvault_crate_colors', JSON.stringify(next))) {
+      console.warn('[crate colours] local storage is full; the colour is saved to your account instead.');
+    }
+    // Debounce cloud save by 1 s so rapid palette changes don't spam Supabase.
+    if (onUpdatePreferences) {
+      clearTimeout(colorSaveTimerRef.current);
+      colorSaveTimerRef.current = setTimeout(() => {
+        onUpdatePreferences({ crate_colors: next });
+      }, 1000);
+    }
   };
 
   // Only user-created crates — tags and genres stay out of this list

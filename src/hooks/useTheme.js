@@ -11,7 +11,7 @@ export function useTheme() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    localStorage.setItem('vv_theme', isDark ? 'dark' : 'light');
+    try { localStorage.setItem('vv_theme', isDark ? 'dark' : 'light'); } catch { /* storage full */ }
   }, [isDark]);
 
   const toggleTheme = () => setIsDark(prev => !prev);

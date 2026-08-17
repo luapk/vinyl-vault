@@ -181,6 +181,16 @@ Nothing is read or written while signed out. Pre-scoping blobs are moved to
 `vinylvault_orphaned_*` rather than adopted (they cannot be attributed to an
 owner) so nothing is destroyed. Guarded by `stress/accounts.spec.mjs`.
 
+### Local storage budget
+Scanned records carry their photo as a base64 data URL (a 1500px JPEG), so a
+few dozen records exceed the ~5MB localStorage quota. `src/lib/localCache.js`
+writes the collection slimmed: photos are kept only for records with no
+confirmed DB row (where this device holds the only copy) and dropped for the
+rest, and if it still does not fit the cache degrades in stages (drop remaining
+photos, then the oldest records) rather than failing. Every other localStorage
+write goes through `safeSetItem`: a full quota once threw inside a React state
+updater and took the whole app down with the crash screen.
+
 ### Sync behaviour
 - Always writes to localStorage on every state change (local-first); new records and edits are additionally persisted immediately (not just via the 800ms debounce)
 - On login, `dbLoad` merges cloud + local via `planLoadMerge` (`src/lib/collectionMerge.js`, unit-tested). Invariants: a record on this device only leaves the collection via an explicit user delete (tombstoned in `vinylvault_deleted_ids`); a record with an unconfirmed local **edit** (flagged in `vinylvault_dirty_ids`) beats the cloud copy and is re-pushed. Otherwise the cloud copy wins for records it has.

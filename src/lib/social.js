@@ -45,7 +45,7 @@ export function getLastSeenTs() {
 }
 
 export function markNotifsSeen() {
-  localStorage.setItem(NOTIF_LAST_SEEN_KEY, new Date().toISOString());
+  try { localStorage.setItem(NOTIF_LAST_SEEN_KEY, new Date().toISOString()); } catch { /* storage full */ }
 }
 
 export async function getNotificationCount(userId, since) {

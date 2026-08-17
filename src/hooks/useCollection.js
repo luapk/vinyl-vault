@@ -2,6 +2,7 @@ import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
 import { cacheCover, isCachedCover } from '../lib/coverCache';
 import { planLoadMerge } from '../lib/collectionMerge';
+import { writeCollectionCache, safeSetItem, photosToKeep } from '../lib/localCache';
 
 // EVERY local key is scoped to the signed-in user.
 //
@@ -32,8 +33,9 @@ function retireLegacyKeys() {
     for (const [name, key] of Object.entries(LEGACY_KEYS)) {
       const value = localStorage.getItem(key);
       if (value === null) continue;
-      localStorage.setItem(`vinylvault_orphaned_${name}`, value);
-      localStorage.removeItem(key);
+      // If the rescue copy will not fit, leave the original in place rather
+      // than deleting data we cannot save anywhere.
+      if (safeSetItem(localStorage, `vinylvault_orphaned_${name}`, value)) localStorage.removeItem(key);
     }
   } catch { /* storage unavailable */ }
 }
@@ -45,11 +47,22 @@ function load(userId) {
   catch { return []; }
 }
 
-function save(userId, records) {
+// Photos are stored as base64 data URLs, so a large collection does not fit in
+// localStorage. writeCollectionCache slims and, if needed, degrades the cache
+// rather than letting the write fail outright -- a failed write used to be
+// swallowed here, quietly disabling the safety net that keeps unsynced scans
+// alive across a reload.
+function save(userId, records, confirmedIds = {}) {
   const key = keyFor('collection', userId);
   if (!key) return;
-  try { localStorage.setItem(key, JSON.stringify(records)); }
-  catch { /* storage full */ }
+  // Derived from the records being written, so a record added a moment ago
+  // (not yet in component state) still counts as photo-only-here.
+  const res = writeCollectionCache(localStorage, key, records, photosToKeep(records, confirmedIds));
+  if (!res.ok) {
+    console.warn('[cache] could not write the local collection:', res.error?.message);
+  } else if (res.dropped > 0) {
+    console.warn(`[cache] local storage is full: cached the newest ${res.wrote} records, left out ${res.dropped}. They are still in the cloud.`);
+  }
 }
 
 // Explicit user deletions, remembered so a deleted record is never
@@ -337,7 +350,7 @@ export function useCollection(userId = null) {
         const nextIds = new Set(dbRecords.map(r => r.id));
         if (collectionRef.current.some(r => r?.id && !nextIds.has(r.id))) {
           const backupKey = keyFor('backup', userId);
-          if (backupKey) localStorage.setItem(backupKey, JSON.stringify({ at: Date.now(), records: collectionRef.current }));
+          if (backupKey) safeSetItem(localStorage, backupKey, JSON.stringify({ at: Date.now(), records: collectionRef.current }));
         }
       } catch { /* storage full */ }
 
@@ -399,7 +412,7 @@ export function useCollection(userId = null) {
   // serialise the whole array on every keystroke.
   useEffect(() => {
     const t = setTimeout(() => {
-      save(userId, collection);
+      save(userId, collection, dbIds.current);
     }, 800);
     return () => clearTimeout(t);
   }, [collection]);
@@ -415,7 +428,7 @@ export function useCollection(userId = null) {
     // Persist a brand-new record to localStorage immediately (the debounced
     // effect could miss it if the app closes/crashes within 800ms).
     if (!existing) {
-      save(userId, [record, ...collectionRef.current]);
+      save(userId, [record, ...collectionRef.current], dbIds.current);
     }
     if (!useDb) return Promise.resolve();
     if (existing && dbIds.current[existing.id]) {
@@ -468,7 +481,7 @@ export function useCollection(userId = null) {
     // clears only when a write is confirmed; until then the local version
     // beats the cloud copy on load and the background retry keeps pushing.
     markDirty(userId, id);
-    save(userId, collectionRef.current.map(r => r.id === id ? { ...r, ...patch } : r));
+    save(userId, collectionRef.current.map(r => r.id === id ? { ...r, ...patch } : r), dbIds.current);
     if (useDb && dbIds.current[id]) {
       const dbId = dbIds.current[id];
       // dbUpdate replaces the whole jsonb `data` column, so we must send the
@@ -529,7 +542,7 @@ export function useCollection(userId = null) {
       // Persist immediately (the effect that writes localStorage is debounced
       // 800ms; a crash inside that window after a batch scan would otherwise
       // lose freshly-added records that also hadn't reached Supabase yet).
-      save(userId, [...newRecords, ...existing]);
+      save(userId, [...newRecords, ...existing], dbIds.current);
       if (useDb) {
         try {
           const { data, error } = await supabase
