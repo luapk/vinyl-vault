@@ -3716,8 +3716,10 @@ function AccountSection({ label, open, onToggle, children }) {
         onClick={onToggle}
         className="w-full flex items-center justify-between py-3.5 text-left transition-colors"
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
-        <span style={{ fontSize: 13, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.75)' : 'rgba(var(--fg),0.4)' }}>{label}</span>
-        <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.25)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+        {/* Menu rows carry real weight: at 0.4 the labels washed out to near
+            invisible against the light theme's warm paper background. */}
+        <span style={{ fontSize: 13, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.95)' : 'rgba(var(--fg),0.8)' }}>{label}</span>
+        <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.45)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
       {open && <div className="pb-4">{children}</div>}
     </div>
@@ -4071,9 +4073,9 @@ function AccountModal({ user, profile, accentRGB, isDark, initialSection = null,
 
         {/* Plan row */}
         <div style={{ borderTop: '1px solid rgba(var(--fg),0.07)', borderBottom: '1px solid rgba(var(--fg),0.07)', paddingTop: 11, paddingBottom: 11, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Plan</span>
+          <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.8)' }}>Plan</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', letterSpacing: '0.06em', textTransform: 'capitalize' }}>{tier || 'Digger'}</span>
+            <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.7)', letterSpacing: '0.06em', textTransform: 'capitalize' }}>{tier || 'Digger'}</span>
             {!isPaid && (
               <button onClick={onUpgrade}
                 style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 500, color: 'rgba(var(--fg),0.55)', background: 'transparent', border: '1px solid rgba(var(--fg),0.18)', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', letterSpacing: '0.08em', transition: 'all 0.15s' }}
@@ -4421,9 +4423,9 @@ function AccountModal({ user, profile, accentRGB, isDark, initialSection = null,
 
           {/* Appearance */}
           <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: '1px solid rgba(var(--fg),0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)' }}>Appearance</span>
+            <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.8)' }}>Appearance</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.30)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
+              <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.6)', letterSpacing: '0.08em' }}>{isDark ? 'Dark' : 'Light'}</span>
               <button
                 onClick={onToggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -4468,9 +4470,9 @@ function AccountModal({ user, profile, accentRGB, isDark, initialSection = null,
           {isAdmin && <span style={{ color: 'rgba(var(--fg),0.12)', fontSize: 12 }}>|</span>}
           <button onClick={onSignOut}
             className="inline-flex items-center gap-1.5 transition-all"
-            style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}
+            style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, letterSpacing: '0.06em' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'rgba(239,100,100,0.75)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.3)'; }}>
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(var(--fg),0.6)'; }}>
             <SignOut size={11} />Sign out
           </button>
         </div>
