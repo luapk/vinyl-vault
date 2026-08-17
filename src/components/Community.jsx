@@ -67,7 +67,7 @@ function Avatar({ profile, size = 40, isOnline = false }) {
 function PublicRecordCard({ record, accentRGB, reactionCount, onSelect }) {
   return (
     <div className="relative group cursor-pointer" onClick={onSelect}>
-      <div className="aspect-square rounded-xl overflow-hidden mb-2 relative" style={{ boxShadow: "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
+      <div className="aspect-square rounded-xl overflow-hidden mb-2 relative vv-art-shadow">
         {record.coverUrl
           ? <img src={record.coverUrl} alt={record.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
           : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>

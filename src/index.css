@@ -366,6 +366,28 @@ body {
     0 1px 2px rgba(20, 20, 30, 0.10);
 }
 
+/* ---- Cover art shadow -------------------------------------------------------
+   The shadow under a square of sleeve art. A box-shadow's corner radius is the
+   element's radius adjusted by the SPREAD, so a large negative spread squares
+   the shadow off: the old `0 8px 32px -8px` on a 12px radius drew a 4px-radius
+   slab, offset 8px down and blurred 32px, which read as a grey rectangle
+   sticking out below the rounded art. Keep the spread small so the shadow keeps
+   the art's radius, and keep the offset and blur tight so it sits under the
+   sleeve rather than trailing away from it. */
+.vv-art-shadow {
+  box-shadow:
+    0 1px 2px rgba(20, 20, 30, 0.10),
+    0 6px 14px -2px rgba(20, 20, 30, 0.18),
+    0 0 0 1px rgba(var(--fg), 0.06);
+}
+[data-theme="dark"] .vv-art-shadow,
+:root:not([data-theme="light"]) .vv-art-shadow {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 8px 18px -2px rgba(0, 0, 0, 0.50),
+    0 0 0 1px rgba(var(--fg), 0.05);
+}
+
 /* ---- Glass crate lozenges ---------------------------------------------------
    A coloured crate row rendered as a slab of tinted glass rather than a flat
    fill. The colour arrives as --crate (solid) and --crate-deep (a shade), set

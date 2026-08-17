@@ -1749,7 +1749,7 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
             {recs.slice(0, 6).map(rec => (
               <div key={rec.id} style={{ flex: '0 0 calc(33.33% - 7px)', minWidth: 120, scrollSnapAlign: 'start' }}>
                 {/* Square art -- matches RecordCard exactly */}
-                <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: '0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)' }}>
+                <div className="aspect-square rounded-xl overflow-hidden mb-2 vv-art-shadow">
                   {rec.thumb
                     ? <img src={rec.thumb} alt={rec.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
@@ -1940,7 +1940,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-6 md:gap-10">
         {/* Image gallery */}
         <div className="relative min-w-0">
-          <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 40px 90px -20px rgba(${accentRGB},0.45), 0 0 0 1px rgba(var(--fg),0.07)` }} onTouchStart={onImgTouchStart} onTouchEnd={onImgTouchEnd}>
+          <div className="relative w-full md:w-[300px] lg:w-[360px] aspect-square rounded-2xl overflow-hidden" style={{ boxShadow: `0 3px 8px rgba(0,0,0,0.22), 0 26px 60px -8px rgba(${accentRGB},0.42), 0 0 0 1px rgba(var(--fg),0.07)` }} onTouchStart={onImgTouchStart} onTouchEnd={onImgTouchEnd}>
             {displayImage ? (
               <img src={displayImage} alt={release.title} className="w-full h-full object-cover transition-opacity duration-300" onError={(e) => { if (imageUrl && e.target.src !== imageUrl) e.target.src = imageUrl; }} />
             ) : (
@@ -2930,7 +2930,10 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   return (
     <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }}>
-      <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: selected ? `0 0 0 2px rgb(${accentRGB}), 0 8px 32px -8px rgba(0,0,0,0.5)` : "0 8px 32px -8px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--fg),0.05)" }}>
+      {/* Selection ring is an outline, not another shadow layer: outline follows
+          the border radius and leaves .vv-art-shadow to own the drop shadow. */}
+      <div className="aspect-square rounded-xl overflow-hidden mb-2 vv-art-shadow"
+        style={selected ? { outline: `2px solid rgb(${accentRGB})`, outlineOffset: 0 } : undefined}>
         {record.coverUrl ? (
           <img src={record.coverUrl} alt={record.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" />
         ) : (
@@ -3256,7 +3259,8 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             entirely; min-w-0 keeps long meta text in check too. */}
         <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-5 mb-6">
           <div className="min-w-0">
-            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 20px 50px -15px rgba(${localAccent},0.35)` }}>
+            {/* Small spread so the shadow keeps the 12px radius (see .vv-art-shadow). */}
+            <div className="aspect-square rounded-xl overflow-hidden mb-2" style={{ boxShadow: `0 2px 5px rgba(0,0,0,0.20), 0 10px 24px -4px rgba(${localAccent},0.35)` }}>
               {images[imgIdx] ? (
                 <img src={images[imgIdx]} alt={record.title} className="w-full h-full object-cover" />
               ) : (
