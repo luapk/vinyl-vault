@@ -4481,9 +4481,34 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ records: compact }),
     })
-      .then(res => res.ok ? res.json() : res.json().then(e => Promise.reject(new Error(e.error || `HTTP ${res.status}`))))
-      .then(data => { setCrates(data.crates || []); setLoading(false); })
-      .catch(err => { setError(err.message); setLoading(false); });
+      .then(async res => {
+        // Read as text first: a gateway timeout or an SPA fallback answers with
+        // HTML, and calling res.json() on that throws a parse error that reads
+        // like a bug rather than "the request did not get through".
+        const body = await res.text();
+        let data = null;
+        try { data = JSON.parse(body); } catch { /* not JSON */ }
+        if (!res.ok) {
+          throw new Error(data?.error || (res.status === 504
+            ? 'That took too long. Try again, and it will usually work second time.'
+            : `Sorting failed (HTTP ${res.status}).`));
+        }
+        if (!data) throw new Error('The server sent something unreadable. Try again.');
+        return data;
+      })
+      .then(data => {
+        // Never trust the shape into render: a non-array here used to take the
+        // whole app down with the generic crash screen, because .map is not a
+        // function on an object.
+        const list = Array.isArray(data.crates) ? data.crates : [];
+        setCrates(list.filter(c => c && typeof c.name === 'string').map(c => ({
+          name: c.name,
+          description: typeof c.description === 'string' ? c.description : '',
+          ids: Array.isArray(c.ids) ? c.ids.filter(id => typeof id === 'string') : [],
+        })));
+        setLoading(false);
+      })
+      .catch(err => { setError(err.message || 'Sorting failed'); setLoading(false); });
   }, []);
 
   const apply = () => {

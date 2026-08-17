@@ -49,8 +49,14 @@ class ErrorBoundary extends React.Component {
               style={{ display: 'inline-block', padding: '12px 28px', borderRadius: 999, background: '#cafe04', color: '#08080c', fontFamily: 'monospace', fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', border: 'none', cursor: 'pointer' }}>
               Reload app
             </button>
-            <details style={{ marginTop: 26, textAlign: 'left' }}>
-              <summary style={{ fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}>Technical details</summary>
+            {/* The one line worth reading is shown without a click: when a
+                tester photographs this screen, the message is what identifies
+                the fault. The full stack stays behind the summary. */}
+            <p style={{ fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '8px 10px', margin: '0 0 18px', wordBreak: 'break-word' }}>
+              {this.state.error?.message || 'Unknown error'}
+            </p>
+            <details style={{ marginTop: 4, textAlign: 'left' }}>
+              <summary style={{ fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}>Full stack</summary>
               <pre style={{ fontFamily: 'monospace', fontSize: 11, color: 'rgba(255,255,255,0.4)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'rgba(255,255,255,0.04)', padding: 14, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', marginTop: 10 }}>
                 {this.state.error?.message}{'\n'}{this.state.error?.stack}
               </pre>
