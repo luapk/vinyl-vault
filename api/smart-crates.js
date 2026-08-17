@@ -1,5 +1,13 @@
+import { requireAuth } from './lib/auth.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Signed-in callers only. This endpoint sends up to 2MB of text to Claude and
+  // asks for 8192 tokens back, so leaving it open meant anyone who found the
+  // URL could spend the project's Anthropic budget at will.
+  const authUser = await requireAuth(req, res);
+  if (!authUser) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });

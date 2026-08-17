@@ -2,6 +2,7 @@ const BASE = 'https://api.discogs.com';
 const UA = 'VinylVault/1.0';
 
 import { buildStoreLinks } from './buy-link.js';
+import { requireAuth } from './lib/auth.js';
 
 function authHeaders(token) {
   return {
@@ -85,6 +86,11 @@ Return ONLY a JSON array, no other text:
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Signed-in callers only: this endpoint spends both Anthropic and Discogs
+  // quota, and the recommendations it returns are for the logged-in collector.
+  const authUser = await requireAuth(req, res);
+  if (!authUser) return;
 
   const token = process.env.DISCOGS_PERSONAL_ACCESS_TOKEN;
   const apiKey = process.env.ANTHROPIC_API_KEY;

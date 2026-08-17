@@ -1620,7 +1620,10 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
     if (topArtists.length) params.set('artists', topArtists.join(','));
     if (topGenres.length)  params.set('genres',  topGenres.join(','));
 
-    fetch(`/api/recommendations?${params}`)
+    freshAccessToken(null)
+      .then(token => fetch(`/api/recommendations?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }))
       .then(r => r.ok ? r.json() : { results: [] })
       .then(data => {
         const results = data.results || [];
@@ -4476,11 +4479,15 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
       genres: r.genres,
     }));
 
-    fetch('/api/smart-crates', {
+    // The endpoint requires a signed-in caller, so send a fresh token.
+    freshAccessToken(null).then(token => fetch('/api/smart-crates', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ records: compact }),
-    })
+    }))
       .then(async res => {
         // Read as text first: a gateway timeout or an SPA fallback answers with
         // HTML, and calling res.json() on that throws a parse error that reads
@@ -4489,6 +4496,8 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
         let data = null;
         try { data = JSON.parse(body); } catch { /* not JSON */ }
         if (!res.ok) {
+          if (res.status === 401) throw new Error('Your session expired. Sign out and back in, then try again.');
+          if (res.status === 503) throw new Error('The server is busy. Wait a moment and try again.');
           throw new Error(data?.error || (res.status === 504
             ? 'That took too long. Try again, and it will usually work second time.'
             : `Sorting failed (HTTP ${res.status}).`));
