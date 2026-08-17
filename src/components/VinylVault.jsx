@@ -1682,8 +1682,8 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
           backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="flex flex-col items-center gap-5 text-center">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(145deg, rgba(${accentRGB},0.3), rgba(${accentRGB},0.08))`, boxShadow: isLight ? `inset 0 1px 0 rgba(255,255,255,0.7), 0 4px 12px rgba(${accentRGB},0.18)` : 'inset 0 1px 0 rgba(var(--fg),0.2), 0 4px 12px rgba(0,0,0,0.3)' }}>
-              <Camera size={22} weight="light" style={{ color: `rgb(${accentRGB})` }} />
+            <div className="vv-glass-tile w-12 h-12 rounded-2xl flex items-center justify-center">
+              <Camera size={22} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
             </div>
             <div>
               <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
@@ -1701,8 +1701,8 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
           backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
         } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
           <div className="relative z-10 flex flex-col items-center gap-5 text-center">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: isLight ? 'linear-gradient(145deg, rgba(160,130,255,0.18), rgba(160,130,255,0.06))' : 'linear-gradient(145deg, rgba(var(--fg),0.10), rgba(var(--fg),0.03))', boxShadow: isLight ? 'inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 10px rgba(160,130,255,0.22)' : 'inset 0 1px 0 rgba(var(--fg),0.12), 0 4px 12px rgba(0,0,0,0.3)' }}>
-              <GridNine size={22} weight="light" style={{ color: isLight ? 'rgba(120,90,220,0.80)' : undefined }} className={isLight ? '' : 'text-white/45'} />
+            <div className="vv-glass-tile w-12 h-12 rounded-2xl flex items-center justify-center">
+              <GridNine size={22} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
             </div>
             <div>
               <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
@@ -4666,9 +4666,9 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
             const ink = filled ? contrastInk(activeColor) : null;
             const inkFade = (a) => (ink === '#ffffff' ? `rgba(255,255,255,${a})` : `rgba(8,8,12,${a})`);
             return (
-              <div key={crate} className="rounded-xl overflow-hidden"
+              <div key={crate} className={`rounded-xl overflow-hidden${filled ? ' vv-crate-glass' : ''}`}
                 style={filled
-                  ? { background: `linear-gradient(135deg, ${activeColor} 0%, ${shade(activeColor, 0.22)} 100%)`, border: `1px solid ${shade(activeColor, 0.3)}`, boxShadow: `0 2px 10px -4px ${activeColor}99` }
+                  ? { '--crate': activeColor, '--crate-deep': shade(activeColor, 0.26), '--crate-shadow': `${activeColor}88` }
                   : { background: "rgba(var(--fg),0.025)", border: `1px solid ${activeColor ? activeColor + '33' : 'rgba(var(--fg),0.07)'}`, boxShadow: activeColor ? `0 0 20px -6px ${activeColor}66` : 'none' }}>
                 <div className="flex items-center gap-3 px-3.5 py-3">
                   {/* Solid colour circle. Redundant once the row itself is the

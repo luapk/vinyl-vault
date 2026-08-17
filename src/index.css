@@ -300,3 +300,129 @@ body {
   color: #08080c;
 }
 .vv-search-btn:hover:not(:disabled) { opacity: 0.85; }
+
+/* ---- Glass icon tiles -------------------------------------------------------
+   The small square behind an icon on the scan cards. Neutral grey glass rather
+   than a coloured wash: a pane of frosted glass sitting proud of the card, lit
+   from above. Depth comes from four things working together, not from a single
+   shadow: a top-lit gradient fill, a bright inset top edge (the lit rim), a
+   dark inset bottom edge (the shaded rim), and an outer drop shadow so the tile
+   reads as floating above the surface. ::before adds the diagonal specular
+   sweep that makes it read as glass rather than plastic. */
+.vv-glass-tile {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.18) 42%, rgba(140, 140, 150, 0.10) 100%),
+    rgba(190, 190, 198, 0.16);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.07),
+    inset 1px 0 0 rgba(255, 255, 255, 0.35),
+    inset -1px 0 0 rgba(0, 0, 0, 0.04),
+    0 6px 14px -6px rgba(20, 20, 30, 0.28),
+    0 1px 2px rgba(20, 20, 30, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+/* Specular sweep across the top-left corner */
+.vv-glass-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.10) 38%, transparent 60%);
+  pointer-events: none;
+}
+.vv-glass-tile > * { position: relative; z-index: 1; }
+
+[data-theme="dark"] .vv-glass-tile,
+:root:not([data-theme="light"]) .vv-glass-tile {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.10) 100%),
+    rgba(150, 155, 165, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 8px 18px -8px rgba(0, 0, 0, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+[data-theme="dark"] .vv-glass-tile::before,
+:root:not([data-theme="light"]) .vv-glass-tile::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 40%, transparent 62%);
+}
+
+/* Lift on hover of the surrounding card, so the tile feels attached to it */
+.group:hover .vv-glass-tile,
+.vv-glass-tile:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.07),
+    0 10px 20px -8px rgba(20, 20, 30, 0.32),
+    0 1px 2px rgba(20, 20, 30, 0.10);
+}
+
+/* ---- Glass crate lozenges ---------------------------------------------------
+   A coloured crate row rendered as a slab of tinted glass rather than a flat
+   fill. The colour arrives as --crate (solid) and --crate-deep (a shade), set
+   inline per crate; everything that makes it three-dimensional lives here:
+   a top-lit gradient through the tint, a lit top rim and shaded bottom rim,
+   a coloured drop shadow so it sits above the page, and a diagonal specular
+   sweep on ::before. */
+.vv-crate-glass {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--crate) 82%, white) 0%,
+      var(--crate) 45%,
+      var(--crate-deep) 100%);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  border: 1px solid var(--crate-deep);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    inset 1px 0 0 rgba(255, 255, 255, 0.20),
+    0 8px 18px -8px var(--crate-shadow),
+    0 2px 4px rgba(20, 20, 30, 0.12);
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+/* Browsers without color-mix still get a solid tint rather than nothing */
+@supports not (background: color-mix(in srgb, red 50%, white)) {
+  .vv-crate-glass {
+    background: linear-gradient(168deg, var(--crate) 0%, var(--crate) 45%, var(--crate-deep) 100%);
+  }
+}
+.vv-crate-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(122deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.10) 34%, transparent 56%);
+  pointer-events: none;
+}
+/* A soft highlight riding the top edge, like light caught on a bevel */
+.vv-crate-glass::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 42%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.34), transparent 70%);
+  pointer-events: none;
+}
+.vv-crate-glass > * { position: relative; z-index: 1; }
+.vv-crate-glass:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 12px 24px -8px var(--crate-shadow),
+    0 2px 4px rgba(20, 20, 30, 0.12);
+}
