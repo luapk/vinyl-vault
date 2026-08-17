@@ -159,6 +159,22 @@ body {
   to   { transform: translateX(0); }
 }
 
+/* Milestone badge unlock card: the acid ground flashes in, the seal lands with
+   a bounce, and rings push out from behind it. All of it is skipped for
+   prefers-reduced-motion (handled in Badges.jsx), so the card just appears. */
+@keyframes badgeFlash {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes badgeSeal {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-14deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes badgeRing {
+  0%   { opacity: 0.22; transform: scale(0.55); }
+  100% { opacity: 0;    transform: scale(2.6); }
+}
+
 /* Dual-thumb BPM range slider (Tracks view). Two range inputs are overlaid on
    the histogram; only the thumbs receive pointer events so both stay draggable. */
 .bpm-range {

@@ -18,6 +18,8 @@ import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { BadgeCelebration, BadgeGrid } from './Badges.jsx';
+import { planCelebration, loadCelebrated, saveCelebrated } from '../lib/badges.js';
 import { parseImportRows } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
@@ -744,6 +746,9 @@ export default function VinylVault() {
   const [pricingSeen, setPricingSeen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
+  // Which accordion section the account panel opens on ("badges" when the user
+  // arrives from the unlock card). Null means the panel opens closed up.
+  const [accountSection, setAccountSection] = useState(null);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(() => new URLSearchParams(window.location.search).get('checkout') === 'success');
   const [smartCrateNames, setSmartCrateNames] = useState(() => {
@@ -855,6 +860,47 @@ export default function VinylVault() {
 
   const userId = user?.id ?? null;
   const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, addRecordsBulk } = useCollection(userId);
+
+  // ----- Milestone badges ----------------------------------------------------
+  // Watched off the collection size rather than hooked into each save, so every
+  // route in counts the same: single scan, batch, Discogs import, file import.
+  const [pendingBadge, setPendingBadge] = useState(null);
+  const [celebrated, setCelebrated] = useState([]);
+  // Ledger mirror, so the evaluator never reads a stale closure.
+  const celebratedRef = useRef([]);
+  const badgeUserRef = useRef(null);
+
+  useEffect(() => {
+    if (!userId) {
+      badgeUserRef.current = null;
+      celebratedRef.current = [];
+      setCelebrated([]);
+      setPendingBadge(null);
+      return;
+    }
+    if (badgeUserRef.current === userId) return;
+    badgeUserRef.current = userId;
+    celebratedRef.current = loadCelebrated(userId);
+    setCelebrated(celebratedRef.current);
+  }, [userId]);
+
+  const total = collection.length;
+  useEffect(() => {
+    if (!userId || badgeUserRef.current !== userId || !total) return;
+    // Settle first. The cached collection renders before the cloud load lands,
+    // so evaluating on the first frame would fire a card for 50 and then
+    // another for 500 a second later.
+    const t = setTimeout(() => {
+      const { badge, celebrated: next } = planCelebration(total, celebratedRef.current);
+      if (next.length !== celebratedRef.current.length) {
+        celebratedRef.current = next;
+        setCelebrated(next);
+        saveCelebrated(userId, next);
+      }
+      if (badge) setPendingBadge(badge);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [total, userId]);
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
     setRelease(prev => {
@@ -1389,14 +1435,29 @@ export default function VinylVault() {
 
       {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
 
+      {/* Badge unlock takes the whole screen, so it waits its turn: never over a
+          running batch, and never on top of the account panel it links to. */}
+      {pendingBadge && !batchProcessing && !showAccount && (
+        <BadgeCelebration
+          badge={pendingBadge}
+          count={collection.length}
+          celebrated={celebrated}
+          onClose={() => setPendingBadge(null)}
+          onViewBadges={() => { setPendingBadge(null); setAccountSection('badges'); setShowAccount(true); }}
+        />
+      )}
+
       {showAccount && (
         <AccountModal
           user={user}
           profile={profile}
           accentRGB={accentRGB}
           isDark={isDark}
+          initialSection={accountSection}
+          collectionCount={collection.length}
+          celebrated={celebrated}
           onToggleTheme={toggleTheme}
-          onClose={() => setShowAccount(false)}
+          onClose={() => { setShowAccount(false); setAccountSection(null); }}
           onSignOut={() => { setShowAccount(false); signOut(); }}
           onUpdateDisplayName={updateDisplayName}
           onUpdateProfile={updateProfile}
@@ -3693,14 +3754,14 @@ function ImportStatusList({ items, listRef }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
+function AccountModal({ user, profile, accentRGB, isDark, initialSection = null, collectionCount = 0, celebrated = [], onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [openSection, setOpenSection] = useState(null);
+  const [openSection, setOpenSection] = useState(initialSection);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingErr, setBillingErr] = useState('');
 
@@ -4026,6 +4087,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onToggleTheme, onClose
 
         {/* Accordion sections */}
         <div>
+
+          <AccountSection label="Badges" open={openSection === 'badges'} onToggle={() => toggleSection('badges')}>
+            <BadgeGrid count={collectionCount} celebrated={celebrated} />
+          </AccountSection>
 
           <AccountSection label="Collector name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
             <div className="flex gap-2">

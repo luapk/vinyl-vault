@@ -56,11 +56,13 @@ src/
     VinylVault.jsx     # entire app UI (single large component file)
     AuthScreen.jsx     # login / sign-up screen
     AdminPanel.jsx     # admin user management
+    Badges.jsx         # milestone unlock card + the grid in the account panel
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
   lib/
     supabase.js        # Supabase client (handles both legacy JWT and publishable keys)
+    badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
   App.jsx              # root: auth gate -> VinylVault or AuthScreen
 
 api/                   # Vercel serverless functions (all secret keys live here)
@@ -197,7 +199,28 @@ updater and took the whole app down with the crash screen.
 - A 25s background retry re-attempts failed inserts (unsynced records) and failed updates (dirty records) until confirmed -- an expired session or offline period costs latency, never data
 - `syncedIds` Set tracks which records are confirmed in Supabase; unsynced records show an amber `!` badge
 
-## Known quirks
+### Milestone badges
+Nine space-themed tiers (50, 100, 200, 350, 500, 1000, 2000, 3500, 5000) in
+`src/lib/badges.js`, rendered by `src/components/Badges.jsx`: a full-screen
+acid unlock card with a Web Audio fanfare, and a grid in the account panel
+where everything ahead of the user is greyed out up to 5,000.
+
+- The trigger is `collection.length`, watched in one effect rather than hooked
+  into each save, so every route in counts the same: single scan, batch,
+  Discogs import, file import. The evaluation is delayed 1.5s so the cloud
+  load has landed; without it a returning user got a card for 50 and then
+  another for 500 a second later.
+- **Only ever one card.** `planCelebration` returns the highest tier earned
+  but not yet celebrated and banks the rest silently, so a 600-record import
+  (or an existing collector meeting the system for the first time) gets one
+  moment, not six.
+- The card waits for a clear screen: never over a running batch, never on top
+  of the account panel it links to.
+- The ledger (`vinylvault_badges:<uid>`) is local and user-scoped like every
+  other local key. It is unioned with what the count has earned, so deleting
+  records never takes a badge away. Being local, a first sign-in on a new
+  device replays the single highest card once; that is a welcome, and it costs
+  no schema change.
 
 - **Auth lock**: `supabase.js` uses a **strictly serialising, bounded-wait** `navigator.locks` auth lock. Cross-context serialisation prevents refresh-token reuse revocation (the "session expired" sign-outs when a PWA window + tab share storage); a 5s cap means a hung holder degrades one call instead of freezing the app. supabase-js never re-enters an injected lock (its `_acquireLock` queues nested acquires internally), so no re-entrancy short-circuit is needed -- and an earlier same-tab short-circuit let refreshes bypass serialisation and replay stale tokens (caught by `stress/race.spec.mjs`; do not reintroduce it).
 - **onAuthStateChange deadlock guard**: never `await` a supabase call inside the `onAuthStateChange` callback (`useAuth.js`). supabase-js awaits these callbacks while holding its auth lock; a query there calls `getSession()`, which waits on `initialize()`, which waits on the callback -- a circular wait that wedges the whole client on with-session boots (the historic "profile/admin/community missing until refresh" hydration bug). Dispatch follow-up work with `setTimeout(..., 0)`. Regression-tested by `stress/session.spec.mjs`.
