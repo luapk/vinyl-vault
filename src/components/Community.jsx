@@ -465,7 +465,10 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
     return <div className="pt-20 flex flex-col items-center"><div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(var(--fg),0.1)', borderTopColor: `rgb(${accentRGB})` }} /></div>;
   }
   if (state === 'notfound') {
-    return <ProfileMessage onBack={onBack} title="Profile not found" body={`No collector goes by @${username}.`} />;
+    // Row-level security hides a private profile exactly as it hides one that
+    // does not exist, so the client genuinely cannot tell the two apart. Say
+    // both rather than asserting the person is not here.
+    return <ProfileMessage onBack={onBack} title="Profile unavailable" body={`No public collector goes by @${username}. They may not have set that username, or their collection may be private.`} />;
   }
   if (state === 'private') {
     return <ProfileMessage onBack={onBack} title={`${nameFor(profile)}'s vault is private`} body="This collector hasn't made their collection public." profile={profile} />;

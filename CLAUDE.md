@@ -124,7 +124,10 @@ If applying to an existing database rather than a fresh schema.sql run:
 -- Add avatar_url to profiles
 alter table public.profiles add column if not exists avatar_url text;
 
--- Fix profiles RLS infinite recursion (policies must use is_admin() helper)
+-- Fix profiles RLS infinite recursion (policies must use is_admin() helper).
+-- NOTE the `is_public` clause: without it, non-admin users cannot read anyone
+-- else's profile and every community profile reports "Profile not found".
+-- An earlier version of this block omitted it and broke exactly that.
 create or replace function public.is_admin()
 returns boolean language sql security definer stable set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
@@ -132,7 +135,7 @@ $$;
 drop policy if exists "profiles_select" on public.profiles;
 drop policy if exists "profiles_admin_update" on public.profiles;
 create policy "profiles_select" on public.profiles
-  for select using (auth.uid() = id or public.is_admin());
+  for select using (auth.uid() = id or public.is_admin() or is_public = true);
 create policy "profiles_admin_update" on public.profiles
   for update using (public.is_admin());
 

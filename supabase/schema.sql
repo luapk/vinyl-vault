@@ -13,6 +13,10 @@ create table if not exists public.profiles (
   -- Campaign email only. Account mail (password resets and the like) ignores
   -- this flag. Set by /api/unsubscribe; the send script filters on it.
   marketing_opt_out boolean not null default false,
+  -- Community visibility. social-schema.sql also adds this (idempotently); it
+  -- is declared here so the select policy below can reference it on a fresh
+  -- install regardless of which file runs first.
+  is_public   boolean not null default false,
   created_at  timestamptz not null default now()
 );
 
@@ -34,8 +38,13 @@ returns boolean language sql security definer stable set search_path = public as
 $$;
 
 -- Users can read their own profile; admins can read all profiles.
+-- Public profiles must stay readable: the community browses other collectors by
+-- username. Leaving the is_public clause out here means re-running this file
+-- silently breaks community profile viewing for every non-admin user, which is
+-- how it broke once already. social-schema.sql defines the same policy; keep
+-- the two identical so applying either in any order is safe.
 create policy "profiles_select" on public.profiles
-  for select using (auth.uid() = id or public.is_admin());
+  for select using (auth.uid() = id or public.is_admin() or is_public = true);
 
 -- Users can update their own profile (display name, avatar, etc.).
 create policy "profiles_self_update" on public.profiles
@@ -45,11 +54,12 @@ create policy "profiles_self_update" on public.profiles
 create policy "profiles_admin_update" on public.profiles
   for update using (public.is_admin());
 
--- Migration for existing databases (run in Supabase SQL editor):
+-- Migration for existing databases (run in Supabase SQL editor). Keep the
+-- is_public clause: dropping it locks non-admins out of every other profile.
 -- create or replace function public.is_admin() returns boolean language sql security definer stable set search_path = public as $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'); $$;
 -- drop policy if exists "profiles_select" on public.profiles;
 -- drop policy if exists "profiles_admin_update" on public.profiles;
--- create policy "profiles_select" on public.profiles for select using (auth.uid() = id or public.is_admin());
+-- create policy "profiles_select" on public.profiles for select using (auth.uid() = id or public.is_admin() or is_public = true);
 -- create policy "profiles_admin_update" on public.profiles for update using (public.is_admin());
 
 -- ─── Auto-create profile on sign-up ───────────────────────────────────────────
@@ -87,9 +97,19 @@ returns boolean language sql security definer stable set search_path = public as
   );
 $$;
 
--- Users can read their own records; admins can read everyone's.
+-- Users can read their own records; admins can read everyone's; anyone can read
+-- the records of a profile that has opted into being public. As with
+-- profiles_select, omitting the public clause here silently breaks community
+-- browsing, so this must stay identical to social-schema.sql.
 create policy "records_select" on public.records
-  for select using (auth.uid() = user_id or public.is_admin());
+  for select using (
+    auth.uid() = user_id
+    or public.is_admin()
+    or exists (
+      select 1 from public.profiles
+      where id = records.user_id and is_public = true
+    )
+  );
 
 -- Users can insert their own records.
 create policy "records_insert" on public.records
