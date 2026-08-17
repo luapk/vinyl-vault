@@ -754,6 +754,21 @@ export default function VinylVault() {
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
+
+  // An inbound ?u= link, captured during render before any effect can strip it
+  // (same trick as checkoutSuccess above).
+  //
+  // A standalone PWA launch is deliberately excluded. The param used to stick
+  // to the URL forever, so anyone who opened a shared profile link and then
+  // installed the app got a launcher that reopened that stranger's profile on
+  // every cold start. A launch URL is not somebody clicking a link.
+  const [pendingProfileLink, setPendingProfileLink] = useState(() => {
+    const u = new URLSearchParams(window.location.search).get('u');
+    if (!u) return null;
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    return standalone ? null : u;
+  });
   const [notifCount, setNotifCount] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatRecipient, setChatRecipient] = useState(null); // profile object
@@ -788,11 +803,34 @@ export default function VinylVault() {
     if (window.location.search) window.history.pushState({}, '', window.location.pathname);
   }, []);
 
-  // On first load, open a shared profile link if present (?u=username).
+  // Open an inbound profile link, once, when we know enough to judge it.
+  // Waits for the signed-in user's own profile so that a link to yourself can
+  // be ignored: landing on your own public profile is never what you wanted.
+  // A signed-out visitor (the usual recipient of a shared link) resolves
+  // immediately, since there is no own-username to compare against.
   useEffect(() => {
-    const u = new URLSearchParams(window.location.search).get('u');
-    if (u) { setProfileUsername(u); setAppView('community'); }
-  }, []);
+    if (!pendingProfileLink || authLoading) return;
+    if (user && !profile) return;
+    const own = (profile?.username || '').toLowerCase();
+    if (!own || own !== pendingProfileLink.toLowerCase()) {
+      setProfileUsername(pendingProfileLink);
+      setAppView('community');
+    }
+    setPendingProfileLink(null);
+  }, [pendingProfileLink, authLoading, user, profile]);
+
+  // ?u= is only meaningful while a profile is open, so leaving the community
+  // view drops it. Without this the param outlived the visit: browse one
+  // profile, carry on scanning, and a reload hours later booted you back into
+  // that profile instead of where you actually were.
+  useEffect(() => {
+    if (appView === 'community') return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('u')) return;
+    params.delete('u');
+    const qs = params.toString();
+    window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
+  }, [appView]);
 
   // Browser back/forward: re-sync the open profile from the URL.
   useEffect(() => {
