@@ -18,8 +18,8 @@ import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
-import { BadgeCelebration, BadgeGrid } from './Badges.jsx';
-import { planCelebration, loadCelebrated, saveCelebrated } from '../lib/badges.js';
+import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
+import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { parseImportRows } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
@@ -746,9 +746,6 @@ export default function VinylVault() {
   const [pricingSeen, setPricingSeen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState('signup');
   const [showAccount, setShowAccount] = useState(false);
-  // Which accordion section the account panel opens on ("badges" when the user
-  // arrives from the unlock card). Null means the panel opens closed up.
-  const [accountSection, setAccountSection] = useState(null);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(() => new URLSearchParams(window.location.search).get('checkout') === 'success');
   const [smartCrateNames, setSmartCrateNames] = useState(() => {
@@ -865,23 +862,25 @@ export default function VinylVault() {
   // Watched off the collection size rather than hooked into each save, so every
   // route in counts the same: single scan, batch, Discogs import, file import.
   const [pendingBadge, setPendingBadge] = useState(null);
-  const [celebrated, setCelebrated] = useState([]);
+  const [showBadges, setShowBadges] = useState(false);
+  const [ledger, setLedger] = useState({ celebrated: [], unlockedAt: {} });
   // Ledger mirror, so the evaluator never reads a stale closure.
-  const celebratedRef = useRef([]);
+  const ledgerRef = useRef(ledger);
   const badgeUserRef = useRef(null);
 
   useEffect(() => {
     if (!userId) {
       badgeUserRef.current = null;
-      celebratedRef.current = [];
-      setCelebrated([]);
+      ledgerRef.current = { celebrated: [], unlockedAt: {} };
+      setLedger(ledgerRef.current);
       setPendingBadge(null);
+      setShowBadges(false);
       return;
     }
     if (badgeUserRef.current === userId) return;
     badgeUserRef.current = userId;
-    celebratedRef.current = loadCelebrated(userId);
-    setCelebrated(celebratedRef.current);
+    ledgerRef.current = loadLedger(userId);
+    setLedger(ledgerRef.current);
   }, [userId]);
 
   const total = collection.length;
@@ -891,16 +890,24 @@ export default function VinylVault() {
     // so evaluating on the first frame would fire a card for 50 and then
     // another for 500 a second later.
     const t = setTimeout(() => {
-      const { badge, celebrated: next } = planCelebration(total, celebratedRef.current);
-      if (next.length !== celebratedRef.current.length) {
-        celebratedRef.current = next;
-        setCelebrated(next);
-        saveCelebrated(userId, next);
+      const { badge, celebrated: next } = planCelebration(total, ledgerRef.current.celebrated);
+      if (next.length !== ledgerRef.current.celebrated.length) {
+        const updated = { celebrated: next, unlockedAt: stampUnlocks(ledgerRef.current.unlockedAt, next) };
+        ledgerRef.current = updated;
+        setLedger(updated);
+        saveLedger(userId, updated);
       }
       if (badge) setPendingBadge(badge);
     }, 1500);
     return () => clearTimeout(t);
   }, [total, userId]);
+
+  // Dates come from the collection (the Nth record's savedAt is the day the
+  // Nth milestone was reached), with the ledger as fallback.
+  const badgeDates = useMemo(
+    () => unlockDates(collection, ledger.unlockedAt),
+    [collection, ledger.unlockedAt]
+  );
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
     setRelease(prev => {
@@ -1437,13 +1444,22 @@ export default function VinylVault() {
 
       {/* Badge unlock takes the whole screen, so it waits its turn: never over a
           running batch, and never on top of the account panel it links to. */}
-      {pendingBadge && !batchProcessing && !showAccount && (
+      {pendingBadge && !batchProcessing && !showAccount && !showBadges && (
         <BadgeCelebration
           badge={pendingBadge}
           count={collection.length}
-          celebrated={celebrated}
+          celebrated={ledger.celebrated}
           onClose={() => setPendingBadge(null)}
-          onViewBadges={() => { setPendingBadge(null); setAccountSection('badges'); setShowAccount(true); }}
+          onViewBadges={() => { setPendingBadge(null); setShowBadges(true); }}
+        />
+      )}
+
+      {showBadges && (
+        <BadgesPanel
+          count={collection.length}
+          celebrated={ledger.celebrated}
+          dates={badgeDates}
+          onClose={() => setShowBadges(false)}
         />
       )}
 
@@ -1453,11 +1469,9 @@ export default function VinylVault() {
           profile={profile}
           accentRGB={accentRGB}
           isDark={isDark}
-          initialSection={accountSection}
-          collectionCount={collection.length}
-          celebrated={celebrated}
+          onOpenBadges={() => { setShowAccount(false); setShowBadges(true); }}
           onToggleTheme={toggleTheme}
-          onClose={() => { setShowAccount(false); setAccountSection(null); }}
+          onClose={() => setShowAccount(false)}
           onSignOut={() => { setShowAccount(false); signOut(); }}
           onUpdateDisplayName={updateDisplayName}
           onUpdateProfile={updateProfile}
@@ -3726,6 +3740,23 @@ function AccountSection({ label, open, onToggle, children }) {
   );
 }
 
+// A menu row that navigates to its own panel rather than expanding in place.
+// Same shape as AccountSection so the list reads as one thing; the caret does
+// not rotate, because nothing opens underneath it.
+function AccountLink({ label, onClick }) {
+  return (
+    <div style={{ borderBottom: '1px solid rgba(var(--fg),0.07)' }}>
+      <button
+        onClick={onClick}
+        className="w-full flex items-center justify-between text-left transition-colors"
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
+        <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.8)' }}>{label}</span>
+        <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.45)' }} />
+      </button>
+    </div>
+  );
+}
+
 // Live per-row status list for the file import: a green tick lands on each
 // row as it is saved; drafts and skipped duplicates are labelled inline.
 function ImportStatusList({ items, listRef }) {
@@ -3756,14 +3787,14 @@ function ImportStatusList({ items, listRef }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, initialSection = null, collectionCount = 0, celebrated = [], onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
+function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [openSection, setOpenSection] = useState(initialSection);
+  const [openSection, setOpenSection] = useState(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingErr, setBillingErr] = useState('');
 
@@ -4090,10 +4121,6 @@ function AccountModal({ user, profile, accentRGB, isDark, initialSection = null,
         {/* Accordion sections */}
         <div>
 
-          <AccountSection label="Badges" open={openSection === 'badges'} onToggle={() => toggleSection('badges')}>
-            <BadgeGrid count={collectionCount} celebrated={celebrated} />
-          </AccountSection>
-
           <AccountSection label="Collector name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
             <div className="flex gap-2">
               <input
@@ -4181,6 +4208,8 @@ function AccountModal({ user, profile, accentRGB, isDark, initialSection = null,
               )}
             </div>
           </AccountSection>
+
+          <AccountLink label="Badges" onClick={onOpenBadges} />
 
           <AccountSection label="Password" open={openSection === 'password'} onToggle={() => toggleSection('password')}>
             {resetSent ? (

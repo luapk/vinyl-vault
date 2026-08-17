@@ -62,6 +62,27 @@ export function progressToward(count, tier) {
   return Math.max(0, Math.min(1, (count - floor) / span));
 }
 
+// When each milestone was reached. A collection hit its 50th record on the day
+// its 50th record was saved, so the dates are derived from `savedAt` rather
+// than stored: that gets the badges a long-standing collector earned years ago
+// right, instead of stamping them all with the day the feature shipped.
+//
+// `stored` is the fallback for a tier the collection can no longer account for
+// (records deleted since), so a banked badge never shows a blank date.
+export function unlockDates(records = [], stored = {}) {
+  const times = records
+    .map(r => r?.savedAt)
+    .filter(t => typeof t === 'number' && Number.isFinite(t))
+    .sort((a, b) => a - b);
+
+  const out = {};
+  for (const tier of BADGE_TIERS) {
+    if (times.length >= tier.count) out[tier.count] = times[tier.count - 1];
+    else if (stored[tier.count]) out[tier.count] = stored[tier.count];
+  }
+  return out;
+}
+
 // Decides what to put on screen, and what to write back to the ledger.
 //
 // Only ONE card is ever shown: the highest tier earned but not yet celebrated.
@@ -92,20 +113,35 @@ export function planCelebration(count, celebrated = []) {
 
 const keyFor = (userId) => (userId ? `vinylvault_badges:${userId}` : null);
 
-export function loadCelebrated(userId) {
+const EMPTY_LEDGER = { celebrated: [], unlockedAt: {} };
+
+export function loadLedger(userId) {
   const key = keyFor(userId);
-  if (!key) return [];
+  if (!key) return EMPTY_LEDGER;
   try {
     const raw = JSON.parse(localStorage.getItem(key) || 'null');
-    if (!Array.isArray(raw?.celebrated)) return [];
-    return raw.celebrated.filter(n => typeof n === 'number' && Number.isFinite(n));
+    if (!Array.isArray(raw?.celebrated)) return EMPTY_LEDGER;
+    return {
+      celebrated: raw.celebrated.filter(n => typeof n === 'number' && Number.isFinite(n)),
+      // Absent on ledgers written before dates existed. unlockDates derives
+      // those from the collection anyway, so there is nothing to migrate.
+      unlockedAt: (raw.unlockedAt && typeof raw.unlockedAt === 'object') ? raw.unlockedAt : {},
+    };
   } catch {
-    return [];
+    return EMPTY_LEDGER;
   }
 }
 
-export function saveCelebrated(userId, celebrated) {
+export function saveLedger(userId, ledger) {
   const key = keyFor(userId);
   if (!key) return;
-  safeSetItem(localStorage, key, JSON.stringify({ celebrated }));
+  safeSetItem(localStorage, key, JSON.stringify(ledger));
+}
+
+// Timestamps the tiers that have just been banked, leaving existing stamps
+// alone so a date is never rewritten.
+export function stampUnlocks(unlockedAt, celebrated, now = Date.now()) {
+  const out = { ...unlockedAt };
+  for (const c of celebrated) if (!out[c]) out[c] = now;
+  return out;
 }

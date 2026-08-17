@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   BADGE_TIERS, earnedTiers, unlockedCounts, nextTier, progressToward, planCelebration,
+  unlockDates, stampUnlocks,
 } from '../badges.js';
+
+// A collection of n records saved one day apart, oldest first.
+const DAY = 86_400_000;
+const START = Date.UTC(2024, 0, 1);
+const madeOf = (n) => Array.from({ length: n }, (_, i) => ({ id: `r${i}`, savedAt: START + i * DAY }));
 
 describe('badge ladder', () => {
   it('is ordered and starts at 50, ends at 5000', () => {
@@ -94,6 +100,57 @@ describe('nextTier', () => {
 
   it('is null once the whole ladder is done', () => {
     expect(nextTier(5000)).toBeNull();
+  });
+});
+
+describe('unlockDates', () => {
+  it('dates a milestone from the record that crossed it', () => {
+    const dates = unlockDates(madeOf(120));
+    expect(dates[50]).toBe(START + 49 * DAY);   // the 50th record
+    expect(dates[100]).toBe(START + 99 * DAY);
+  });
+
+  it('has no date for a milestone not yet reached', () => {
+    const dates = unlockDates(madeOf(60));
+    expect(dates[50]).toBeDefined();
+    expect(dates[100]).toBeUndefined();
+  });
+
+  it('reads the collection in save order, not array order', () => {
+    const shuffled = [...madeOf(60)].reverse();
+    expect(unlockDates(shuffled)[50]).toBe(START + 49 * DAY);
+  });
+
+  it('falls back to the stored stamp when records have since been deleted', () => {
+    const stored = { 50: START + 999 * DAY };
+    // Only 10 records left, so the collection cannot account for the 50 badge.
+    expect(unlockDates(madeOf(10), stored)[50]).toBe(stored[50]);
+  });
+
+  it('prefers the collection over the stored stamp, so historic badges are dated truthfully', () => {
+    // The ledger stamped everything on the day the feature shipped; the
+    // collection knows the 50th record actually landed in 2024.
+    const stored = { 50: Date.UTC(2026, 7, 17) };
+    expect(unlockDates(madeOf(60), stored)[50]).toBe(START + 49 * DAY);
+  });
+
+  it('ignores records with a missing or unusable savedAt', () => {
+    const records = [...madeOf(50), { id: 'x' }, { id: 'y', savedAt: 'nonsense' }];
+    expect(unlockDates(records)[50]).toBe(START + 49 * DAY);
+  });
+
+  it('survives an empty collection', () => {
+    expect(unlockDates([])).toEqual({});
+    expect(unlockDates()).toEqual({});
+  });
+});
+
+describe('stampUnlocks', () => {
+  it('stamps newly banked tiers and never rewrites an existing date', () => {
+    const first = stampUnlocks({}, [50, 100], 1000);
+    expect(first).toEqual({ 50: 1000, 100: 1000 });
+    const second = stampUnlocks(first, [50, 100, 200], 5000);
+    expect(second).toEqual({ 50: 1000, 100: 1000, 200: 5000 });
   });
 });
 

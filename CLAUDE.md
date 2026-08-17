@@ -202,8 +202,9 @@ updater and took the whole app down with the crash screen.
 ### Milestone badges
 Nine space-themed tiers (50, 100, 200, 350, 500, 1000, 2000, 3500, 5000) in
 `src/lib/badges.js`, rendered by `src/components/Badges.jsx`: a full-screen
-acid unlock card with a Web Audio fanfare, and a grid in the account panel
-where everything ahead of the user is greyed out up to 5,000.
+acid unlock card with a Web Audio fanfare, and `BadgesPanel`, its own sheet
+(reached from the Badges row under Profile in the account panel, or from the
+unlock card) where everything ahead of the user is greyed out up to 5,000.
 
 - The trigger is `collection.length`, watched in one effect rather than hooked
   into each save, so every route in counts the same: single scan, batch,
@@ -216,6 +217,13 @@ where everything ahead of the user is greyed out up to 5,000.
   moment, not six.
 - The card waits for a clear screen: never over a running batch, never on top
   of the account panel it links to.
+- **Unlock dates are derived, not stored.** A collection reached its 50th
+  record on the day its 50th record was saved, so `unlockDates` reads the Nth
+  oldest `savedAt` (`src/lib/badges.js`). That dates the badges a long-standing
+  collector earned years ago truthfully, instead of stamping them all with the
+  day the feature shipped, and it needs no migration. The ledger's `unlockedAt`
+  is only a fallback for a tier the collection can no longer account for
+  (records deleted since).
 - The ledger (`vinylvault_badges:<uid>`) is local and user-scoped like every
   other local key. It is unioned with what the count has earned, so deleting
   records never takes a badge away. Being local, a first sign-in on a new

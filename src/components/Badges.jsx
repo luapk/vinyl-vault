@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import {
   Alien, Planet, Rocket, RocketLaunch, FlyingSaucer, MoonStars,
-  Meteor, Star, Sun, LockSimple,
+  Meteor, Star, Sun, LockSimple, X,
 } from '@phosphor-icons/react';
 import {
   BADGE_TIERS, unlockedCounts, nextTier, progressToward,
@@ -16,6 +16,15 @@ const ACID = '#cafe04';
 const INK = '#08080c';
 
 const fmt = (n) => n.toLocaleString('en-GB');
+
+const fmtDate = (ts) => {
+  if (!ts) return null;
+  try {
+    return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return null;
+  }
+};
 
 const reducedMotion = () =>
   typeof window !== 'undefined'
@@ -184,7 +193,7 @@ export function BadgeCelebration({ badge, count, celebrated = [], onClose, onVie
 
 // ----- account panel grid ----------------------------------------------------
 
-export function BadgeGrid({ count = 0, celebrated = [] }) {
+export function BadgeGrid({ count = 0, celebrated = [], dates = {} }) {
   const unlocked = unlockedCounts(count, celebrated);
   const next = nextTier(count, celebrated);
   const pct = Math.round(progressToward(count, next) * 100);
@@ -215,9 +224,10 @@ export function BadgeGrid({ count = 0, celebrated = [] }) {
           const Icon = iconFor(tier.icon);
           const got = unlocked.has(tier.count);
           const isNext = next?.count === tier.count;
+          const on = got ? fmtDate(dates[tier.count]) : null;
           return (
             <div key={tier.count}
-              title={got ? `${tier.name}: ${tier.line}` : `Locked: ${fmt(tier.count)} records`}
+              title={got ? `${tier.name}: ${tier.line}${on ? ` (unlocked ${on})` : ''}` : `Locked: ${fmt(tier.count)} records`}
               style={{
                 borderRadius: 12, padding: '13px 6px 10px', textAlign: 'center',
                 minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -243,9 +253,52 @@ export function BadgeGrid({ count = 0, celebrated = [] }) {
               <div style={{ fontSize: 10, fontFamily: 'monospace', letterSpacing: '0.06em', opacity: got ? 0.6 : 0.85 }}>
                 {fmt(tier.count)}
               </div>
+              {on && (
+                <div style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.02em', opacity: 0.5, marginTop: 3 }}>
+                  {on}
+                </div>
+              )}
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ----- standalone panel ------------------------------------------------------
+// Its own screen rather than an accordion drawer: nine tiles and a progress
+// bar need more room than a menu row gives them.
+
+export function BadgesPanel({ count = 0, celebrated = [], dates = {}, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      role="dialog" aria-modal="true" aria-label="Badges"
+      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
+      <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6"
+        style={{
+          background: 'rgba(var(--bg),0.97)', border: '1px solid rgba(var(--fg),0.10)',
+          backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+          boxShadow: '0 32px 64px rgba(0,0,0,0.5)', maxHeight: '92vh', overflowY: 'auto',
+        }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="flex items-center justify-between mb-5">
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Badges</h2>
+          <button onClick={onClose} aria-label="Close badges"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(var(--fg),0.45)', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <BadgeGrid count={count} celebrated={celebrated} dates={dates} />
       </div>
     </div>
   );
