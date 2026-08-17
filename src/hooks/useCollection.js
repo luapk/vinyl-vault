@@ -3,25 +3,69 @@ import { supabase, isSupabaseEnabled } from '../lib/supabase';
 import { cacheCover, isCachedCover } from '../lib/coverCache';
 import { planLoadMerge } from '../lib/collectionMerge';
 
-const STORAGE_KEY = 'vinylvault_collection';
-const BACKUP_KEY = 'vinylvault_collection_backup';
-const TOMBSTONE_KEY = 'vinylvault_deleted_ids';
+// EVERY local key is scoped to the signed-in user.
+//
+// It used to be one global key per device. The local cache is what renders
+// first, before the cloud load lands, so on a shared browser the previous
+// account's collection was shown to whoever signed in next -- and because the
+// merge deliberately never drops local records, those records were then
+// adopted into the new user's account for real. Scoping by user id is what
+// makes "my records" mean one person's records.
+//
+// While no one is signed in there is no scope, so nothing is read or written:
+// the collection belongs to an account, not to a browser.
+const LEGACY_KEYS = {
+  collection: 'vinylvault_collection',
+  backup: 'vinylvault_collection_backup',
+  tombstones: 'vinylvault_deleted_ids',
+  dirty: 'vinylvault_dirty_ids',
+};
 
-function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+const keyFor = (base, userId) => (userId ? `${LEGACY_KEYS[base]}:${userId}` : null);
+
+// The pre-scoping blobs cannot be attributed to an owner, so they are never
+// adopted -- that is exactly the leak. They are moved aside once rather than
+// deleted, so a support request can still recover anything that had not
+// reached the cloud.
+function retireLegacyKeys() {
+  try {
+    for (const [name, key] of Object.entries(LEGACY_KEYS)) {
+      const value = localStorage.getItem(key);
+      if (value === null) continue;
+      localStorage.setItem(`vinylvault_orphaned_${name}`, value);
+      localStorage.removeItem(key);
+    }
+  } catch { /* storage unavailable */ }
+}
+
+function load(userId) {
+  const key = keyFor('collection', userId);
+  if (!key) return [];
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); }
   catch { return []; }
+}
+
+function save(userId, records) {
+  const key = keyFor('collection', userId);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(records)); }
+  catch { /* storage full */ }
 }
 
 // Explicit user deletions, remembered so a deleted record is never
 // resurrected by the local->cloud merge. Bounded to the most recent 400.
-function loadTombstones() {
-  try { return new Set(JSON.parse(localStorage.getItem(TOMBSTONE_KEY) || '[]')); }
+function loadTombstones(userId) {
+  const key = keyFor('tombstones', userId);
+  if (!key) return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); }
   catch { return new Set(); }
 }
-function addTombstone(id) {
+function addTombstone(userId, id) {
+  const key = keyFor('tombstones', userId);
+  if (!key) return;
   try {
-    const t = [...loadTombstones(), id].slice(-400);
-    localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(t));
+    const t = [...loadTombstones(userId), id].slice(-400);
+    localStorage.setItem(key, JSON.stringify(t));
   } catch { /* storage full */ }
 }
 
@@ -29,17 +73,20 @@ function addTombstone(id) {
 // Persisted so an edit that failed to sync (expired session, offline) still
 // beats the stale cloud copy after a reload -- see planLoadMerge. Cleared only
 // when a dbUpdate/dbInsert for that record succeeds.
-const DIRTY_KEY = 'vinylvault_dirty_ids';
-function loadDirty() {
-  try { return new Set(JSON.parse(localStorage.getItem(DIRTY_KEY) || '[]')); }
+function loadDirty(userId) {
+  const key = keyFor('dirty', userId);
+  if (!key) return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); }
   catch { return new Set(); }
 }
-function saveDirty(set) {
-  try { localStorage.setItem(DIRTY_KEY, JSON.stringify([...set].slice(-400))); }
+function saveDirty(userId, set) {
+  const key = keyFor('dirty', userId);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify([...set].slice(-400))); }
   catch { /* storage full */ }
 }
-function markDirty(id) { const d = loadDirty(); if (!d.has(id)) { d.add(id); saveDirty(d); } }
-function clearDirty(id) { const d = loadDirty(); if (d.has(id)) { d.delete(id); saveDirty(d); } }
+function markDirty(userId, id) { const d = loadDirty(userId); if (!d.has(id)) { d.add(id); saveDirty(userId, d); } }
+function clearDirty(userId, id) { const d = loadDirty(userId); if (d.has(id)) { d.delete(id); saveDirty(userId, d); } }
 
 function recordFromRelease(release, crates) {
   const tags = [
@@ -171,8 +218,12 @@ async function dbDelete(dbId) {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useCollection(userId = null) {
-  const [collection, dispatch] = useReducer(reducer, null, load);
+  // Starts empty on purpose: at first render the signed-in user is not known
+  // yet, and the collection belongs to an account rather than to the browser.
+  // It hydrates from that user's own cache the moment the id arrives.
+  const [collection, dispatch] = useReducer(reducer, []);
   const useDb = isSupabaseEnabled && !!userId;
+  const hydratedFor = useRef(null);
 
   // Track db row IDs keyed by local record id so we can update/delete.
   const dbIds = useRef({});
@@ -188,6 +239,28 @@ export function useCollection(userId = null) {
   // dispatch-then-read races (needed for partial updates like crate changes).
   const collectionRef = useRef(collection);
   collectionRef.current = collection;
+
+  // Hydrate from this user's own local cache. Runs before the cloud load so an
+  // offline or slow start still shows their records immediately, and switching
+  // account swaps the view rather than blending two collections.
+  useEffect(() => {
+    retireLegacyKeys();
+    if (!userId) {
+      // Signed out: hold nothing in memory.
+      if (hydratedFor.current !== null) {
+        hydratedFor.current = null;
+        dispatch({ type: 'SET', records: [] });
+      }
+      return;
+    }
+    if (hydratedFor.current === userId) return;
+    hydratedFor.current = userId;
+    dbIds.current = {};
+    dbHasData.current = false;
+    dbLoadedRef.current = false;
+    setSyncedIds(null);
+    dispatch({ type: 'SET', records: load(userId) });
+  }, [userId]);
 
   // Copy a record's cover into Supabase storage and swap coverUrl to the
   // durable URL (keeping the original in sourceCoverUrl). Fire-and-forget;
@@ -228,7 +301,7 @@ export function useCollection(userId = null) {
       // (tombstone). Trade-off, chosen deliberately: a record deleted on
       // another device can reappear here (annoying, recoverable) rather than
       // an unsynced record being destroyed (catastrophic, unrecoverable).
-      const plan = planLoadMerge(rows, [...collectionRef.current, ...load()], loadTombstones(), loadDirty());
+      const plan = planLoadMerge(rows, [...collectionRef.current, ...load(userId)], loadTombstones(userId), loadDirty(userId));
       const dbRecords = plan.records;
       Object.assign(dbIds.current, plan.dbIdMap);
       for (const rowId of plan.spareRowIds) dbDelete(rowId).catch(() => {});
@@ -241,7 +314,7 @@ export function useCollection(userId = null) {
           const dbId = await dbInsert(userId, record);
           dbIds.current[record.id] = dbId;
           confirmed.add(record.id);
-          clearDirty(record.id);
+          clearDirty(userId, record.id);
         } catch (e) {
           console.error('Sync pending for', record.artist || '(unidentified)', record.title || '', e);
         }
@@ -251,7 +324,7 @@ export function useCollection(userId = null) {
       for (const record of plan.toUpdate) {
         try {
           await dbUpdate(dbIds.current[record.id], record);
-          clearDirty(record.id);
+          clearDirty(userId, record.id);
         } catch (e) {
           console.error('Edit sync pending for', record.artist || '(unidentified)', e);
         }
@@ -263,7 +336,8 @@ export function useCollection(userId = null) {
       try {
         const nextIds = new Set(dbRecords.map(r => r.id));
         if (collectionRef.current.some(r => r?.id && !nextIds.has(r.id))) {
-          localStorage.setItem(BACKUP_KEY, JSON.stringify({ at: Date.now(), records: collectionRef.current }));
+          const backupKey = keyFor('backup', userId);
+          if (backupKey) localStorage.setItem(backupKey, JSON.stringify({ at: Date.now(), records: collectionRef.current }));
         }
       } catch { /* storage full */ }
 
@@ -291,7 +365,7 @@ export function useCollection(userId = null) {
     if (!useDb) return;
     const t = setInterval(async () => {
       if (!dbLoadedRef.current) return;
-      const tombstones = loadTombstones();
+      const tombstones = loadTombstones(userId);
       const unsynced = collectionRef.current.filter(
         r => r?.id && !dbIds.current[r.id] && !tombstones.has(r.id)
       );
@@ -300,20 +374,20 @@ export function useCollection(userId = null) {
           const dbId = await dbInsert(userId, r);
           dbIds.current[r.id] = dbId;
           setSyncedIds(s => new Set([...(s || []), r.id]));
-          clearDirty(r.id);
+          clearDirty(userId, r.id);
           cacheCoverFor(r);
         } catch { break; }
       }
       // Re-push edits whose dbUpdate failed earlier (expired session, network
       // drop). The record stays flagged dirty until a write is confirmed.
-      for (const id of loadDirty()) {
+      for (const id of loadDirty(userId)) {
         const r = collectionRef.current.find(x => x.id === id);
-        if (!r) { clearDirty(id); continue; } // removed since
+        if (!r) { clearDirty(userId, id); continue; } // removed since
         const dbId = dbIds.current[id];
         if (!dbId) continue; // insert path above owns it
         try {
           await dbUpdate(dbId, r);
-          clearDirty(id);
+          clearDirty(userId, id);
         } catch { break; }
       }
     }, 25000);
@@ -325,8 +399,7 @@ export function useCollection(userId = null) {
   // serialise the whole array on every keystroke.
   useEffect(() => {
     const t = setTimeout(() => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collection)); }
-      catch { /* storage full */ }
+      save(userId, collection);
     }, 800);
     return () => clearTimeout(t);
   }, [collection]);
@@ -342,7 +415,7 @@ export function useCollection(userId = null) {
     // Persist a brand-new record to localStorage immediately (the debounced
     // effect could miss it if the app closes/crashes within 800ms).
     if (!existing) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...collectionRef.current])); } catch { /* storage full */ }
+      save(userId, [record, ...collectionRef.current]);
     }
     if (!useDb) return Promise.resolve();
     if (existing && dbIds.current[existing.id]) {
@@ -368,8 +441,8 @@ export function useCollection(userId = null) {
     dispatch({ type: 'REMOVE', id });
     // Tombstone the explicit delete so the local->cloud merge never
     // resurrects it; a removed record has no edits left to sync.
-    addTombstone(id);
-    clearDirty(id);
+    addTombstone(userId, id);
+    clearDirty(userId, id);
     if (!useDb) return;
     if (dbIds.current[id]) {
       dbDelete(dbIds.current[id]).catch(console.error);
@@ -394,12 +467,8 @@ export function useCollection(userId = null) {
     // debounced writer could lose it to a crash within its window). The flag
     // clears only when a write is confirmed; until then the local version
     // beats the cloud copy on load and the background retry keeps pushing.
-    markDirty(id);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(
-        collectionRef.current.map(r => r.id === id ? { ...r, ...patch } : r)
-      ));
-    } catch { /* storage full */ }
+    markDirty(userId, id);
+    save(userId, collectionRef.current.map(r => r.id === id ? { ...r, ...patch } : r));
     if (useDb && dbIds.current[id]) {
       const dbId = dbIds.current[id];
       // dbUpdate replaces the whole jsonb `data` column, so we must send the
@@ -408,10 +477,10 @@ export function useCollection(userId = null) {
       const current = collectionRef.current.find(r => r.id === id) || {};
       const merged = { ...current, ...patch };
       dbUpdate(dbId, merged)
-        .then(() => clearDirty(id))
+        .then(() => clearDirty(userId, id))
         .catch(e => console.error('Edit sync pending for', id, e));
     }
-  }, [useDb]);
+  }, [useDb, userId]);
 
   const renameCrate = useCallback((from, to) => {
     dispatch({ type: 'RENAME_CRATE', from, to });
@@ -419,13 +488,13 @@ export function useCollection(userId = null) {
     collectionRef.current
       .filter(r => (r.crates || []).includes(from))
       .forEach(r => {
-        markDirty(r.id);
+        markDirty(userId, r.id);
         const dbId = dbIds.current[r.id];
         if (!dbId) return;
         const merged = { ...r, crates: r.crates.map(c => c === from ? to : c) };
-        dbUpdate(dbId, merged).then(() => clearDirty(r.id)).catch(console.error);
+        dbUpdate(dbId, merged).then(() => clearDirty(userId, r.id)).catch(console.error);
       });
-  }, [useDb]);
+  }, [useDb, userId]);
 
   const deleteCrate = useCallback((name) => {
     dispatch({ type: 'DELETE_CRATE', name });
@@ -433,13 +502,13 @@ export function useCollection(userId = null) {
     collectionRef.current
       .filter(r => (r.crates || []).includes(name))
       .forEach(r => {
-        markDirty(r.id);
+        markDirty(userId, r.id);
         const dbId = dbIds.current[r.id];
         if (!dbId) return;
         const merged = { ...r, crates: r.crates.filter(c => c !== name) };
-        dbUpdate(dbId, merged).then(() => clearDirty(r.id)).catch(console.error);
+        dbUpdate(dbId, merged).then(() => clearDirty(userId, r.id)).catch(console.error);
       });
-  }, [useDb]);
+  }, [useDb, userId]);
 
   const addRecordsBulk = useCallback(async (releases) => {
     const existing = collectionRef.current;
@@ -460,7 +529,7 @@ export function useCollection(userId = null) {
       // Persist immediately (the effect that writes localStorage is debounced
       // 800ms; a crash inside that window after a batch scan would otherwise
       // lose freshly-added records that also hadn't reached Supabase yet).
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...newRecords, ...existing])); } catch { /* storage full */ }
+      save(userId, [...newRecords, ...existing]);
       if (useDb) {
         try {
           const { data, error } = await supabase

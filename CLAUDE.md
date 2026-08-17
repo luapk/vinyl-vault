@@ -27,7 +27,8 @@ browser against a mock Supabase (`stress/mock-supabase.mjs`) that faithfully
 models refresh-token rotation + reuse revocation. It covers the session
 lifecycle (revoked sessions, unreachable auth server, sign-out always works),
 the no-data-loss sync invariant under database faults, and the PWA + tab
-concurrent-refresh race that guards the auth lock. CI runs it on every push
+concurrent-refresh race that guards the auth lock, and account isolation on a
+shared device. CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
 
@@ -165,6 +166,16 @@ Each record is a JSON blob stored in the `data` jsonb column:
 - `identified`, `confidence`, `source`, `notes`
 - `priceData`, `priceCheckedAt` -- persisted result of the last marketplace price check (`/api/price`): `{ currency, conditions: [{grade, value}], suggestionsStatus, floor, totalListings, checkedAt }`
 - `savedAt` -- timestamp
+
+### Local cache is per user
+Every localStorage key is scoped to the signed-in user id
+(`vinylvault_collection:<uid>` and friends). The cache renders before the cloud
+load lands, so a global key meant that on a shared browser the previous
+account's records were shown to whoever signed in next -- and because the merge
+never drops local records, they were then written into the new user's account.
+Nothing is read or written while signed out. Pre-scoping blobs are moved to
+`vinylvault_orphaned_*` rather than adopted (they cannot be attributed to an
+owner) so nothing is destroyed. Guarded by `stress/accounts.spec.mjs`.
 
 ### Sync behaviour
 - Always writes to localStorage on every state change (local-first); new records and edits are additionally persisted immediately (not just via the 800ms debounce)

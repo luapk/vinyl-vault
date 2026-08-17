@@ -37,6 +37,7 @@ fallback in `playwright.config.mjs`.
 | --- | --- |
 | `session.spec.mjs` | profile hydration on first load; session-expired UX shows a working sign-out, even with the auth server unreachable |
 | `sync.spec.mjs` | the no-data-loss invariant: records added while the DB is down survive reloads and auto-sync on recovery; two devices converge |
+| `accounts.spec.mjs` | account isolation: one user's cached records must never render for, or be written into, another account on the same browser |
 | `race.spec.mjs` | THE flagship: PWA + tab refreshing concurrently with a zero grace window must not trip reuse revocation. Fails if the re-entrant auth lock in `src/lib/supabase.js` is broken or removed |
 
 `race.spec.mjs` sets `graceMs: 0`, which is stricter than real Supabase
