@@ -2059,12 +2059,23 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
 
 // ----- Crate colour system ---------------------------------------------------
 
+// Ten crate colours. The original five ran cool (violet through blue to
+// cyan) plus the brand acid, which left the warm half of the wheel empty and
+// made two crates of similar mood hard to tell apart. The second five fill
+// that gap at a matching saturation so the set still reads as one family, and
+// every one of them takes black type under the contrast test used by the
+// filled lozenges, so the whole palette stays legible.
 const CRATE_PALETTE = [
-  { id: 'purple', hex: '#5B21D4', rgb: '91,33,212'   },
-  { id: 'violet', hex: '#AC90E2', rgb: '172,144,226' },
-  { id: 'cyan',   hex: '#60EDD6', rgb: '96,237,214'  },
-  { id: 'blue',   hex: '#3498EF', rgb: '52,152,239'  },
-  { id: 'lime',   hex: '#C9FF00', rgb: '201,255,0'   },
+  { id: 'purple',  hex: '#5B21D4', rgb: '91,33,212'   },
+  { id: 'violet',  hex: '#AC90E2', rgb: '172,144,226' },
+  { id: 'cyan',    hex: '#60EDD6', rgb: '96,237,214'  },
+  { id: 'blue',    hex: '#3498EF', rgb: '52,152,239'  },
+  { id: 'lime',    hex: '#C9FF00', rgb: '201,255,0'   },
+  { id: 'emerald', hex: '#17C08A', rgb: '23,192,138'  },
+  { id: 'amber',   hex: '#FFB020', rgb: '255,176,32'  },
+  { id: 'coral',   hex: '#FF5C4D', rgb: '255,92,77'   },
+  { id: 'magenta', hex: '#F0409C', rgb: '240,64,156'  },
+  { id: 'slate',   hex: '#7B8FA8', rgb: '123,143,168' },
 ];
 
 // Palette RGB strings for use in rgba() — matches CRATE_PALETTE order
@@ -4426,7 +4437,7 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
                 </div>
                 {/* Colour picker — only shown when editing this crate */}
                 {editingName === crate && (
-                  <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                  <div className="flex items-center gap-2 px-3 pb-3 pt-0 flex-wrap">
                     <span className="text-[11px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
                     {CRATE_PALETTE.map(({ id, hex }) => {
                       const isActive = activeColor === hex;
@@ -4695,7 +4706,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
                   <button onClick={() => { if (window.confirm(`Delete the "${crate}" crate? Records in this crate will not be deleted.`)) onDelete(crate); }} className="w-8 h-8 rounded-full flex items-center justify-center transition-all" style={{ color: filled ? inkFade(0.55) : "rgba(220,100,100,0.35)" }} onMouseEnter={e => { e.currentTarget.style.color = filled ? ink : 'rgba(220,100,100,0.75)'; }} onMouseLeave={e => { e.currentTarget.style.color = filled ? inkFade(0.55) : 'rgba(220,100,100,0.35)'; }}><Trash size={13} /></button>
                 </div>
                 {editingName === crate && (
-                  <div className="flex items-center gap-2 px-3 pb-3 pt-0">
+                  <div className="flex items-center gap-2 px-3 pb-3 pt-0 flex-wrap">
                     <span className="text-[11px] tracking-[0.18em] uppercase font-mono text-white/20 mr-1">Colour</span>
                     {CRATE_PALETTE.map(({ id, hex }) => {
                       const isActive = activeColor === hex;
