@@ -1152,6 +1152,13 @@ export default function VinylVault() {
     setSavedId(null);
   };
 
+  // NEW SCAN means exactly that: a clean scan screen with the viewfinder
+  // already up, so working through a stack of records is one tap each.
+  const newScan = () => {
+    reset();
+    setCameraOpen(true);
+  };
+
   // Sync helper: keeps ref and state in lockstep so async callbacks always
   // read the latest queue without stale-closure issues.
   const syncQueue = (next) => {
@@ -1313,12 +1320,11 @@ export default function VinylVault() {
               onClick={() => {
                 if (id === "community") { openCommunityHome(); return; }
                 setAppView(id);
-                if (id === "scan") {
-                  if (appView !== "scan") reset();
-                  // Straight to the viewfinder, where the label / sleeve /
-                  // barcode toggle lives. Closing it lands on the scan screen.
-                  setCameraOpen(true);
-                }
+                // Nav goes to the scan home screen and stops there. Opening the
+                // viewfinder from here made the header button a one-way trip
+                // into the camera with no way back to home. The camera is
+                // reached from the tile on that screen, or from NEW SCAN.
+                if (id === "scan" && appView !== "scan") reset();
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
@@ -1381,7 +1387,7 @@ export default function VinylVault() {
             {phase === "disambiguation" && (
               <>
                 <div className="flex justify-center pt-4 pb-1">
-                  <button onClick={reset} className="text-[14px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "rgba(var(--fg),0.03)" }}>
+                  <button onClick={newScan} className="text-[14px] tracking-[0.15em] uppercase font-mono px-5 py-2 rounded-full transition-all" style={{ border: "1px solid rgba(var(--fg),0.10)", color: "rgba(var(--fg),0.40)", background: "rgba(var(--fg),0.03)" }}>
                     New scan
                   </button>
                 </div>
@@ -1389,7 +1395,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onNewScan={newScan} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} onSignOut={signOut} />}
           </>
@@ -1885,7 +1891,7 @@ function ProcessingView({ imageUrl, status, accentRGB, onCancel }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onManual, collection = [], smartCrateNames = [] }) {
+function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onNewScan, onManual, collection = [], smartCrateNames = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -1985,7 +1991,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
       )}
       {/* Top bar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
+        <button onClick={onNewScan || onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
           <CaretLeft size={12} />New scan
         </button>
         {onManual && (
@@ -6556,10 +6562,13 @@ function CameraModal({ onCapture, onBarcode, onClose }) {
               ? 'Reads by itself, no need to press the button'
               : 'Front or back -- catalogue number and spine text help most'}
           </p>
-          <button onClick={capture}
+          {/* Always white on black, never themed: the viewfinder behind it is a
+              dark video feed whatever the app theme is, so a --fg background
+              turned the shutter near-black and invisible in light mode. */}
+          <button onClick={capture} aria-label="Take photo"
             className="w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95"
-            style={{ background: 'rgba(var(--fg),0.92)', border: '3px solid rgba(var(--fg),0.5)', boxShadow: '0 0 0 4px rgba(var(--fg),0.15)' }}>
-            <Camera size={24} style={{ color: '#111' }} weight="bold" />
+            style={{ background: '#ffffff', border: '3px solid rgba(255,255,255,0.5)', boxShadow: '0 0 0 4px rgba(255,255,255,0.18)' }}>
+            <Camera size={24} style={{ color: '#08080c' }} weight="bold" />
           </button>
         </div>
       )}
