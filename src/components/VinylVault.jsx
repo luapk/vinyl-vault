@@ -808,20 +808,31 @@ export default function VinylVault() {
     return () => clearTimeout(timer);
   }, [checkoutSuccess, user?.id, refreshProfile]);
 
+  // Which profile is open lives in history STATE, never in the address bar.
+  //
+  // It used to be pushed as ?u=, which made the browser's own restore
+  // behaviour a bug: tap a profile, switch away from the app, and the tab the
+  // phone restores hours later is still that profile's URL, so the app reopens
+  // on a stranger's profile. Stripping the param on leaving the community view
+  // did not help, because the case that hurts is closing the app WHILE the
+  // profile is open. History state gives back/forward everything it needs
+  // without leaving a trace anything can restore from. Sharing is unaffected:
+  // the share button builds its link from the origin, not the address bar.
   const openProfile = useCallback((username) => {
     if (!username) return;
     setProfileUsername(username);
     setAppView('community');
-    const url = `${window.location.pathname}?u=${encodeURIComponent(username)}`;
-    if (`?u=${encodeURIComponent(username)}` !== window.location.search) {
-      window.history.pushState({ u: username }, '', url);
+    if (window.history.state?.u !== username) {
+      window.history.pushState({ ...window.history.state, u: username }, '', window.location.pathname);
     }
   }, []);
 
   const openCommunityHome = useCallback(() => {
     setProfileUsername(null);
     setAppView('community');
-    if (window.location.search) window.history.pushState({}, '', window.location.pathname);
+    if (window.history.state?.u) {
+      window.history.pushState({ ...window.history.state, u: null }, '', window.location.pathname);
+    }
   }, []);
 
   // Open an inbound profile link, once, when we know enough to judge it.
@@ -853,10 +864,12 @@ export default function VinylVault() {
     window.history.replaceState({}, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname);
   }, [appView]);
 
-  // Browser back/forward: re-sync the open profile from the URL.
+  // Browser back/forward: re-sync the open profile from history state (the
+  // address bar no longer carries it). An inbound ?u= link is still honoured
+  // here for the entry that created it, before the param is stripped.
   useEffect(() => {
-    const onPop = () => {
-      const u = new URLSearchParams(window.location.search).get('u');
+    const onPop = (e) => {
+      const u = e.state?.u || new URLSearchParams(window.location.search).get('u');
       if (u) { setProfileUsername(u); setAppView('community'); }
       else { setProfileUsername(null); }
     };

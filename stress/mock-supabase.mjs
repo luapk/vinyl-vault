@@ -12,6 +12,7 @@
 //   POST /__test/config              -- { graceMs?, expiresIn? }
 //   POST /__test/revoke              -- { email } revoke every session family
 //   POST /__test/seed-records        -- { email, records: [recordJson] }
+//   POST /__test/set-profile         -- { email, username?, isPublic? }
 //   GET  /__test/state               -- { records, users, revocations }
 import http from 'node:http';
 
@@ -45,8 +46,18 @@ function reset() {
 }
 function addUser(email, password, displayName) {
   const id = `00000000-0000-4000-8000-${String(state.users.size + 1).padStart(12, '0')}`;
-  state.users.set(email, { id, email, password, displayName });
+  state.users.set(email, { id, email, password, displayName, username: null, isPublic: false });
   return state.users.get(email);
+}
+
+// The profile row as the app expects to read it.
+function profileJson(u) {
+  return {
+    id: u.id, email: u.email, role: u.email === 'paul@test.local' ? 'admin' : 'user',
+    avatar_url: null, display_name: u.displayName, username: u.username, bio: null,
+    is_public: !!u.isPublic, preferences: null, subscription_tier: 'free',
+    subscription_status: null, scans_this_period: 0, scans_period_end: null,
+  };
 }
 reset();
 
@@ -170,6 +181,14 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 200, { count: state.records.length });
   }
+  if (path === '/__test/set-profile') {
+    const body = await readBody(req);
+    const target = state.users.get(body.email);
+    if (!target) return send(res, 404, { error: 'no such user' });
+    if (body.username !== undefined) target.username = body.username;
+    if (body.isPublic !== undefined) target.isPublic = body.isPublic;
+    return send(res, 200, { ok: true });
+  }
   if (path === '/__test/state') {
     return send(res, 200, {
       records: state.records,
@@ -226,16 +245,19 @@ const server = http.createServer(async (req, res) => {
     const wantsSingle = /vnd\.pgrst\.object/.test(req.headers['accept'] || '');
 
     if (table === 'profiles' && req.method === 'GET') {
+      // Lookup by id (own profile) or by username (a public collector).
       const id = eqValue(url, 'id');
-      const target = [...state.users.values()].find(x => x.id === id);
+      const username = eqValue(url, 'username');
+      if (!id && !username) {
+        // Discovery lists (latest members, user search). The mock ignores the
+        // ilike/order refinements and just returns every public collector,
+        // which is enough to put a real profile in front of a real click.
+        return send(res, 200, [...state.users.values()].filter(x => x.isPublic && x.username).map(profileJson));
+      }
+      const target = [...state.users.values()].find(x =>
+        (id && x.id === id) || (username && (x.username || '').toLowerCase() === username.toLowerCase()));
       if (!target) return wantsSingle ? send(res, 406, { message: 'JSON object requested, multiple (or no) rows returned', code: 'PGRST116' }) : send(res, 200, []);
-      const profile = {
-        id: target.id, email: target.email, role: target.email === 'paul@test.local' ? 'admin' : 'user',
-        avatar_url: null, display_name: target.displayName, username: null, bio: null,
-        is_public: false, preferences: null, subscription_tier: 'free',
-        subscription_status: null, scans_this_period: 0, scans_period_end: null,
-      };
-      return send(res, 200, wantsSingle ? profile : [profile]);
+      return send(res, 200, wantsSingle ? profileJson(target) : [profileJson(target)]);
     }
 
     if (table === 'records') {

@@ -28,7 +28,8 @@ models refresh-token rotation + reuse revocation. It covers the session
 lifecycle (revoked sessions, unreachable auth server, sign-out always works),
 the no-data-loss sync invariant under database faults, and the PWA + tab
 concurrent-refresh race that guards the auth lock, account isolation on a
-shared device, and the smart-crate runs (which may only ever ADD crate names).
+shared device, the smart-crate runs (which may only ever ADD crate names), and
+the rule that a community profile can never become somebody's home page.
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -235,6 +236,13 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
 - **onAuthStateChange deadlock guard**: never `await` a supabase call inside the `onAuthStateChange` callback (`useAuth.js`). supabase-js awaits these callbacks while holding its auth lock; a query there calls `getSession()`, which waits on `initialize()`, which waits on the callback -- a circular wait that wedges the whole client on with-session boots (the historic "profile/admin/community missing until refresh" hydration bug). Dispatch follow-up work with `setTimeout(..., 0)`. Regression-tested by `stress/session.spec.mjs`.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
+- **Community profile routing**: which profile is open lives in
+  `history.state.u`, **never in the address bar**. `?u=` is accepted only as an
+  inbound shared link, consumed once, and stripped on the first render. Putting
+  it in the URL made the browser's own restore behaviour a bug: tap a profile,
+  switch away, and the tab the phone restores hours later reopens a stranger's
+  profile. Guarded by `stress/profile-link.spec.mjs`. Sharing is unaffected --
+  the share button builds its link from `window.location.origin`.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
 - **Smart crates**: two runs. `mode: 'full'` sorts the whole collection from
   scratch and replaces the suggestion list. `mode: 'unfiled'` (the default action
