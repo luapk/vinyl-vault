@@ -131,6 +131,11 @@ function recordFromRelease(release, crates) {
     tracklist: (release.tracklist || []).map(t => ({
       position: t.position,
       title: t.title,
+      // Set only on compilations, where each track has its own artist and the
+      // release artist is just "Various". Whitelisted here deliberately: this
+      // map is what persists, so a field missing from it is a field that
+      // survives the scan screen and then disappears on save.
+      artist: t.artist || null,
       duration: t.duration || null,
       bpm: t.bpm || null,
       bpmSource: t.bpmSource || null,

@@ -13,3 +13,15 @@ export function toCamelot(spotifyKey, mode) {
   if (spotifyKey == null || mode == null) return null;
   return TABLE[`${spotifyKey},${mode}`] ?? null;
 }
+
+// Camelot wheel colour for a key badge. The 12 numbers walk the hue circle so
+// harmonically adjacent keys sit next to each other in colour too; the A/B
+// letter (minor/major) varies saturation and lightness.
+export const camelotColor = (key) => {
+  if (!key) return "rgb(120,120,130)";
+  const num = parseInt(key, 10);
+  const letter = key.slice(-1).toUpperCase();
+  if (isNaN(num) || num < 1 || num > 12) return "rgb(120,120,130)";
+  const hue = ((num - 1) * 30) % 360;
+  return `hsl(${hue}, ${letter === "B" ? 70 : 55}%, ${letter === "B" ? 68 : 62}%)`;
+};

@@ -87,7 +87,8 @@ export async function enrichWithDeezer(tracks, artist, opts = {}) {
       const idx = queue[cursor++];
       const t = out[idx];
       try {
-        const hit = await searchTrack(artist, t.title, t.duration);
+        // Per-track artist on compilations; the release artist otherwise.
+        const hit = await searchTrack(t.artist || artist, t.title, t.duration);
         if (!hit) continue;
 
         let updated = t;

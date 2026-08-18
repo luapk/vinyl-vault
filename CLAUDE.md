@@ -56,6 +56,7 @@ sent; users are tagged by Supabase user id only.
 src/
   components/
     VinylVault.jsx     # entire app UI (single large component file)
+    TrackRow.jsx       # one tracklist row; shared by record detail and community
     AuthScreen.jsx     # login / sign-up screen
     AdminPanel.jsx     # admin user management
     Badges.jsx         # milestone unlock card + the grid in the account panel
@@ -167,7 +168,10 @@ Each record is a JSON blob stored in the `data` jsonb column:
 - `artist`, `title`, `label`, `catalogNumber`, `year`, `country`, `format`
 - `genres[]`, `tags[]`
 - `crates[]` -- user-assigned crate names (strings)
-- `tracklist[]` -- `{ position, title, duration, bpm, bpmSource, bpmConfidence, key, previewUrl, hot }`
+- `tracklist[]` -- `{ position, title, artist, duration, bpm, bpmSource, bpmConfidence, key, previewUrl, hot }`
+  - `artist`: set only on compilations, where each track has its own artist and
+    the release artist is just "Various". Null on single-artist releases, where
+    repeating the name on every row would be noise.
   - `bpmSource`: `deezer` | `getsongbpm` | `cache:*` | `waveform` | `waveform+arbiter`
   - `bpmConfidence`: `high` (two independent sources agree) | `low` (sources disagree; dimmed in Tracks view) | null (single source)
 - `coverUrl`, `images[]`
@@ -234,6 +238,19 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
 
 - **Auth lock**: `supabase.js` uses a **strictly serialising, bounded-wait** `navigator.locks` auth lock. Cross-context serialisation prevents refresh-token reuse revocation (the "session expired" sign-outs when a PWA window + tab share storage); a 5s cap means a hung holder degrades one call instead of freezing the app. supabase-js never re-enters an injected lock (its `_acquireLock` queues nested acquires internally), so no re-entrancy short-circuit is needed -- and an earlier same-tab short-circuit let refreshes bypass serialisation and replay stale tokens (caught by `stress/race.spec.mjs`; do not reintroduce it).
 - **onAuthStateChange deadlock guard**: never `await` a supabase call inside the `onAuthStateChange` callback (`useAuth.js`). supabase-js awaits these callbacks while holding its auth lock; a query there calls `getSession()`, which waits on `initialize()`, which waits on the callback -- a circular wait that wedges the whole client on with-session boots (the historic "profile/admin/community missing until refresh" hydration bug). Dispatch follow-up work with `setTimeout(..., 0)`. Regression-tested by `stress/session.spec.mjs`.
+- **Compilation track artists**: Discogs sends a per-track `artists` array on
+  compilations; `trackArtist` (`api/lib/discogs.js`, unit-tested) keeps it. It
+  is not only for display -- every preview and BPM lookup prefers it over the
+  release artist, because searching "Various - Song Title" matches nothing, and
+  writing a whole compilation into the shared `track_bpm` cache under "various"
+  would pollute it for everyone. Note that `recordFromRelease`
+  (`useCollection.js`) whitelists track fields: a field missing from that map
+  survives the scan screen and then disappears on save.
+- **User cover photos**: any image strip ends with an add-your-own tile
+  (`AddCoverTile`). The upload goes to the same `covers` bucket as cached
+  Discogs art, whose per-user RLS policies already exist in
+  `supabase/storage.sql`, so there is no migration. A failed upload falls back
+  to a local data URL: the photo is never lost, it just does not sync.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Community profile routing**: which profile is open lives in

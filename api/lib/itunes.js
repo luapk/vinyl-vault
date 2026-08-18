@@ -232,8 +232,11 @@ export async function fillItunesPreviews(tracks, artist, releaseContext = {}) {
   return Promise.all(
     tracks.map(async track => {
       if (track.previewUrl) return track;
+      // Per-track artist on compilations, where `artist` is only "Various".
+      // The album path above deliberately keeps the release artist: it is
+      // matching the collection, not the song.
       const match = await searchTrackPreview(
-        artist, track.title, track.duration, releaseYear, releaseTitle
+        track.artist || artist, track.title, track.duration, releaseYear, releaseTitle
       ).catch(() => null);
       if (!match) return track;
       return {

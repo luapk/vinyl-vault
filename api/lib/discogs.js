@@ -212,6 +212,21 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   });
 }
 
+// Per-track artists exist on compilations, where the release artist is only
+// "Various". Keeping them is what lets the tracklist say who each song is
+// actually by, and it is also the name the preview and BPM lookups need:
+// searching "Various - Song Title" matches nothing.
+//
+// Discogs disambiguates same-named artists with a trailing "(2)", which is
+// catalogue bookkeeping rather than part of the name, so it is stripped the
+// same way the release artist is.
+export function trackArtist(track) {
+  const names = (track?.artists || [])
+    .map(a => (a?.name || '').replace(/\s*\(\d+\)$/, '').trim())
+    .filter(Boolean);
+  return names.length ? names.join(', ') : null;
+}
+
 export async function fetchDiscogsRelease(id) {
   const headers = authHeaders();
   // 1 retry, 4s timeout: keeps the "pulling data" screen fast even if Discogs
@@ -234,6 +249,7 @@ export async function fetchDiscogsRelease(id) {
       position: t.position || '',
       title: t.title || '',
       duration: t.duration || null,
+      artist: trackArtist(t),
     }));
 
   const images = (r.images || []).map(img => img.uri).filter(Boolean);

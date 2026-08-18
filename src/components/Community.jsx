@@ -12,6 +12,7 @@ import {
   getNotifications, getLastSeenTs, bustFollowCache,
 } from "../lib/social.js";
 import { spaceIconFor } from "../lib/avatarIcon.js";
+import TrackRow from "./TrackRow.jsx";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -253,8 +254,34 @@ function CommentSection({ ownerUserId, recordLocalId, currentUserId, accentRGB, 
 
 // ─── Record social modal (read-only detail + reactions + comments) ────────────
 
-function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onClose, onOpenProfile }) {
+function RecordSocialModal({ record, owner, ownerUserId, currentUserId, accentRGB, onClose, onOpenProfile }) {
   const recordLocalId = record.id;
+  // Someone else's record, as against one of your own reached from a
+  // notification. Everything about whose shelf this is hangs off this.
+  const isTheirs = !!ownerUserId && ownerUserId !== currentUserId;
+  const ownerName = owner?.username ? `@${owner.username}` : (owner?.display_name || 'this collector');
+
+  const tracks = (record.tracklist || []).filter(t => t && (t.title || t.position));
+  const playable = tracks.some(t => t.previewUrl);
+
+  // Previews play here exactly as they do in your own record detail. Same
+  // <audio> element approach: one clip at a time, stopped when the sheet closes.
+  const audioRef = useRef(null);
+  const [playingPreview, setPlayingPreview] = useState(null);
+  const playPreview = (url) => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    if (playingPreview === url) { setPlayingPreview(null); return; }
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    audioRef.current = audio;
+    audio.oncanplay = () => { if (audioRef.current === audio) audio.play().catch(() => {}); };
+    setPlayingPreview(url);
+    audio.onended = () => { setPlayingPreview(null); audioRef.current = null; };
+  };
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
+
+  const OwnerIcon = owner ? spaceIconFor(owner) : null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(10px)' }} onClick={onClose}>
@@ -264,7 +291,29 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
 
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3"
           style={{ background: 'rgba(var(--bg),0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(var(--fg),0.06)' }}>
-          <span className="text-[11px] tracking-[0.25em] uppercase font-mono text-white/35">Record</span>
+          {/* Whose shelf this is, kept in the sticky header so it stays on
+              screen while you scroll the tracklist. Playing another person's
+              previews should never feel like looking at your own collection. */}
+          {isTheirs ? (
+            <button
+              onClick={() => owner?.username && onOpenProfile?.(owner.username)}
+              className="flex items-center gap-2 min-w-0"
+              style={{ background: 'none', border: 'none', padding: 0, cursor: owner?.username ? 'pointer' : 'default' }}>
+              <span className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center vv-avatar-fallback">
+                {owner?.avatar_url
+                  ? <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
+                  : (OwnerIcon ? <OwnerIcon size={13} weight="regular" /> : null)}
+              </span>
+              {/* Deliberately not the accent colour: the accent is sampled from
+                  the cover art, so it can land pale and vanish against the
+                  light theme. Ownership has to be readable every time. */}
+              <span className="text-[11px] tracking-[0.18em] uppercase font-mono truncate" style={{ color: 'rgba(var(--fg),0.8)' }}>
+                {ownerName}'s copy
+              </span>
+            </button>
+          ) : (
+            <span className="text-[11px] tracking-[0.25em] uppercase font-mono text-white/35">Record</span>
+          )}
           <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: '1px solid rgba(var(--fg),0.1)', color: 'rgba(var(--fg),0.45)' }}><X size={13} /></button>
         </div>
 
@@ -290,6 +339,23 @@ function RecordSocialModal({ record, ownerUserId, currentUserId, accentRGB, onCl
               {[...new Set([...(record.genres || []), ...(record.tags || [])])].slice(0, 8).map(t => (
                 <span key={t} className="px-2.5 py-1 rounded-full text-[11px] font-mono" style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', color: 'rgba(var(--fg),0.5)' }}>{t}</span>
               ))}
+            </div>
+          )}
+
+          {tracks.length > 0 && (
+            <div className="mb-5">
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/35">Tracklist</span>
+                <span className="text-[11px] font-mono text-white/25">
+                  {playable ? 'Tap to play' : `${tracks.length} tracks`}
+                </span>
+              </div>
+              <div className="space-y-0.5 -mx-2">
+                {tracks.map((track, i) => (
+                  <TrackRow key={i} track={track} index={i} accentRGB={accentRGB}
+                    playingPreview={playingPreview} onPlay={playPreview} />
+                ))}
+              </div>
             </div>
           )}
 
@@ -543,7 +609,7 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
       )}
 
       {selected && (
-        <RecordSocialModal record={selected} ownerUserId={profile.id} currentUserId={currentUserId} accentRGB={accentRGB} onClose={() => setSelected(null)} onOpenProfile={onOpenProfile} />
+        <RecordSocialModal record={selected} owner={profile} ownerUserId={profile.id} currentUserId={currentUserId} accentRGB={accentRGB} onClose={() => setSelected(null)} onOpenProfile={onOpenProfile} />
       )}
 
       {showFollowModal && (

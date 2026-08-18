@@ -41,24 +41,30 @@ const CONF_RANK = { high: 3, medium: 2, low: 1 };
 export async function lookupBpms(artist, tracks) {
   const empty = tracks.map(() => null);
   const supabase = getServiceClient();
-  const artistNorm = normKey(artist);
-  if (!supabase || !artistNorm) return empty;
+  if (!supabase) return empty;
 
+  // A track carrying its own artist (compilations) is looked up under that
+  // name, not the release artist. On a Various Artists release the release
+  // artist is "Various", which matches nothing and would poison the cache.
+  const artistFor = t => normKey(t?.artist || artist);
+
+  const artistNorms = [...new Set(tracks.map(artistFor).filter(Boolean))];
   const titleNorms = [...new Set(tracks.map(t => normKey(t?.title)).filter(Boolean))];
-  if (!titleNorms.length) return empty;
+  if (!artistNorms.length || !titleNorms.length) return empty;
 
   try {
     const { data, error } = await supabase
       .from('track_bpm')
-      .select('title_norm, duration_bucket, bpm, source, confidence')
-      .eq('artist_norm', artistNorm)
+      .select('artist_norm, title_norm, duration_bucket, bpm, source, confidence')
+      .in('artist_norm', artistNorms)
       .in('title_norm', titleNorms);
     if (error || !data?.length) return empty;
 
     return tracks.map(t => {
+      const an = artistFor(t);
       const tn = normKey(t?.title);
-      if (!tn) return null;
-      const rows = data.filter(r => r.title_norm === tn);
+      if (!an || !tn) return null;
+      const rows = data.filter(r => r.artist_norm === an && r.title_norm === tn);
       if (!rows.length) return null;
       const bucket = durationBucket(t?.duration);
       // Prefer the exact version (same duration bucket), then a row with

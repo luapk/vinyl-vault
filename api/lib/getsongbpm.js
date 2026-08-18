@@ -123,7 +123,8 @@ export async function enrichBpm(tracks, artist, { concurrency = 2 } = {}) {
     while (cursor < queue.length) {
       const idx = queue[cursor++];
       const t = out[idx];
-      const bpm = await lookupBpm(apiKey, artist, t.title).catch(() => null);
+      // Per-track artist on compilations; the release artist otherwise.
+      const bpm = await lookupBpm(apiKey, t.artist || artist, t.title).catch(() => null);
       out[idx] = bpm != null
         ? { ...t, bpm, bpmSource: 'getsongbpm', bpmGsb2Tried: true }
         : { ...t, bpmGsb2Tried: true };

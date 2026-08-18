@@ -163,7 +163,8 @@ export async function enrichTracks(tracks, artist, releaseContext = {}) {
   return Promise.all(
     tracks.map(async track => {
       try {
-        const result = await searchTrack(token, artist, track.title, releaseYear, track.duration);
+        // track.artist is set on compilations, where `artist` is only "Various".
+        const result = await searchTrack(token, track.artist || artist, track.title, releaseYear, track.duration);
         if (!result) return { ...track, ...noMatch };
 
         notePreviewOutcome(!!result.previewUrl);

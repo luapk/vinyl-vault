@@ -143,7 +143,10 @@ async function buildRelease(discogsRelease, vision, hasSpotify, apiKey) {
   const toStore = outputTracks
     .filter(t => t.bpm != null && t.bpmSource && !t.bpmSource.startsWith('cache'))
     .map(t => ({
-      artist: release.artist,
+      // Store under the track's own artist on compilations. Writing every
+      // track of a Various Artists release under "Various" would pollute the
+      // shared cache for everyone.
+      artist: t.artist || release.artist,
       title: t.title,
       duration: t.duration,
       bpm: t.bpm,

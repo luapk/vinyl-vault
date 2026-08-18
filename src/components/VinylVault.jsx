@@ -18,6 +18,9 @@ import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { camelotColor } from '../lib/camelot.js';
+import { uploadUserCover } from '../lib/coverCache.js';
+import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { parseImportRows } from '../lib/importParse.js';
@@ -274,15 +277,6 @@ const resizeAvatar = (file, size = 160) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-
-const camelotColor = (key) => {
-  if (!key) return "rgb(120,120,130)";
-  const num = parseInt(key, 10);
-  const letter = key.slice(-1).toUpperCase();
-  if (isNaN(num) || num < 1 || num > 12) return "rgb(120,120,130)";
-  const hue = ((num - 1) * 30) % 360;
-  return `hsl(${hue}, ${letter === "B" ? 70 : 55}%, ${letter === "B" ? 68 : 62}%)`;
-};
 
 const downloadCSV = (collection) => {
   const csv = exportCSV(collection);
@@ -1200,10 +1194,16 @@ export default function VinylVault() {
     }
   };
 
-  const saveRecord = (selectedCover, conditions = {}) => {
+  const saveRecord = (selectedCover, conditions = {}, addedCovers = []) => {
     if (!release) return;
     const coverUrl = selectedCover || release.coverUrl || imageUrl || null;
-    const extraImages = imageUrl ? [...(release.images || []), imageUrl] : (release.images || []);
+    // Covers the user added on the result screen are part of the record, not
+    // scratch state: without this they vanish the moment the view unmounts.
+    const extraImages = [
+      ...(release.images || []),
+      ...(imageUrl ? [imageUrl] : []),
+      ...addedCovers,
+    ];
     const toSave = { ...release, coverUrl, images: extraImages, mediaCondition: conditions.mediaCondition || '', sleeveCondition: conditions.sleeveCondition || '' };
     playSaveChime();
     addRecord(toSave, pendingCrates).catch(err => setErrorMsg(`Saved locally but failed to sync: ${err.message}`));
@@ -1467,13 +1467,13 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onNewScan={newScan} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} userId={userId} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onNewScan={newScan} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} onSignOut={signOut} />}
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} userId={userId} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "tracks" && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
@@ -1963,7 +1963,62 @@ function ProcessingView({ imageUrl, status, accentRGB, onCancel }) {
 
 // ----- ResultView ------------------------------------------------------------
 
-function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onNewScan, onManual, collection = [], smartCrateNames = [] }) {
+// The always-present last square in an image strip: add a cover of your own.
+//
+// Discogs art can be missing, wrong, or a worse shot than the sleeve in your
+// hands, so every strip ends with this. accept="image/*" with no capture
+// attribute deliberately lets the phone offer both the camera and the library.
+//
+// The upload goes to the same storage bucket as cached Discogs art, so it
+// syncs across devices. If storage is unreachable the resized data URL is used
+// instead: the photo is never lost to a failed upload, it just stays local.
+function AddCoverTile({ px = 48, userId, onAdd, label = "Add your own cover" }) {
+  const inputRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+
+  const handleFile = async (file) => {
+    if (!file || busy) return;
+    setBusy(true);
+    try {
+      const dataUrl = await resizeImage(file, 1500, 0.85);
+      let url = dataUrl;
+      if (userId) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          url = (await uploadUserCover(userId, blob)) || dataUrl;
+        } catch { /* keep the data URL */ }
+      }
+      onAdd(url);
+    } catch { /* unreadable image */ }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; handleFile(f); }} />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        title={label}
+        aria-label={label}
+        className="relative shrink-0 rounded-lg flex items-center justify-center transition-all"
+        style={{
+          width: px, height: px,
+          border: '1px dashed rgba(var(--fg),0.22)',
+          background: 'rgba(var(--fg),0.03)',
+          color: 'rgba(var(--fg),0.45)',
+          cursor: busy ? 'wait' : 'pointer',
+        }}>
+        {busy
+          ? <div className="animate-spin" style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(var(--fg),0.15)', borderTopColor: 'rgba(var(--fg),0.5)' }} />
+          : <Camera size={px >= 48 ? 17 : 15} weight="bold" />}
+      </button>
+    </>
+  );
+}
+
+function ResultView({ release, imageUrl, accentRGB, userId, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onNewScan, onManual, collection = [], smartCrateNames = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -1972,6 +2027,9 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
   const bpmTriedRef = useRef(new Set());
   const [pendingMedia, setPendingMedia] = useState('');
   const [pendingSleeve, setPendingSleeve] = useState('');
+  // Covers the user added here, before the record exists. Passed to onSave so
+  // they are stored with it rather than lost when the view unmounts.
+  const [addedCovers, setAddedCovers] = useState([]);
 
   const releaseKey = `${release?.discogsId || release?.artist}|${release?.title}`;
   useEffect(() => {
@@ -1992,7 +2050,8 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
   const discogsImages = release.images?.length ? release.images : (release.coverUrl ? [release.coverUrl] : []);
   // Always append the user's scanned photo so there is always at least two options
   // when a Discogs cover exists: the official artwork and their own shot.
-  const images = (imageUrl && discogsImages.length > 0) ? [...discogsImages, imageUrl] : discogsImages.length > 0 ? discogsImages : imageUrl ? [imageUrl] : [];
+  const baseImages = (imageUrl && discogsImages.length > 0) ? [...discogsImages, imageUrl] : discogsImages.length > 0 ? discogsImages : imageUrl ? [imageUrl] : [];
+  const images = addedCovers.length ? [...baseImages, ...addedCovers] : baseImages;
   const displayImage = images[imgIdx] || imageUrl;
 
   // Swipe support for the main image
@@ -2104,10 +2163,10 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(var(--fg),0.06), transparent 40%)" }} />
           </div>
 
-          {/* Image strip */}
-          {images.length > 0 && (
-            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-              {images.map((src, i) => (
+          {/* Image strip. Always rendered, even with no artwork at all, because
+              the add-your-own tile lives at the end of it. */}
+          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+            {images.map((src, i) => (
                 <button key={i} onClick={() => setImgIdx(i)} className="relative shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all"
                   style={{ opacity: imgIdx === i ? 1 : 0.45, border: imgIdx === i ? "1px solid rgba(120,220,140,0.70)" : "1px solid rgba(var(--fg),0.08)", boxShadow: imgIdx === i ? "0 0 10px -2px rgba(120,220,140,0.45)" : "none" }}>
                   <img src={src} alt="" className="w-full h-full object-cover" />
@@ -2116,10 +2175,13 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
                       <Check size={9} weight="bold" style={{ color: "#fff" }} />
                     </div>
                   )}
-                </button>
-              ))}
-            </div>
-          )}
+              </button>
+            ))}
+            <AddCoverTile px={48} userId={userId} onAdd={(url) => {
+              setAddedCovers(prev => [...prev, url]);
+              setImgIdx(images.length); // select the one just added
+            }} />
+          </div>
 
           <div className="absolute -inset-10 -z-10 blur-3xl opacity-40 pointer-events-none" style={{ background: `radial-gradient(circle, rgba(${accentRGB},0.5), transparent 60%)` }} />
         </div>
@@ -2191,7 +2253,7 @@ function ResultView({ release, imageUrl, accentRGB, pendingCrates, setPendingCra
             </div>
           )}
 
-          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve })}
+          <button onClick={() => saved ? onReset() : onSave(images[imgIdx] || imageUrl, { mediaCondition: pendingMedia, sleeveCondition: pendingSleeve }, addedCovers)}
             className={`w-full py-3 rounded-xl text-[15px] tracking-[0.2em] uppercase font-mono transition-all${saved ? '' : ' vv-save-btn'}`}
             style={saved
               ? { background: "rgba(100,210,120,0.18)", border: "1px solid rgba(100,210,120,0.50)", color: "rgb(140,230,160)", boxShadow: "0 0 24px -8px rgba(100,210,120,0.4)" }
@@ -2320,7 +2382,7 @@ function RotatingCube({ color, size = 9 }) {
 // names, so The Beatles files under B and The Cure under C.
 const artistSortKey = (v) => String(v || '').replace(/^the\s+/i, '');
 
-function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], smartCrateMeta = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
+function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], smartCrateMeta = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   // Carousel vs grid is a personal preference: remember the last choice so
   // the collection reopens the way the user left it.
@@ -2643,7 +2705,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
         </>
       )}
 
-      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} accessToken={accessToken} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />}
+      {detailRecord && <RecordDetailModal record={detailRecord} onClose={() => setDetailRecordId(null)} onRemove={() => { onRemove(detailRecord.id); setDetailRecordId(null); }} onUpdate={onUpdate} accentRGB={accentRGB} accessToken={accessToken} userId={userId} crateColors={crateColors} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />}
       {showBatchLabelModal && (
         <BatchLabelModal
           records={filtered.filter(r => selectedForLabels.has(r.id))}
@@ -3123,7 +3185,7 @@ function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false,
 
 // ----- RecordDetailModal -----------------------------------------------------
 
-function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, accessToken, crateColors = {}, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
+function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, accessToken, userId, crateColors = {}, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
@@ -3422,9 +3484,10 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
                 </div>
               )}
             </div>
-            {images.length > 0 && (
-              <div className="flex gap-1.5 overflow-x-auto">
-                {images.map((src, i) => (
+            {/* Always rendered: the add-your-own tile lives at the end of it,
+                and a record with no artwork is exactly where it is wanted. */}
+            <div className="flex gap-1.5 overflow-x-auto">
+              {images.map((src, i) => (
                   <button key={i} onClick={() => {
                     setImgIdx(i);
                     if (src !== record.coverUrl && onUpdate) onUpdate(record.id, { coverUrl: src });
@@ -3435,10 +3498,13 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
                         <Check size={7} weight="bold" style={{ color: "#fff" }} />
                       </div>
                     )}
-                  </button>
-                ))}
-              </div>
-            )}
+                </button>
+              ))}
+              <AddCoverTile px={40} userId={userId} onAdd={(url) => {
+                onUpdate?.(record.id, { images: [...images, url], coverUrl: url });
+                setImgIdx(images.length);
+              }} />
+            </div>
           </div>
           <div className="flex flex-col justify-center min-w-0">
             <div className="text-[13px] tracking-[0.2em] uppercase text-white/45 mb-2 font-mono">{[record.year, record.format, record.country].filter(Boolean).join(" · ")}</div>
@@ -5688,7 +5754,9 @@ function TracksView({ collection, accentRGB, onUpdate, accessToken }) {
           uid: `${rec.id}:${i}`,
           recordId: rec.id,
           trackIndex: i,
-          artist: rec.artist || '',
+          // The track's own artist on a compilation, where the record artist
+          // is only "Various" and would label every row identically.
+          artist: t.artist || rec.artist || '',
           recordTitle: rec.title || '',
           coverUrl: rec.coverUrl || null,
           title: t.title || `Track ${i + 1}`,
@@ -6079,77 +6147,6 @@ function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
   );
 }
 
-function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading, onHotToggle }) {
-  const keyColor = track.key ? camelotColor(track.key) : null;
-  const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
-
-  const PlayBtn = ({ size = 9 }) => track.previewUrl ? (
-    <button onClick={() => onPlay(track.previewUrl)}
-      className="rounded-full flex items-center justify-center transition-all shrink-0"
-      style={{
-        width: size === 9 ? 24 : 28, height: size === 9 ? 24 : 28,
-        background: isPlaying ? `rgba(${accentRGB},0.18)` : "transparent",
-        border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : "1px solid rgba(var(--fg),0.13)",
-        color: isPlaying ? `rgb(${accentRGB})` : "rgba(var(--fg),0.50)",
-      }}>
-      {isPlaying ? <Pause size={size} weight="fill" /> : <Play size={size} weight="fill" />}
-    </button>
-  ) : null;
-
-  return (
-    <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
-      <div className="text-[13px] tracking-[0.12em] text-white/50 font-mono">{track.position}</div>
-      <div className="min-w-0 flex items-start gap-1.5">
-        {/* Hot toggle: clickable when onHotToggle provided, display-only when track.hot */}
-        {(onHotToggle || track.hot) && (
-          <button
-            onClick={onHotToggle ? () => onHotToggle(index) : undefined}
-            className="shrink-0 leading-none transition-opacity"
-            style={{ fontSize: 20, opacity: track.hot ? 1 : 0.22, cursor: onHotToggle ? "pointer" : "default", marginTop: 2 }}
-            title={onHotToggle ? (track.hot ? "Unmark as hot" : "Mark as hot") : undefined}
-          >
-            🔥
-          </button>
-        )}
-        <div className="min-w-0">
-          <div className="text-[18px] md:text-[19px] truncate font-display text-white/85">{track.title}</div>
-          {/* Mobile: duration + BPM + key inline */}
-          <div className="md:hidden text-[13px] text-white/42 mt-0.5 flex items-center gap-1.5 font-mono">
-            {track.duration && <><span>{track.duration}</span><span>·</span></>}
-            {bpmLoading
-              ? <span style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>
-              : <span>{track.bpm != null ? `${track.bpm} BPM` : ""}</span>
-            }
-            {track.bpm != null && <span>·</span>}
-            <span style={{ color: keyColor || "rgba(var(--fg),0.38)" }}>{track.key || ""}</span>
-          </div>
-        </div>
-      </div>
-      {/* Mobile play button — sits in the "auto" third column */}
-      <div className="md:hidden flex items-center justify-center">
-        <PlayBtn size={10} />
-      </div>
-      {/* Desktop columns */}
-      <div className="hidden md:flex items-center gap-1 text-[14px] text-white/50 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
-      <div className="hidden md:flex items-center gap-1 text-[14px] tabular-nums min-w-[72px] justify-end font-mono">
-        <span className="text-white/35 text-[11px]">BPM</span>
-        {bpmLoading
-          ? <span className="text-white/40" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
-          : <span style={{ color: track.bpm != null ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.40)" }}>{track.bpm != null ? track.bpm : "—"}</span>
-        }
-      </div>
-      {/* Key badge — hidden on mobile (already shown inline above) */}
-      <div className="hidden md:flex items-center justify-center md:w-12 h-7">
-        {keyColor ? (
-          <div className="w-full h-full rounded-full flex items-center justify-center text-[14px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
-        ) : <span className="text-white/35 text-[13px] font-mono">—</span>}
-      </div>
-      <div className="hidden md:flex items-center justify-center">
-        <PlayBtn size={9} />
-      </div>
-    </div>
-  );
-}
 
 function ConditionSelect({ label, icon, value, onChange }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';

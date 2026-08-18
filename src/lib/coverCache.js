@@ -44,3 +44,29 @@ export async function cacheCover(userId, recordId, coverUrl) {
     return null;
   }
 }
+
+// A cover the user supplied themselves: a photo of their own sleeve, or a
+// better scan than Discogs holds. It goes into the same 'covers' bucket as the
+// cached Discogs art, which means it syncs across devices and survives the
+// localStorage slimming that deliberately drops data-URL photos.
+//
+// Returns the public URL, or null on any failure. Callers fall back to keeping
+// the image as a local data URL, so a storage outage costs sync, not the photo.
+export async function uploadUserCover(userId, blob, contentType = 'image/jpeg') {
+  if (!supabase || !userId || !blob || !blob.size) return null;
+  try {
+    const ext = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+    // Random suffix, never the record id: a replaced cover must get a NEW URL,
+    // or the 1-year immutable cache header keeps serving the old image.
+    const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const path = `${userId}/user-${stamp}.${ext}`;
+    const { error } = await supabase.storage
+      .from('covers')
+      .upload(path, blob, { upsert: false, contentType, cacheControl: '31536000' });
+    if (error) return null;
+    const { data } = supabase.storage.from('covers').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch {
+    return null;
+  }
+}
