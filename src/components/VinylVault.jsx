@@ -23,6 +23,7 @@ import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } fr
 import { parseImportRows } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
+import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
 import { supabase } from '../lib/supabase.js';
 
 // A Supabase access token expires ~hourly. The cached token from useAuth stays
@@ -748,9 +749,29 @@ export default function VinylVault() {
   const [showAccount, setShowAccount] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(() => new URLSearchParams(window.location.search).get('checkout') === 'success');
-  const [smartCrateNames, setSmartCrateNames] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('vv_smart_crate_names') || '[]'); } catch { return []; }
+  // Smart crate suggestions, as {name, description}. The description is what a
+  // later "sort unfiled" run needs to file accurately into a crate it did not
+  // create, so it is kept rather than thrown away. Falls back to the older
+  // names-only key so anyone who has already sorted keeps their list.
+  const [smartCrateMeta, setSmartCrateMeta] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('vv_smart_crate_meta') || 'null');
+      if (Array.isArray(stored)) return normalizeCrateMeta(stored);
+      return normalizeCrateMeta(JSON.parse(localStorage.getItem('vv_smart_crate_names') || '[]'));
+    } catch { return []; }
   });
+  const smartCrateNames = useMemo(() => smartCrateMeta.map(c => c.name), [smartCrateMeta]);
+  // A run's results land here. A full run replaces the list; an unfiled run
+  // adds to it, so the crates it filed into do not drop off the suggestions.
+  const applySmartCrates = useCallback((incoming, mode) => {
+    setSmartCrateMeta(prev => mergeCrateMeta(prev, incoming, mode));
+  }, []);
+  // Persisted outside the updater. A storage write inside a React state updater
+  // once took the whole app down; updaters stay pure here.
+  useEffect(() => {
+    safeSetItem(localStorage, 'vv_smart_crate_meta', JSON.stringify(smartCrateMeta));
+    safeSetItem(localStorage, 'vv_smart_crate_names', JSON.stringify(smartCrateMeta.map(c => c.name)));
+  }, [smartCrateMeta]);
   // Community routing: which public profile is open (null = community home).
   // Mirrored to the URL (?u=username) via History API for shareable links.
   const [profileUsername, setProfileUsername] = useState(null);
@@ -1439,7 +1460,7 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} onSmartCratesApplied={(names) => { setSmartCrateNames(names); safeSetItem(localStorage, 'vv_smart_crate_names', JSON.stringify(names)); }} profile={profile} onUpdatePreferences={updatePreferences} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
         {appView === "tracks" && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
@@ -2286,7 +2307,7 @@ function RotatingCube({ color, size = 9 }) {
 // names, so The Beatles files under B and The Cure under C.
 const artistSortKey = (v) => String(v || '').replace(/^the\s+/i, '');
 
-function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
+function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], smartCrateMeta = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   // Carousel vs grid is a personal preference: remember the last choice so
   // the collection reopens the way the user left it.
@@ -2464,7 +2485,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, onRemov
 
       {/* CRATES MODE */}
       {collectionMode === "crates" && (
-        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} onOpenCrate={(crate) => { setFilterCrate(crate); setCrateMenuOpen(false); setCollectionMode("stacks"); }} />
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onOpenCrate={(crate) => { setFilterCrate(crate); setCrateMenuOpen(false); setCollectionMode("stacks"); }} />
       )}
 
       {/* STATS MODE */}
@@ -4632,13 +4653,19 @@ function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = 
 
 // ----- SmartCratesModal ------------------------------------------------------
 
-function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onSetColor, onApplied }) {
+function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onSetColor, onApplied, mode = 'full', existingCrates = [] }) {
   const [loading, setLoading] = useState(true);
   const [crates, setCrates] = useState(null);
   const [error, setError] = useState(null);
 
+  // What we are actually sending. An unfiled run touches only records in no
+  // crate at all, so anything the user filed by hand is left exactly as it is.
+  // Frozen on mount: the collection prop changes as records are applied, and a
+  // moving target would make the coverage line lie.
+  const [sent] = useState(() => (mode === 'unfiled' ? unfiledRecords(collection) : collection));
+
   useEffect(() => {
-    const compact = collection.map(r => ({
+    const compact = sent.map(r => ({
       id: r.id,
       artist: r.artist,
       title: r.title,
@@ -4654,7 +4681,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ records: compact }),
+      body: JSON.stringify({ records: compact, mode, existingCrates: mode === 'unfiled' ? existingCrates : [] }),
     }))
       .then(async res => {
         // Read as text first: a gateway timeout or an SPA fallback answers with
@@ -4712,9 +4739,13 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
         }
       }
     }
-    onApplied?.((crates || []).map(c => c.name));
+    // Descriptions travel with the names: the next unfiled run needs them to
+    // file accurately into a crate it did not create.
+    onApplied?.((crates || []).map(c => ({ name: c.name, description: c.description || '' })), mode);
     onClose();
   };
+
+  const { filed, total, unfiled } = coverage(crates || [], sent);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)" }} onClick={onClose}>
@@ -4725,13 +4756,15 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
             <Sparkle size={14} style={{ color: "rgba(var(--fg),0.45)" }} />
             <h3 className="text-[14px] tracking-[0.3em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.6)" }}>Smart Crates</h3>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.40)" }}><X size={13} /></button>
+          <button onClick={onClose} aria-label="Close" className="w-7 h-7 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(var(--fg),0.08)", color: "rgba(var(--fg),0.40)" }}><X size={13} /></button>
         </div>
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-14 gap-5">
             <div className="w-10 h-10 rounded-full animate-spin" style={{ border: "2.5px solid rgba(var(--fg),0.07)", borderTopColor: "rgba(var(--fg),0.55)" }} />
-            <div className="text-[13px] font-mono tracking-wide" style={{ color: "rgba(var(--fg),0.35)" }}>Sorting your collection...</div>
+            <div className="text-[13px] font-mono tracking-wide" style={{ color: "rgba(var(--fg),0.35)" }}>
+              {mode === 'unfiled' ? `Filing ${sent.length} record${sent.length !== 1 ? 's' : ''}...` : 'Sorting your collection...'}
+            </div>
           </div>
         )}
 
@@ -4741,8 +4774,23 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
           </div>
         )}
 
-        {!loading && crates && (
+        {!loading && !error && crates && crates.length === 0 && (
+          <div className="py-8 text-center">
+            <p className="text-[13px] font-mono leading-relaxed" style={{ color: "rgba(var(--fg),0.45)" }}>
+              Nothing to file this time. These records are too distinctive to group with the rest without forcing it.
+            </p>
+          </div>
+        )}
+
+        {!loading && crates && crates.length > 0 && (
           <>
+            {/* Coverage, said out loud. Claude is told to leave a record alone
+                rather than force it, so a shortfall is normal, but silence here
+                reads as "it missed some". */}
+            <p className="text-[12px] font-mono mb-3 leading-relaxed" style={{ color: "rgba(var(--fg),0.45)" }}>
+              Filed {filed} of {total} record{total !== 1 ? 's' : ''}.
+              {unfiled > 0 && ` ${unfiled} left unfiled, with no group it genuinely belongs to.`}
+            </p>
             <div className="overflow-y-auto flex-1 space-y-2 pr-0.5" style={{ minHeight: 0 }}>
               {crates.map((crate, i) => (
                 <div key={i} className="rounded-xl p-3.5" style={{ background: "rgba(var(--fg),0.03)", border: "1px solid rgba(var(--fg),0.07)" }}>
@@ -4771,9 +4819,9 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 
 // ----- CratesTabView ---------------------------------------------------------
 
-function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], onOpenCrate }) {
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], smartCrateMeta = [], onOpenCrate }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const [showSmartCrates, setShowSmartCrates] = useState(false);
+  const [smartMode, setSmartMode] = useState(null); // null = closed, 'full' | 'unfiled'
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
 
@@ -4783,6 +4831,18 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
   };
 
   const canScan = collection.length >= 2;
+  // Once a collection has been sorted once, the usual job is a handful of new
+  // scans, not a re-think of the whole shelf. Filing those becomes the default
+  // action and the full re-sort steps back.
+  const sorted = smartCrateNames.length > 0;
+  const unfiledCount = unfiledRecords(collection).length;
+
+  const btnStyle = (enabled) => ({
+    border: "none",
+    color: enabled ? "#000" : "rgba(var(--fg),0.25)",
+    background: enabled ? "#C9FF00" : "rgba(var(--fg),0.06)",
+    cursor: enabled ? "pointer" : "not-allowed",
+  });
 
   return (
     <div className="pt-2 max-w-sm">
@@ -4795,21 +4855,47 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         <p className="text-[12px] font-mono mb-3" style={{ color: "rgba(var(--fg),0.45)" }}>
           AI sorts your collection into crates by sound, era and scene.
         </p>
-        {smartCrateNames.length > 0 && (
-          <p className="text-[11px] font-mono mb-3 px-3 py-2 rounded-lg" style={{ color: "rgba(220,160,60,0.85)", background: "rgba(220,160,60,0.08)", border: "1px solid rgba(220,160,60,0.18)" }}>
-            You have already scanned your collection. Running again will replace existing smart crates.
-          </p>
+        {!sorted ? (
+          <button
+            onClick={() => canScan && setSmartMode('full')}
+            disabled={!canScan}
+            className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
+            style={btnStyle(canScan)}
+            onMouseEnter={e => { if (canScan) e.currentTarget.style.background = '#d8ff33'; }}
+            onMouseLeave={e => { if (canScan) e.currentTarget.style.background = '#C9FF00'; }}
+          >
+            Sort my collection
+          </button>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => unfiledCount > 0 && setSmartMode('unfiled')}
+                disabled={unfiledCount === 0}
+                className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
+                style={btnStyle(unfiledCount > 0)}
+                onMouseEnter={e => { if (unfiledCount > 0) e.currentTarget.style.background = '#d8ff33'; }}
+                onMouseLeave={e => { if (unfiledCount > 0) e.currentTarget.style.background = '#C9FF00'; }}
+              >
+                {unfiledCount > 0 ? `Sort unfiled records (${unfiledCount})` : 'Everything is filed'}
+              </button>
+              <button
+                onClick={() => {
+                  if (!canScan) return;
+                  if (window.confirm('Re-sort the whole collection? Crates already on your records stay put, and the suggestions list is rebuilt from scratch.')) setSmartMode('full');
+                }}
+                disabled={!canScan}
+                className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
+                style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.14)', color: canScan ? 'rgba(var(--fg),0.55)' : 'rgba(var(--fg),0.25)', cursor: canScan ? 'pointer' : 'not-allowed' }}
+              >
+                Re-sort everything
+              </button>
+            </div>
+            <p className="text-[11px] font-mono mt-2.5 leading-relaxed" style={{ color: "rgba(var(--fg),0.38)" }}>
+              Sorting unfiled records only looks at records in no crate at all. It files them into your existing crates and makes a new one only where nothing fits. Records you filed yourself are left alone.
+            </p>
+          </>
         )}
-        <button
-          onClick={() => canScan && setShowSmartCrates(true)}
-          disabled={!canScan}
-          className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
-          style={{ border: "none", color: canScan ? "#000" : "rgba(var(--fg),0.25)", background: canScan ? "#C9FF00" : "rgba(var(--fg),0.06)", cursor: canScan ? "pointer" : "not-allowed" }}
-          onMouseEnter={e => { if (canScan) e.currentTarget.style.background = '#d8ff33'; }}
-          onMouseLeave={e => { if (canScan) e.currentTarget.style.background = canScan ? '#C9FF00' : "rgba(var(--fg),0.06)"; }}
-        >
-          Scan Collection
-        </button>
       </div>
 
       {/* Crate list */}
@@ -4884,7 +4970,7 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         </div>
       )}
 
-      {showSmartCrates && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setShowSmartCrates(false)} crateColors={crateColors} onSetColor={onSetColor} onApplied={onSmartCratesApplied} />}
+      {smartMode && <SmartCratesModal collection={collection} onUpdate={onUpdate} onClose={() => setSmartMode(null)} crateColors={crateColors} onSetColor={onSetColor} onApplied={onSmartCratesApplied} mode={smartMode} existingCrates={smartCrateMeta} />}
     </div>
   );
 }

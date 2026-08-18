@@ -27,8 +27,9 @@ browser against a mock Supabase (`stress/mock-supabase.mjs`) that faithfully
 models refresh-token rotation + reuse revocation. It covers the session
 lifecycle (revoked sessions, unreachable auth server, sign-out always works),
 the no-data-loss sync invariant under database faults, and the PWA + tab
-concurrent-refresh race that guards the auth lock, and account isolation on a
-shared device. CI runs it on every push
+concurrent-refresh race that guards the auth lock, account isolation on a
+shared device, and the smart-crate runs (which may only ever ADD crate names).
+CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
 
@@ -235,3 +236,15 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
+- **Smart crates**: two runs. `mode: 'full'` sorts the whole collection from
+  scratch and replaces the suggestion list. `mode: 'unfiled'` (the default action
+  once a collection has been sorted once) sends only records in **no crate at
+  all**, passes the existing crates with their descriptions, and asks Claude to
+  file into those first. A record the user filed by hand is never sent and never
+  touched. Applying a run only ever ADDS crate names, so a bad run costs a
+  tidy-up, never a record (`stress/crates.spec.mjs`). Descriptions are persisted
+  in `vv_smart_crate_meta` because the next unfiled run needs them to file
+  accurately; `vv_smart_crate_names` is still written for backwards
+  compatibility. Claude is told to leave a record unfiled rather than force a
+  weak grouping, so partial coverage is normal -- the results modal says so
+  explicitly ("Filed 42 of 58 records") because silence read as a bug.
