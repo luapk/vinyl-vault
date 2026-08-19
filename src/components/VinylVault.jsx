@@ -6673,19 +6673,15 @@ function CameraModal({ onCapture, onBarcode, onClose }) {
           </div>
         )}
         {/* Barcode: a wide letterbox shaped like the barcode itself, with
-            corner brackets matching sleeve mode, a centre scan line and faint
-            stripes so the target reads instantly. guideRef drives the capture
-            crop, so what is inside this box is exactly what gets sent. */}
+            corner brackets matching sleeve mode and a centre scan line.
+            Deliberately empty inside: a painted stripe pattern used to sit
+            here, and fake bars over a live preview of real bars is clutter
+            competing with the thing being aimed at. guideRef drives the
+            capture crop, so what is inside this box is exactly what gets sent. */}
         {ready && scanMode === 'barcode' && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div ref={guideRef} className="relative" style={{ width: 'min(86vw, 78vh)', height: 'min(46vw, 40vh)' }}>
               <div className="absolute inset-0 rounded-lg transition-all" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)', border: barcodeLocked ? '2px solid #cafe04' : '1px solid rgba(202,254,4,0.35)', background: barcodeLocked ? 'rgba(202,254,4,0.18)' : 'transparent' }} />
-              {/* Stripe hint: the shape a barcode makes */}
-              <div className="absolute inset-0 flex items-center justify-center gap-[3px] px-6 overflow-hidden" style={{ opacity: 0.22 }}>
-                {[3, 1, 2, 1, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1].map((w, i) => (
-                  <div key={i} style={{ width: w, height: '42%', background: '#cafe04', flexShrink: 0 }} />
-                ))}
-              </div>
               {/* Scan line across the middle */}
               <div className="absolute left-3 right-3 top-1/2 -translate-y-1/2" style={{ height: 2, background: 'rgba(202,254,4,0.85)' }} />
               {/* Corner brackets */}
