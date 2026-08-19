@@ -6585,10 +6585,24 @@ function CameraModal({ onCapture, onBarcode, onClose }) {
       {/* Flash overlay */}
       {flash && <div className="absolute inset-0 z-20 pointer-events-none" style={{ background: 'rgba(var(--fg),0.7)', animation: 'none' }} />}
 
-      {/* Close */}
-      <button onClick={onClose} className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full flex items-center justify-center text-white"
-        style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(var(--fg),0.15)' }}>
-        <X size={18} />
+      {/* Close.
+          Acid keyline, hard-coded like the shutter: the viewfinder is a dark
+          video feed whatever the app theme is, so the old --fg keyline went
+          near-black on black in light mode.
+          Pushed below env(safe-area-inset-top) because this modal is a bare
+          fixed overlay with no header of its own, so at a flat 16px it sat
+          under the notch / Dynamic Island on phones that have one. */}
+      <button onClick={onClose} aria-label="Close camera"
+        className="absolute right-4 z-30 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95"
+        style={{
+          top: 'calc(env(safe-area-inset-top, 0px) + 18px)',
+          background: 'rgba(8,8,12,0.55)',
+          border: '1.5px solid #cafe04',
+          color: '#cafe04',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+        }}>
+        <X size={18} weight="bold" />
       </button>
 
       {/* Video feed */}
