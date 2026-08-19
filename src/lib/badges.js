@@ -36,6 +36,15 @@ export function earnedTiers(count) {
   return BADGE_TIERS.filter(t => count >= t.count);
 }
 
+// The top tier a collection size alone has earned, or null below the first
+// milestone. Derived purely from the count, which is what makes it usable on
+// somebody else's profile: their ledger is on their device, but their record
+// count is public.
+export function highestEarned(count) {
+  const earned = earnedTiers(count);
+  return earned.length ? earned[earned.length - 1] : null;
+}
+
 // What the grid shows as unlocked. The ledger is unioned in so a badge, once
 // won, is never taken away again: deleting records is housekeeping, not a
 // demotion.

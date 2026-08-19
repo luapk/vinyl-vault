@@ -13,6 +13,7 @@ import {
 } from "../lib/social.js";
 import { spaceIconFor } from "../lib/avatarIcon.js";
 import TrackRow from "./TrackRow.jsx";
+import { BadgeChip } from "./Badges.jsx";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -556,7 +557,12 @@ function PublicProfileView({ username, currentUserId, accentRGB, onBack, onOpenP
           {profile.username && <div className="text-xs font-mono text-white/40">@{profile.username}</div>}
           {profile.bio && <p className="text-[15px] mt-2 max-w-md leading-relaxed" style={{ color: 'rgba(var(--fg),0.6)' }}>{profile.bio}</p>}
           <div className="flex items-center gap-4 mt-3 text-[13px] font-mono text-white/45">
-            <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{total}</span> records</span>
+            <span className="inline-flex items-center gap-2">
+              <span><span style={{ color: 'rgba(var(--fg),0.8)' }}>{total}</span> records</span>
+              {/* Rank earned by the size of the collection. Derived from the
+                  public count, so it needs nothing from the owner's device. */}
+              <BadgeChip count={total} />
+            </span>
             <button onClick={() => setShowFollowModal('followers')} className="transition-colors hover:text-white/70">
               <span style={{ color: 'rgba(var(--fg),0.8)' }}>{follow.followers}</span> followers
             </button>

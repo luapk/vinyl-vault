@@ -6,7 +6,7 @@ import {
   Meteor, Star, Sun, LockSimple, X,
 } from '@phosphor-icons/react';
 import {
-  BADGE_TIERS, unlockedCounts, nextTier, progressToward,
+  BADGE_TIERS, unlockedCounts, nextTier, progressToward, highestEarned,
 } from '../lib/badges.js';
 
 const ICONS = { Alien, Planet, Rocket, RocketLaunch, FlyingSaucer, MoonStars, Meteor, Star, Sun };
@@ -188,6 +188,37 @@ export function BadgeCelebration({ badge, count, celebrated = [], onClose, onVie
         </div>
       </div>
     </div>
+  );
+}
+
+// ----- profile chip ----------------------------------------------------------
+
+// The rank a collection has reached, small enough to sit inline beside the
+// record count on a profile. Derived from the count alone, so it works on
+// anyone's profile: the badge ledger is local to its owner's device, but the
+// number of records they have is public.
+//
+// Renders nothing below the first milestone. A collector with 12 records does
+// not need a "no badge yet" marker on their profile.
+export function BadgeChip({ count = 0, size = 'md' }) {
+  const tier = highestEarned(count);
+  if (!tier) return null;
+  const Icon = iconFor(tier.icon);
+  const small = size === 'sm';
+
+  return (
+    <span
+      title={`${tier.name}: ${fmt(tier.count)} records`}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: small ? 4 : 5,
+        padding: small ? '2px 7px 2px 5px' : '3px 9px 3px 6px',
+        borderRadius: 20, background: ACID, color: INK,
+        fontSize: small ? 10 : 11, fontFamily: 'monospace', fontWeight: 700,
+        letterSpacing: '0.06em', whiteSpace: 'nowrap', verticalAlign: 'middle',
+      }}>
+      <Icon size={small ? 11 : 13} weight="fill" />
+      {tier.name}
+    </span>
   );
 }
 

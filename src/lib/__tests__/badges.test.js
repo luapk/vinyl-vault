@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BADGE_TIERS, earnedTiers, unlockedCounts, nextTier, progressToward, planCelebration,
-  unlockDates, stampUnlocks,
+  unlockDates, stampUnlocks, highestEarned,
 } from '../badges.js';
 
 // A collection of n records saved one day apart, oldest first.
@@ -79,6 +79,23 @@ describe('planCelebration', () => {
   it('runs out of badges at the top of the ladder', () => {
     const all = planCelebration(5000, []).celebrated;
     expect(planCelebration(99999, all).badge).toBeNull();
+  });
+});
+
+describe('highestEarned', () => {
+  it('is null before the first milestone', () => {
+    expect(highestEarned(0)).toBeNull();
+    expect(highestEarned(49)).toBeNull();
+  });
+
+  it('is the top tier the count has reached, not the first', () => {
+    expect(highestEarned(50).name).toBe(BADGE_TIERS[0].name);
+    expect(highestEarned(640).count).toBe(500);
+    expect(highestEarned(5000).count).toBe(5000);
+  });
+
+  it('stays at the top of the ladder beyond the last tier', () => {
+    expect(highestEarned(99999).count).toBe(5000);
   });
 });
 

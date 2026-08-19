@@ -208,7 +208,8 @@ updater and took the whole app down with the crash screen.
 ### Milestone badges
 Nine space-themed tiers (50, 100, 200, 350, 500, 1000, 2000, 3500, 5000) in
 `src/lib/badges.js`, rendered by `src/components/Badges.jsx`: a full-screen
-acid unlock card with a Web Audio fanfare, and `BadgesPanel`, its own sheet
+acid unlock card with a Web Audio fanfare, a `BadgeChip` rank beside the
+record count on a community profile, and `BadgesPanel`, its own sheet
 (reached from the Badges row under Profile in the account panel, or from the
 unlock card) where everything ahead of the user is greyed out up to 5,000.
 
@@ -230,6 +231,11 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   day the feature shipped, and it needs no migration. The ledger's `unlockedAt`
   is only a fallback for a tier the collection can no longer account for
   (records deleted since).
+- **Somebody else's rank is derived, not fetched.** `highestEarned(count)` is a
+  pure function of the collection size, so the chip on a public profile needs
+  nothing from that person's device: their ledger is local to them, but their
+  record count is already public. Below 50 records it renders nothing rather
+  than a "no badge yet" marker.
 - The ledger (`vinylvault_badges:<uid>`) is local and user-scoped like every
   other local key. It is unioned with what the count has earned, so deleting
   records never takes a badge away. Being local, a first sign-in on a new
