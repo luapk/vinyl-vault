@@ -3216,7 +3216,18 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
   // full snapshot of the overwritten fields so Undo restores them exactly.
   const [replaced, setReplaced] = useState(null);
   const replacedTimer = useRef(null);
-  useEffect(() => { setReplaced(null); clearTimeout(replacedTimer.current); }, [record.id]);
+  // Which candidate the record is currently filed as, so reopening the list
+  // reads as "here is what you chose, here is what else there was".
+  const [pickedCandidateId, setPickedCandidateId] = useState(null);
+  const reidResultsRef = useRef(null);
+
+  // Reopen the panel on the results rather than on the search form: the list
+  // sits below three input rows, which on a phone is entirely off screen.
+  const showPreviousResults = () => {
+    setReidentifying(true);
+    setTimeout(() => reidResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+  };
+  useEffect(() => { setReplaced(null); setPickedCandidateId(null); clearTimeout(replacedTimer.current); }, [record.id]);
   useEffect(() => () => clearTimeout(replacedTimer.current), []);
   const [reidentifyError, setReidentifyError] = useState(null);
   const [enriching, setEnriching] = useState(false);
@@ -3343,6 +3354,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
   const doReidentifySearch = async () => {
     setReidentifyLoading(true);
     setReidentifyResults(null);
+    setPickedCandidateId(null);
     setReidentifyError(null);
     try {
       const res = await fetch('/api/discogs-search', {
@@ -3431,8 +3443,11 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
         clearTimeout(replacedTimer.current);
         replacedTimer.current = setTimeout(() => setReplaced(null), 10000);
       }
+      // The results are deliberately NOT cleared. A pick that turns out wrong
+      // used to cost a second Discogs search for a list that was on screen
+      // moments earlier; keeping it means "Pick another" is instant and free.
       setReidentifying(false);
-      setReidentifyResults(null);
+      setPickedCandidateId(candidate.id);
     } catch (err) {
       // Keep the panel and results open so the user can retry.
       console.error('[reidentify]', err);
@@ -3446,6 +3461,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
   // Restore the release exactly as it was before the last re-identify pick.
   const undoReplace = () => {
     if (!replaced) return;
+    setPickedCandidateId(null);
     onUpdate?.(record.id, replaced.prev);
     if (replaced.prev.coverUrl) extractDominantColor(replaced.prev.coverUrl).then(setLocalAccent).catch(() => {});
     clearTimeout(replacedTimer.current);
@@ -3637,6 +3653,14 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             <div className="flex-1 min-w-0 text-[13px] font-mono leading-snug">
               <span style={{ fontWeight: 700 }}>Release replaced.</span> Now filed as {replaced.name}.
             </div>
+            {/* Two different intents: Undo puts back what you had, Pick another
+                goes straight back to the alternatives. The list is still in
+                state, so this reopens it without touching the network. */}
+            {reidentifyResults?.length > 0 && (
+              <button onClick={showPreviousResults} className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95" style={{ background: 'transparent', color: '#08080c', border: '1px solid rgba(8,8,12,0.35)' }}>
+                Pick another
+              </button>
+            )}
             <button onClick={undoReplace} className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95" style={{ background: '#08080c', color: '#cafe04' }}>
               Undo
             </button>
@@ -3647,7 +3671,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             primary fix-up action, so it sits above the fold. Theme-aware via
             .vv-reid-btn (index.css): acid in dark mode, ink/white in light. */}
         <div className="mb-5">
-          <button onClick={() => { setReidentifying(p => !p); setReidentifyResults(null); setReidentifyError(null); }}
+          <button onClick={() => { setReidentifying(p => !p); setReidentifyError(null); }}
             data-open={reidentifying ? 'true' : undefined}
             className="vv-reid-btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono transition-all active:scale-95">
             <Scan size={11} weight="bold" />
@@ -3684,14 +3708,22 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
               <div className="mt-3 text-[14px] font-mono text-white/30">No results found. Try different search terms.</div>
             )}
             {reidentifyResults && reidentifyResults.length > 0 && (
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div ref={reidResultsRef} className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {reidentifyResults.map(c => (
                   <button key={c.id} onClick={() => pickReidentifyCandidate(c)} disabled={!!reidentifyPicking}
                     className="relative text-left p-2.5 rounded-xl text-[13px] transition-all hover:bg-white/5"
                     style={{
-                      border: reidentifyPicking === c.id ? '1px solid rgba(202,254,4,0.85)' : '1px solid rgba(var(--fg),0.07)',
+                      border: reidentifyPicking === c.id || pickedCandidateId === c.id
+                        ? '1px solid rgba(202,254,4,0.85)'
+                        : '1px solid rgba(var(--fg),0.07)',
                       opacity: reidentifyPicking && reidentifyPicking !== c.id ? 0.35 : 1,
                     }}>
+                    {pickedCandidateId === c.id && !reidentifyPicking && (
+                      <div className="absolute top-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded-full flex items-center gap-1" style={{ background: '#cafe04', color: '#08080c' }}>
+                        <Check size={8} weight="bold" />
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-[0.1em]">Current</span>
+                      </div>
+                    )}
                     {reidentifyPicking === c.id && (
                       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl" style={{ background: 'rgba(0,0,0,0.55)' }}>
                         <div className="w-5 h-5 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(202,254,4,0.35)', borderTopColor: '#cafe04' }} />
