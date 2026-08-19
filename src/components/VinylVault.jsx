@@ -19,6 +19,7 @@ import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { camelotColor } from '../lib/camelot.js';
+import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
@@ -2397,6 +2398,10 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
   }, [viewMode]);
   const [search, setSearch] = useState("");
   const [filterCrate, setFilterCrate] = useState(null);
+  // A genre or decade tapped on the Stats tab, browsed here like a crate.
+  // Owned by this view, which unmounts when you navigate away, so the
+  // collection is always whole when you come back to it.
+  const [focus, setFocus] = useState(null);
   const [crateMenuOpen, setCrateMenuOpen] = useState(false);
   // Sort choice is a personal preference like the view mode: remember it so the
   // collection comes back the way the user left it.
@@ -2474,8 +2479,9 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
       || (r.catalogNumber || "").toLowerCase().includes(q)
       || (r.tags || []).some((t) => t.toLowerCase().includes(q));
     const matchCrate = !filterCrate || (r.crates || []).includes(filterCrate);
-    return matchSearch && matchCrate;
-  }), [collection, search, filterCrate]);
+    // A genre or decade opened from the stats page, treated like a crate.
+    return matchSearch && matchCrate && matchesFocus(r, focus);
+  }), [collection, search, filterCrate, focus]);
 
   const sortedFiltered = useMemo(() => {
     if (sortBy === 'added') return filtered;
@@ -2484,7 +2490,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
     return [...filtered].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
   }, [filtered, sortBy]);
 
-  useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate, sortBy]);
+  useEffect(() => { setCarouselIdx(0); setGridLimit(GRID_PAGE); }, [search, filterCrate, sortBy, focus]);
 
   useEffect(() => {
     const el = gridSentinelRef.current;
@@ -2565,7 +2571,8 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
 
       {/* STATS MODE */}
       {collectionMode === "stats" && (
-        <StatsView collection={collection} accentRGB={accentRGB} />
+        <StatsView collection={collection} accentRGB={accentRGB}
+          onExplore={(f) => { setFocus(f); setCollectionMode('stacks'); }} />
       )}
 
       {/* STACKS MODE */}
@@ -2617,7 +2624,29 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
               )}
             </div>
 
-            {/* Crate filter — dropdown picker (scales to any number of crates) */}
+            {/* Focus pill: a genre or decade opened from the stats page. Same
+                shape as the crate pill, because it is the same idea, and
+                dismissible in the same way. */}
+            {focus && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] tracking-[0.12em] uppercase font-mono"
+                  style={{ background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.32)`, color: 'rgba(var(--fg),0.90)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', boxShadow: `0 4px 16px rgba(${accentRGB},0.20)` }}>
+                  <ChartBar size={11} />
+                  {focusLabel(focus)}
+                  <span style={{ minWidth: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, lineHeight: 1 }}>{filtered.length}</span>
+                </span>
+                <button onClick={() => setFocus(null)} title="Show the whole collection"
+                  className="flex items-center justify-center w-6 h-6 rounded-full transition-all"
+                  style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.10)', color: 'rgba(var(--fg),0.40)' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'rgba(var(--fg),0.80)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'rgba(var(--fg),0.40)'}>
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+
+            {/* Crate filter -- dropdown picker (scales to any number of crates) */}
             {allCrates.length > 0 && (
             <div className="relative">
               {filterCrate ? (
@@ -5216,7 +5245,7 @@ function StatCard({ label, target, suffix = '', ready }) {
   );
 }
 
-function StatsView({ collection, accentRGB }) {
+function StatsView({ collection, accentRGB, onExplore }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setReady(true));
@@ -5245,18 +5274,9 @@ function StatsView({ collection, accentRGB }) {
   const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const maxGenre = topGenres[0]?.[1] || 1;
 
-  const decadeCounts = { '60s': 0, '70s': 0, '80s': 0, '90s': 0, '00s': 0, '10s': 0, '20s': 0 };
-  collection.forEach(r => {
-    const y = parseInt(r.year);
-    if (!y) return;
-    if (y < 1970) decadeCounts['60s']++;
-    else if (y < 1980) decadeCounts['70s']++;
-    else if (y < 1990) decadeCounts['80s']++;
-    else if (y < 2000) decadeCounts['90s']++;
-    else if (y < 2010) decadeCounts['00s']++;
-    else if (y < 2020) decadeCounts['10s']++;
-    else decadeCounts['20s']++;
-  });
+  // Shared with the filter these bars open, so a bar reading 42 can never
+  // open onto 39 records.
+  const decadeCounts = tallyDecades(collection);
   const maxDecade = Math.max(...Object.values(decadeCounts), 1);
 
   const labelCounts = {};
@@ -5297,13 +5317,16 @@ function StatsView({ collection, accentRGB }) {
         <GlassSection title="Genres" accentRGB={accentRGB}>
           <div className="space-y-2.5">
             {topGenres.map(([genre, count], i) => (
-              <div key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button key={genre} onClick={() => onExplore?.({ kind: 'genre', value: genre })}
+                title={`Open the ${count} ${genre} records`}
+                className="w-full transition-all hover:opacity-80 active:scale-[0.99]"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', padding: 0, cursor: onExplore ? 'pointer' : 'default', textAlign: 'left' }}>
                 <div style={{ width: 76, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{genre}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / maxGenre, i, i * 0.04)} />
                 </div>
                 <div style={{ width: 24, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
-              </div>
+              </button>
             ))}
           </div>
         </GlassSection>
@@ -5315,13 +5338,18 @@ function StatsView({ collection, accentRGB }) {
             {Object.entries(decadeCounts).map(([decade, count], i) => {
               const c = barColors[i % barColors.length];
               return (
-                <div key={decade} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                // An empty decade has nothing to open, so it stays inert.
+                <button key={decade} disabled={!count}
+                  onClick={() => count && onExplore?.({ kind: 'decade', value: decade })}
+                  title={count ? `Open the ${count} records from the ${decade}` : undefined}
+                  className={count ? 'transition-all hover:opacity-80 active:scale-[0.98]' : undefined}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: count && onExplore ? 'pointer' : 'default' }}>
                   <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.40)' }}>{count || ''}</div>
                   <div style={{ width: '100%', borderRadius: '4px 4px 0 0', background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.08)', borderBottom: 'none', position: 'relative', overflow: 'hidden', height: 64 }}>
                     <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, borderRadius: '3px 3px 0 0', height: ready ? `${(count / maxDecade) * 100}%` : '0%', transition: `height 0.6s cubic-bezier(0.4,0,0.2,1) ${i * 0.06}s`, background: `linear-gradient(to top, rgba(${c},0.80) 0%, rgba(${c},0.60) 50%, rgba(${c},0.85) 100%)`, boxShadow: `inset 1px 0 0 rgba(255,255,255,0.22), inset -1px 0 0 rgba(0,0,0,0.08), inset 0 2px 0 rgba(255,255,255,0.18), 0 0 8px rgba(${c},0.25)`, border: `1px solid rgba(${c},0.28)`, borderBottom: 'none' }} />
                   </div>
                   <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.28)' }}>{decade}</div>
-                </div>
+                </button>
               );
             })}
           </div>

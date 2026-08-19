@@ -66,6 +66,7 @@ src/
   lib/
     supabase.js        # Supabase client (handles both legacy JWT and publishable keys)
     badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
+    collectionFocus.js # decade buckets + the genre/decade slice filter (unit-tested)
   App.jsx              # root: auth gate -> VinylVault or AuthScreen
 
 api/                   # Vercel serverless functions (all secret keys live here)
@@ -257,6 +258,13 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   Discogs art, whose per-user RLS policies already exist in
   `supabase/storage.sql`, so there is no migration. A failed upload falls back
   to a local data URL: the photo is never lost, it just does not sync.
+- **Stats bars open the collection**: tapping a genre row or decade bar on the
+  Stats tab focuses the collection on that slice, browsed in whichever view
+  mode the user last used, exactly like a crate. The decade buckets live in
+  `src/lib/collectionFocus.js` and are shared by the chart and the filter: two
+  copies would drift, and the failure is quiet (a bar reading 42 that opens
+  onto 39). The focus is owned by `CollectionView`, which unmounts on
+  navigation, so the collection is always whole when you come back to it.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Community profile routing**: which profile is open lives in
