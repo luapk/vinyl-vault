@@ -1,7 +1,7 @@
 // Sync resilience: the no-data-loss invariant under database faults, and
 // cross-device convergence.
 import { test, expect } from '@playwright/test';
-import { resetMock, mockState, signIn, stubApi, csvFile, discogsMatch, openFileImport } from './helpers.mjs';
+import { resetMock, mockState, signIn, stubApi, csvFile, discogsMatch, fileImportInput } from './helpers.mjs';
 
 test.beforeEach(async () => { await resetMock(); });
 
@@ -26,8 +26,7 @@ test('records added while the database is down survive a reload and sync on reco
     return route.fallback();
   });
 
-  await openFileImport(page);
-  await page.locator('input[accept*=".csv"]').setInputFiles(csvFile([
+  await fileImportInput(page).setInputFiles(csvFile([
     { artist: 'Import Artist A', title: 'Album A' },
     { artist: 'Import Artist B', title: 'Album B' },
   ]));
@@ -59,8 +58,7 @@ test('two devices on one account converge', async ({ browser, context, page }) =
 
   // Device A: sign in and import a record (database healthy).
   await signIn(page);
-  await openFileImport(page);
-  await page.locator('input[accept*=".csv"]').setInputFiles(csvFile([
+  await fileImportInput(page).setInputFiles(csvFile([
     { artist: 'Shared Artist', title: 'Shared Album' },
   ]));
   await expect(page.getByText('Added 1 record', { exact: false })).toBeVisible({ timeout: 30_000 });

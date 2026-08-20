@@ -24,7 +24,7 @@ import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
-import { parseImportRows } from '../lib/importParse.js';
+import { useFileImport, ImportStatusList } from './FileImport.jsx';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
@@ -1452,7 +1452,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
@@ -1745,8 +1745,46 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // ----- IdleView --------------------------------------------------------------
 
-function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
+// One of the three "add records" panels on the home screen.
+//
+// Extracted because the glass chrome is a long style object and there are now
+// three of them. On mobile the card is a row (icon beside the words) so all
+// three fit the screen without scrolling; from sm up it is the original
+// centred column.
+function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'div', className = '', icon: Icon, kicker, title, children }) {
+  const style = isLight ? {
+    background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
+    boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)${glow ? `, 0 0 48px -10px rgba(${accentRGB},0.28)` : ''}`,
+    backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px',
+  } : {
+    background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)',
+    boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)${glow ? `, 0 0 60px -20px rgba(${accentRGB},0.25)` : ''}`,
+    backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px',
+  };
+  return (
+    <Tag className={`relative transition-all hover:brightness-110 active:scale-[0.98] p-4 sm:p-7 ${className}`} style={style}>
+      <div className="relative z-10 flex flex-row sm:flex-col items-center gap-4 sm:gap-4 text-left sm:text-center">
+        <div className="vv-glass-tile w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0">
+          <Icon size={20} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] sm:text-[12px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
+          <div className="text-base sm:text-[17px] leading-snug font-display">{title}</div>
+        </div>
+      </div>
+      {children}
+    </Tag>
+  );
+}
+
+function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  // Same hook the account panel uses, so a list imported from here is matched
+  // and de-duplicated by exactly the same rules.
+  const {
+    fileImporting, fileProgress, fileResult, fileError, fileItems,
+    cancelFileImport, importFileRef, importListRef, resetFileImport, handleImportFile,
+  } = useFileImport(onAddRecordsBulk);
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
 
@@ -1837,43 +1875,27 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
             <div style={{ position: 'absolute', top: '42%', left: '38%', width: '36%', height: '38%', background: 'radial-gradient(ellipse, rgba(100,200,255,0.22), transparent 60%)', filter: 'blur(40px)' }} />
           </div>
         )}
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Camera / scan card */}
-        <div className="relative transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7), 0 0 48px -10px rgba(${accentRGB},0.28)`,
-          backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
-        } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: `inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08), 0 0 60px -20px rgba(${accentRGB},0.25)`, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
-          <div className="flex flex-col items-center gap-5 text-center">
-            <div className="vv-glass-tile w-12 h-12 rounded-2xl flex items-center justify-center">
-              <Camera size={22} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
-            </div>
-            <div>
-              <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Single record</div>
-              <div className="text-lg font-display">Scan label, barcode or sleeve</div>
-            </div>
-          </div>
+        <AddCard isLight={isLight} accentRGB={accentRGB} glow icon={Camera}
+          kicker="Single record" title="Scan label, barcode or sleeve">
           {/* Primary: open camera viewfinder */}
           <button onClick={() => setShowCamera(true)} className="absolute inset-0 w-full h-full" style={{ borderRadius: '20px' }} aria-label="Open camera" />
-        </div>
+        </AddCard>
 
         {/* Batch queue card */}
-        <label className="relative block cursor-pointer transition-all hover:brightness-110 active:scale-[0.98]" style={isLight ? {
-          background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)',
-          backdropFilter: 'blur(44px) saturate(240%)', WebkitBackdropFilter: 'blur(44px) saturate(240%)', borderRadius: '20px', padding: '2rem',
-        } : { background: 'linear-gradient(145deg, rgba(var(--fg),0.08) 0%, rgba(var(--fg),0.03) 100%)', boxShadow: 'inset 0 1px 0 rgba(var(--fg),0.15), inset 0 -1px 0 rgba(0,0,0,0.2), 0 32px 64px -20px rgba(0,0,0,0.7), 0 8px 16px -8px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--fg),0.08)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px', padding: '2rem' }}>
-          <div className="relative z-10 flex flex-col items-center gap-5 text-center">
-            <div className="vv-glass-tile w-12 h-12 rounded-2xl flex items-center justify-center">
-              <GridNine size={22} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
-            </div>
-            <div>
-              <div className="text-[13px] tracking-[0.25em] uppercase text-white/35 mb-1 font-mono">Multiple records</div>
-              <div className="text-lg font-display text-white/70">Upload photo/s</div>
-            </div>
-          </div>
+        <AddCard isLight={isLight} accentRGB={accentRGB} as="label" className="block cursor-pointer"
+          icon={GridNine} kicker="Multiple records" title="Upload photo/s">
           <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
-        </label>
+        </AddCard>
+
+        {/* File import card: the same CSV / text import as the account panel,
+            put where records actually get added from. */}
+        <AddCard isLight={isLight} accentRGB={accentRGB} icon={Export}
+          kicker="From a list" title="Import CSV or text">
+          <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
+          <button onClick={() => importFileRef.current?.click()} className="absolute inset-0 w-full h-full" style={{ borderRadius: '20px' }} aria-label="Import a CSV or text file" />
+        </AddCard>
         </div>{/* end grid */}
       </div>{/* end relative wrapper */}
 
@@ -1887,6 +1909,72 @@ function IdleView({ onUpload, onBarcode, onBatch, accentRGB, greeting, collectio
       </div>
 
       {showCamera && <CameraModal onCapture={handleCapture} onBarcode={handleBarcode} onClose={() => setShowCamera(false)} />}
+
+      {/* Import progress. A sheet rather than inline, so a long list does not
+          push the three cards off the screen they were just made to fit. */}
+      {(fileImporting || fileResult || fileError) && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          onClick={() => { if (!fileImporting) resetFileImport(); }}>
+          <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6"
+            style={{ background: 'rgba(var(--bg),0.97)', border: '1px solid rgba(var(--fg),0.10)', boxShadow: '0 32px 64px rgba(0,0,0,0.5)', maxHeight: '92vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: 'rgba(var(--fg),0.9)' }}>Import</h2>
+              {!fileImporting && (
+                <button onClick={resetFileImport} aria-label="Close import"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'rgba(var(--fg),0.45)', display: 'flex' }}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+
+            {fileError && !fileImporting && !fileResult && (
+              <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginBottom: 12 }}>{fileError}</p>
+            )}
+
+            {fileImporting && (
+              <>
+                <div style={{ height: 6, borderRadius: 3, background: 'rgba(var(--fg),0.06)', overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: '100%', borderRadius: 3, background: 'rgba(var(--fg),0.35)', width: fileProgress.total > 0 ? `${Math.min((fileProgress.done / fileProgress.total) * 100, 100)}%` : '0%', transition: 'width 0.3s' }} />
+                </div>
+                <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', marginBottom: 8 }}>
+                  {fileProgress.done} / {fileProgress.total} · {fileProgress.matched} matched
+                </p>
+                <ImportStatusList items={fileItems} listRef={importListRef} />
+                <button onClick={() => { cancelFileImport.current = true; }}
+                  style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  Stop here
+                </button>
+              </>
+            )}
+
+            {!fileImporting && fileResult && (
+              <>
+                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Check size={14} weight="bold" />
+                  {fileResult.stopped ? `Stopped -- ${fileResult.added} of ${fileProgress.total} added` : `Added ${fileResult.added} record${fileResult.added === 1 ? '' : 's'}`}
+                </p>
+                {fileResult.drafts > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
+                    {fileResult.drafts} couldn't be matched -- added as drafts. Open each and use Re-identify to pin the exact release.
+                  </p>
+                )}
+                {fileResult.skipped > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
+                    {fileResult.skipped} already in your collection -- skipped as duplicates
+                  </p>
+                )}
+                <div style={{ marginTop: 8 }}><ImportStatusList items={fileItems} listRef={importListRef} /></div>
+                <button onClick={resetFileImport}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)', border: 'none', cursor: 'pointer' }}>
+                  Done
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recommendations */}
       {recs.length > 0 && (
@@ -3967,36 +4055,6 @@ function AccountLink({ label, onClick }) {
   );
 }
 
-// Live per-row status list for the file import: a green tick lands on each
-// row as it is saved; drafts and skipped duplicates are labelled inline.
-function ImportStatusList({ items, listRef }) {
-  const statusIcon = (s) => {
-    if (s === 'added') return <Check size={13} weight="bold" style={{ color: 'rgb(74,222,128)' }} />;
-    if (s === 'draft') return <Check size={13} weight="bold" style={{ color: 'rgba(240,190,80,0.9)' }} />;
-    if (s === 'skipped') return <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', lineHeight: 1 }}>--</span>;
-    if (s === 'searching') return <div className="animate-spin" style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(var(--fg),0.12)', borderTopColor: 'rgba(var(--fg),0.5)' }} />;
-    return <span style={{ width: 11, height: 11, borderRadius: '50%', border: '1.5px solid rgba(var(--fg),0.12)', display: 'inline-block' }} />;
-  };
-  return (
-    <div ref={listRef} style={{ maxHeight: 210, overflowY: 'auto', borderRadius: 10, border: '1px solid rgba(var(--fg),0.08)', background: 'rgba(var(--fg),0.03)', padding: '7px 12px', marginBottom: 10 }}>
-      {items.map((it, i) => (
-        <div key={i} data-active={it.status === 'searching' ? '1' : undefined} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '3px 0', minWidth: 0 }}>
-          <span style={{ width: 16, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{statusIcon(it.status)}</span>
-          <span style={{ fontSize: 13, fontFamily: 'monospace', color: it.status === 'skipped' ? 'rgba(var(--fg),0.3)' : 'rgba(var(--fg),0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-            {it.artist ? `${it.artist} - ${it.title}` : (it.title || '(untitled)')}
-          </span>
-          {it.status === 'draft' && (
-            <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(240,190,80,0.75)', flexShrink: 0 }}>draft</span>
-          )}
-          {it.status === 'skipped' && (
-            <span style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)', flexShrink: 0 }}>duplicate</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
@@ -4076,110 +4134,13 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     }
   }
 
-  // File import (CSV / text) state
-  const [fileImporting, setFileImporting] = useState(false);
-  const [fileProgress, setFileProgress] = useState({ done: 0, total: 0, matched: 0 });
-  const [fileResult, setFileResult] = useState(null);
-  const [fileError, setFileError] = useState('');
-  // Per-row live status: 'pending' | 'searching' | 'added' | 'draft' | 'skipped'
-  const [fileItems, setFileItems] = useState([]);
-  const cancelFileImport = useRef(false);
-  const importFileRef = useRef(null);
-  const importListRef = useRef(null);
-
-  // Keep the row currently being processed visible in the scrolling list.
-  useEffect(() => {
-    const active = importListRef.current?.querySelector('[data-active="1"]');
-    if (active) active.scrollIntoView({ block: 'nearest' });
-  }, [fileProgress.done]);
-
-  function resetFileImport() {
-    setFileResult(null);
-    setFileItems([]);
-    setFileError('');
-  }
-
-  // Resolve each parsed row against Discogs (vinyl-only search) and bulk-add.
-  // Maximum-recall policy: a row is NEVER dropped. Best match wins (preferring
-  // one with cover art); a row with no match is still added as a draft record
-  // (identified: false) carrying the artist/title, which the user fine-tunes
-  // via Re-identify in the record detail panel. Matched rows use source
-  // 'discogs_import' so the existing lazy enrichment pulls their tracklist on
-  // first open.
-  async function handleImportFile(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || fileImporting) return;
-    let rows;
-    try {
-      rows = parseImportRows(await file.text());
-    } catch {
-      setFileError('Could not read that file.');
-      return;
-    }
-    if (!rows.length) {
-      setFileError('No records found. Use CSV columns like artist,title or lines like "Artist - Title".');
-      return;
-    }
-    cancelFileImport.current = false;
-    setFileImporting(true);
-    setFileError('');
-    setFileResult(null);
-    setFileItems(rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })));
-    setFileProgress({ done: 0, total: rows.length, matched: 0 });
-
-    const setItemStatus = (idx, status) => setFileItems(prev => {
-      const next = [...prev];
-      if (next[idx]) next[idx] = { ...next[idx], status };
-      return next;
-    });
-
-    let matched = 0, drafts = 0, added = 0, skipped = 0, stopped = false;
-    for (let i = 0; i < rows.length; i++) {
-      if (cancelFileImport.current) { stopped = true; break; }
-      const row = rows[i];
-      setItemStatus(i, 'searching');
-      let release = null;
-      try {
-        const res = await fetch('/api/discogs-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ artist: row.artist, title: row.title }),
-        });
-        const data = await res.json();
-        const m = (data.matches || []).find(x => x.coverUrl) || (data.matches || [])[0];
-        if (m) {
-          matched++;
-          release = {
-            id: m.id, artist: m.artist || row.artist, title: m.recordTitle || row.title,
-            label: m.label, catalogNumber: m.catalogNumber, year: m.year,
-            country: m.country, format: m.format, genres: [], tracklist: [],
-            coverUrl: m.coverUrl, source: 'discogs_import',
-          };
-        }
-      } catch { /* network hiccup: fall through to draft */ }
-      const isDraft = !release;
-      if (isDraft) {
-        drafts++;
-        release = {
-          id: null, artist: row.artist, title: row.title || '(untitled)',
-          genres: [], tracklist: [], coverUrl: null,
-          identified: false, confidence: 'low', source: 'file_import',
-        };
-      }
-      // Add one row at a time so each tick in the list reflects a record that
-      // is genuinely saved (and so duplicates are flagged on the right row).
-      const res = await onAddRecordsBulk([release]);
-      added += res.added;
-      skipped += res.skipped;
-      setItemStatus(i, res.skipped ? 'skipped' : (isDraft ? 'draft' : 'added'));
-      setFileProgress({ done: i + 1, total: rows.length, matched });
-      // Pace the Discogs fan-out to stay inside the shared rate limit.
-      if (i < rows.length - 1) await new Promise(r => setTimeout(r, 650));
-    }
-    setFileResult({ added, skipped, matched, drafts, stopped });
-    setFileImporting(false);
-  }
+  // File import (CSV / text). Shared with the Import card on the home screen,
+  // so both run exactly the same matching and duplicate rules.
+  const {
+    fileImporting, fileProgress, fileResult, fileError, fileItems,
+    cancelFileImport, importFileRef, importListRef,
+    resetFileImport, handleImportFile,
+  } = useFileImport(onAddRecordsBulk);
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);

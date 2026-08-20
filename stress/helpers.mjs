@@ -74,7 +74,10 @@ export function csvFile(rows) {
 }
 
 // Open Account modal -> Import from file section.
-export async function openFileImport(page) {
-  await page.locator('button[title="Account settings"]').click();
-  await page.getByText('Import from file', { exact: true }).click();
+// The file import is reached straight from the home screen's Import card, so
+// there is nothing to open first. The account panel offers the same import
+// through the same useFileImport hook, so driving either exercises one code
+// path; the home card is the shorter route and needs no modal.
+export function fileImportInput(page) {
+  return page.locator('input[accept*=".csv"]');
 }

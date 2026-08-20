@@ -60,6 +60,7 @@ src/
     AuthScreen.jsx     # login / sign-up screen
     AdminPanel.jsx     # admin user management
     Badges.jsx         # milestone unlock card + the grid in the account panel
+    FileImport.jsx     # CSV/text import hook + status list, shared by home and account
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
@@ -269,6 +270,13 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   copies would drift, and the failure is quiet (a bar reading 42 that opens
   onto 39). The focus is owned by `CollectionView`, which unmounts on
   navigation, so the collection is always whole when you come back to it.
+- **Three ways to add records**: the home screen has Scan, Upload photos and
+  Import (CSV / text) as one row of `AddCard`s. They are laid out as rows on
+  mobile and a three-column grid from `sm` up, so all three sit above the fold
+  on a 360x740 screen without scrolling; check that when changing the heading
+  block above them. The import itself is `useFileImport`
+  (`src/components/FileImport.jsx`), shared with the account panel so both
+  routes match and de-duplicate by identical rules.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Community profile routing**: which profile is open lives in
