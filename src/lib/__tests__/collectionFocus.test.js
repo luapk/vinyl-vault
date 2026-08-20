@@ -82,6 +82,18 @@ describe('matchesFocus', () => {
     expect(matchesFocus(r, { kind: 'genre', value: 'Jazz' })).toBe(false);
   });
 
+  it('matches a label exactly, not loosely', () => {
+    expect(matchesFocus({ label: 'Warp Records' }, { kind: 'label', value: 'Warp Records' })).toBe(true);
+    // "Warp" and "Warp Records" are different labels on Discogs, and a
+    // substring match would silently merge them in the filtered view.
+    expect(matchesFocus({ label: 'Warp Records' }, { kind: 'label', value: 'Warp' })).toBe(false);
+  });
+
+  it('does not match a record with no label at all', () => {
+    expect(matchesFocus({ label: null }, { kind: 'label', value: 'Warp' })).toBe(false);
+    expect(matchesFocus({}, { kind: 'label', value: 'Warp' })).toBe(false);
+  });
+
   it('lets everything through when nothing is focused', () => {
     expect(matchesFocus({ genres: [] }, null)).toBe(true);
   });
@@ -96,6 +108,7 @@ describe('focusLabel', () => {
   it('reads as a sentence on the pill', () => {
     expect(focusLabel({ kind: 'decade', value: '90s' })).toBe('90s releases');
     expect(focusLabel({ kind: 'genre', value: 'House' })).toBe('House');
+    expect(focusLabel({ kind: 'label', value: 'Warp Records' })).toBe('Warp Records');
     expect(focusLabel(null)).toBe('');
   });
 });

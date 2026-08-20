@@ -258,9 +258,13 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   Discogs art, whose per-user RLS policies already exist in
   `supabase/storage.sql`, so there is no migration. A failed upload falls back
   to a local data URL: the photo is never lost, it just does not sync.
-- **Stats bars open the collection**: tapping a genre row or decade bar on the
-  Stats tab focuses the collection on that slice, browsed in whichever view
-  mode the user last used, exactly like a crate. The decade buckets live in
+- **Stats bars open the collection**: tapping a genre row, decade bar, label
+  row or crate chip on the Stats tab focuses the collection on that slice,
+  browsed in whichever view mode the user last used, exactly like a crate. A
+  crate chip drives the crate filter that already exists rather than a second
+  mechanism that looks the same. Because the stats are computed over the whole
+  collection, opening one clears the search box and the other filter, or a bar
+  reading 42 would land on fewer than 42 with nothing to explain the gap. The decade buckets live in
   `src/lib/collectionFocus.js` and are shared by the chart and the filter: two
   copies would drift, and the failure is quiet (a bar reading 42 that opens
   onto 39). The focus is owned by `CollectionView`, which unmounts on

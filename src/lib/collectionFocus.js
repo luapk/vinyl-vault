@@ -42,11 +42,13 @@ export function matchesFocus(record, focus) {
   if (!focus) return true;
   if (focus.kind === 'genre') return (record?.genres || []).includes(focus.value);
   if (focus.kind === 'decade') return decadeOf(record?.year) === focus.value;
+  if (focus.kind === 'label') return (record?.label || '') === focus.value;
   return true;
 }
 
 // How the focus is described in the UI, on the pill and in the empty state.
 export function focusLabel(focus) {
   if (!focus) return '';
-  return focus.kind === 'decade' ? `${focus.value} releases` : focus.value;
+  if (focus.kind === 'decade') return `${focus.value} releases`;
+  return focus.value;
 }

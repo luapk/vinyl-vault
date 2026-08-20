@@ -2570,9 +2570,14 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
       )}
 
       {/* STATS MODE */}
+      {/* The stats are computed over the whole collection, so opening one
+          clears the other filters. Landing a bar that reads 42 on top of an
+          active crate filter or search box would show fewer records than the
+          number just tapped, with nothing on screen to explain the gap. */}
       {collectionMode === "stats" && (
         <StatsView collection={collection} accentRGB={accentRGB}
-          onExplore={(f) => { setFocus(f); setCollectionMode('stacks'); }} />
+          onExplore={(f) => { setFocus(f); setFilterCrate(null); setSearch(''); setCollectionMode('stacks'); }}
+          onOpenCrate={(name) => { setFilterCrate(name); setFocus(null); setSearch(''); setCollectionMode('stacks'); }} />
       )}
 
       {/* STACKS MODE */}
@@ -5245,7 +5250,7 @@ function StatCard({ label, target, suffix = '', ready }) {
   );
 }
 
-function StatsView({ collection, accentRGB, onExplore }) {
+function StatsView({ collection, accentRGB, onExplore, onOpenCrate }) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setReady(true));
@@ -5360,13 +5365,16 @@ function StatsView({ collection, accentRGB, onExplore }) {
         <GlassSection title="Top Labels" accentRGB={accentRGB}>
           <div className="space-y-2.5">
             {topLabels.map(([label, count], i) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button key={label} onClick={() => onExplore?.({ kind: 'label', value: label })}
+                title={`Open the ${count} records on ${label}`}
+                className="w-full transition-all hover:opacity-80 active:scale-[0.99]"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', padding: 0, cursor: onExplore ? 'pointer' : 'default', textAlign: 'left' }}>
                 <div style={{ width: 76, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.55)', flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{label}</div>
                 <div style={barTrack}>
                   <div style={barFill(count / (topLabels[0]?.[1] || 1), i, i * 0.04)} />
                 </div>
                 <div style={{ width: 24, fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', textAlign: 'right', flexShrink: 0 }}>{count}</div>
-              </div>
+              </button>
             ))}
           </div>
         </GlassSection>
@@ -5375,11 +5383,16 @@ function StatsView({ collection, accentRGB, onExplore }) {
       {crateSizes.length > 0 && (
         <GlassSection title="Crates" accentRGB={accentRGB}>
           <div className="flex flex-wrap gap-2">
+            {/* A crate opens the crate filter that already exists, rather than
+                a second mechanism that happens to look the same. */}
             {crateSizes.map(({ name, count }) => (
-              <div key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)' }}>
+              <button key={name} onClick={() => onOpenCrate?.(name)}
+                title={`Open the ${name} crate (${count} records)`}
+                className="transition-all hover:opacity-80 active:scale-[0.98]"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.10)', cursor: onOpenCrate ? 'pointer' : 'default' }}>
                 <span style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.62)' }}>{name}</span>
                 <span style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.32)' }}>{count}</span>
-              </div>
+              </button>
             ))}
           </div>
         </GlassSection>
