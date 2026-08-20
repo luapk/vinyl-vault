@@ -159,6 +159,22 @@ body {
   to   { transform: translateX(0); }
 }
 
+/* The three "add records" panels arriving one after another. Rise, settle and
+   lift into place: the overshoot in the easing does the contemporary part, and
+   the per-card delay is set inline so the stagger lives with the markup.
+   Motion is skipped entirely for prefers-reduced-motion, where the cards are
+   simply already there. */
+@keyframes addCardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.vv-add-card {
+  animation: addCardIn 0.62s cubic-bezier(0.22, 1.12, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-add-card { animation: none; }
+}
+
 /* Milestone badge unlock card: the acid ground flashes in, the seal lands with
    a bounce, and rings push out from behind it. All of it is skipped for
    prefers-reduced-motion (handled in Badges.jsx), so the card just appears. */

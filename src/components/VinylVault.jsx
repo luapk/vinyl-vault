@@ -1751,7 +1751,7 @@ function SaveConfirmation({ release, accentRGB }) {
 // three of them. On mobile the card is a row (icon beside the words) so all
 // three fit the screen without scrolling; from sm up it is the original
 // centred column.
-function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'div', className = '', icon: Icon, kicker, title, children }) {
+function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, title, onClick, children, ...rest }) {
   const style = isLight ? {
     background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
     boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)${glow ? `, 0 0 48px -10px rgba(${accentRGB},0.28)` : ''}`,
@@ -1762,8 +1762,17 @@ function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'div', className 
     backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderRadius: '20px',
   };
   return (
-    <Tag className={`relative transition-all hover:brightness-110 active:scale-[0.98] p-4 sm:p-7 ${className}`} style={style}>
-      <div className="relative z-10 flex flex-row sm:flex-col items-center gap-4 sm:gap-4 text-left sm:text-center">
+    // The card IS the control, rather than a div with an invisible button
+    // stretched across it. That overlay sat UNDER the z-10 content, so tapping
+    // the icon or the words hit a plain div and did nothing: only the padding
+    // around them worked. As a real button or label the whole panel is the hit
+    // area by construction, and it gets keyboard focus for free.
+    <Tag
+      onClick={onClick}
+      className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] p-4 sm:p-7 ${className}`}
+      style={{ ...style, border: 'none', cursor: 'pointer', animationDelay: `${index * 90}ms` }}
+      {...rest}>
+      <div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-4 text-left sm:text-center">
         {/* Light mode only: a black tile with a white icon, which the pale
             card needs to give the icon any weight. Dark mode keeps the glass
             tile, where a black square would sink into a near-black card. */}
@@ -1881,25 +1890,25 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, g
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Camera / scan card */}
-        <AddCard isLight={isLight} accentRGB={accentRGB} glow icon={Camera}
-          kicker="Single record" title="Scan label, barcode or sleeve">
-          {/* Primary: open camera viewfinder */}
-          <button onClick={() => setShowCamera(true)} className="absolute inset-0 w-full h-full" style={{ borderRadius: '20px' }} aria-label="Open camera" />
-        </AddCard>
+        <AddCard isLight={isLight} accentRGB={accentRGB} glow index={0} type="button"
+          icon={Camera} kicker="Single record" title="Scan label, barcode or sleeve"
+          onClick={() => setShowCamera(true)} aria-label="Scan a record with the camera" />
 
-        {/* Batch queue card */}
-        <AddCard isLight={isLight} accentRGB={accentRGB} as="label" className="block cursor-pointer"
+        {/* Batch queue card. A label rather than a button: the whole panel
+            delegates to the file input inside it, from any child. */}
+        <AddCard isLight={isLight} accentRGB={accentRGB} as="label" index={1} className="block cursor-pointer"
           icon={GridNine} kicker="Multiple records" title="Upload photo/s">
-          <input type="file" accept="image/*" multiple onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+          <input type="file" accept="image/*" multiple className="hidden"
+            onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} />
         </AddCard>
 
         {/* File import card: the same CSV / text import as the account panel,
-            put where records actually get added from. */}
-        <AddCard isLight={isLight} accentRGB={accentRGB} icon={Export}
-          kicker="From a list" title="Import CSV or text">
-          <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
-          <button onClick={() => importFileRef.current?.click()} className="absolute inset-0 w-full h-full" style={{ borderRadius: '20px' }} aria-label="Import a CSV or text file" />
-        </AddCard>
+            put where records actually get added from. The input is a sibling,
+            not a child, since a button may not contain another control. */}
+        <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
+        <AddCard isLight={isLight} accentRGB={accentRGB} index={2} type="button"
+          icon={Export} kicker="From a list" title="Import CSV or text"
+          onClick={() => importFileRef.current?.click()} aria-label="Import a CSV or text file" />
         </div>{/* end grid */}
       </div>{/* end relative wrapper */}
 
