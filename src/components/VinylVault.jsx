@@ -1764,8 +1764,12 @@ function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'div', className 
   return (
     <Tag className={`relative transition-all hover:brightness-110 active:scale-[0.98] p-4 sm:p-7 ${className}`} style={style}>
       <div className="relative z-10 flex flex-row sm:flex-col items-center gap-4 sm:gap-4 text-left sm:text-center">
-        <div className="vv-glass-tile w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0">
-          <Icon size={20} weight="light" style={{ color: 'rgba(var(--fg),0.72)' }} />
+        {/* Light mode only: a black tile with a white icon, which the pale
+            card needs to give the icon any weight. Dark mode keeps the glass
+            tile, where a black square would sink into a near-black card. */}
+        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0${isLight ? '' : ' vv-glass-tile'}`}
+          style={isLight ? { background: '#08080c' } : undefined}>
+          <Icon size={20} weight="light" style={{ color: isLight ? '#ffffff' : 'rgba(var(--fg),0.72)' }} />
         </div>
         <div className="min-w-0">
           <div className="text-[11px] sm:text-[12px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
@@ -2005,13 +2009,13 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, g
                 {rec.reason && (
                   <div style={{ fontSize: 10, fontStyle: 'italic', color: `rgba(${accentRGB},${isLight ? 0.85 : 0.7})`, lineHeight: 1.4, marginTop: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{rec.reason}</div>
                 )}
-                {/* Single lime green buy button */}
+                {/* Buy button: black in light mode, brand lime in dark */}
                 {(rec.storeLinks?.[0]?.url || rec.buyUrl) && (
                   <div style={{ marginTop: 7, display: 'flex', justifyContent: 'center' }}>
                     <a href={rec.storeLinks?.[0]?.url || rec.buyUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'inline-block', padding: '5px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: '#C9FF00', color: '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'background 0.15s', whiteSpace: 'nowrap' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#d8ff33'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#C9FF00'}>
+                      style={{ display: 'inline-block', padding: '5px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, fontFamily: 'monospace', background: isLight ? '#08080c' : '#C9FF00', color: isLight ? '#ffffff' : '#000', textDecoration: 'none', letterSpacing: '0.12em', textTransform: 'uppercase', transition: 'background 0.15s', whiteSpace: 'nowrap' }}
+                      onMouseEnter={e => e.currentTarget.style.background = isLight ? '#1c1c22' : '#d8ff33'}
+                      onMouseLeave={e => e.currentTarget.style.background = isLight ? '#08080c' : '#C9FF00'}>
                       Buy now
                     </a>
                   </div>
