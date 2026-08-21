@@ -3616,10 +3616,20 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.80)", backdropFilter: "blur(10px)" }} onClick={onClose}>
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl" style={{ background: "rgba(var(--bg),0.99)", border: "1px solid rgba(var(--fg),0.08)", boxShadow: "0 40px 100px -20px rgba(0,0,0,0.95)" }} onClick={(e) => e.stopPropagation()}>
 
-        {/* Close bar: drag handle + label. Full-width tap target, especially useful on mobile. */}
+        {/* Close bar: a circled X above its label. The whole bar stays the tap
+            target, which is what makes it easy to hit on mobile; the circle is
+            the affordance, not the hit area. Acid on dark, ink on light, both
+            hard-coded rather than themed so the control keeps one identity. */}
         <button onClick={onClose} className="w-full flex flex-col items-center gap-1.5 pt-3 pb-3 transition-opacity hover:opacity-70 active:opacity-50" aria-label="Close">
-          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(var(--fg),0.30)" }} />
-          <span className="text-[13px] tracking-[0.22em] uppercase font-mono" style={{ color: "rgba(var(--fg),0.45)" }}>Close</span>
+          <span className="flex items-center justify-center rounded-full"
+            style={{
+              width: 28, height: 28,
+              border: `1.5px solid ${isLight ? '#08080c' : '#cafe04'}`,
+              color: isLight ? '#08080c' : '#cafe04',
+            }}>
+            <X size={14} weight="bold" />
+          </span>
+          <span className="text-[13px] tracking-[0.22em] uppercase font-mono" style={{ color: isLight ? '#08080c' : '#cafe04' }}>Close</span>
         </button>
 
         <div className="px-6 md:px-8 pb-8">
