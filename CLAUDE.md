@@ -277,6 +277,17 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   block above them. The import itself is `useFileImport`
   (`src/components/FileImport.jsx`), shared with the account panel so both
   routes match and de-duplicate by identical rules.
+- **Failed BPM lookups must be cached**: `detectBPM` (`VinylVault.jsx`) keys
+  `bpmCache` by preview URL, and EVERY exit including the fetch failures must
+  `bpmCache.set(previewUrl, null)`. Two failure paths once returned without
+  caching, so a preview URL that no longer resolves was re-fetched on every
+  render; the Tracks view's `triedRef` only guards a single mount, so
+  navigating back and forth replayed the whole dead batch and put dozens of
+  failing requests through `/api/audio-proxy` in seconds.
+- **`audio-proxy` status codes carry meaning**: an upstream 4xx is a preview
+  that has expired or been withdrawn, so it answers 404. Only a genuinely
+  broken upstream is 502, and a hung one is 504. Returning 502 for a dead link
+  turned an ordinary missing resource into a platform error alert.
 - **Large single file**: all UI lives in `VinylVault.jsx`. When editing, use grep/search to navigate -- the file is ~3000 lines.
 - **Crate editing**: only available in the record detail panel (click a card in grid view). The carousel view is read-only for crates.
 - **Community profile routing**: which profile is open lives in

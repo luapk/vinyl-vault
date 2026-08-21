@@ -418,7 +418,12 @@ async function detectBPM(previewUrl, genres) {
       const proxyResp = await fetch(
         `/api/audio-proxy?url=${encodeURIComponent(previewUrl)}`
       );
-      if (!proxyResp.ok) return null;
+      // Remember the failure. Returning without caching meant a preview URL
+      // that no longer resolves was re-fetched every time this ran: the
+      // Tracks view's triedRef only guards one mount, so navigating back and
+      // forth replayed the whole dead batch. That is what put 37 failing
+      // requests through /api/audio-proxy in two seconds from one client.
+      if (!proxyResp.ok) { bpmCache.set(previewUrl, null); return null; }
       arrayBuf = await proxyResp.arrayBuffer();
     }
 
@@ -549,6 +554,10 @@ async function detectBPM(previewUrl, genres) {
     return result;
   } catch (e) {
     console.log('[bpm]', e.message);
+    // Cached for the same reason: an undecodable or unreachable preview is
+    // not going to become decodable on the next render. Every other failure
+    // path in here already caches its null; these two were the omissions.
+    bpmCache.set(previewUrl, null);
     return null;
   }
 }
