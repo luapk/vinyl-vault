@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseImportRows } from '../importParse.js';
+import { parseImportRows, IMPORT_ROW_CAP } from '../importParse.js';
 
 describe('parseImportRows -- forgiving record-list parsing', () => {
   it('parses plain "Artist - Title" lines (hyphen, en dash, em dash)', () => {
@@ -65,9 +65,11 @@ describe('parseImportRows -- forgiving record-list parsing', () => {
     ]);
   });
 
-  it('caps at 500 rows', () => {
-    const big = Array.from({ length: 600 }, (_, i) => `Artist ${i} - Title ${i}`).join('\n');
-    expect(parseImportRows(big)).toHaveLength(500);
+  it('caps at the row limit', () => {
+    const big = Array.from({ length: IMPORT_ROW_CAP + 200 }, (_, i) => `Artist ${i} - Title ${i}`).join('\n');
+    expect(parseImportRows(big)).toHaveLength(IMPORT_ROW_CAP);
+    // Callers that need to report what was dropped can ask for everything.
+    expect(parseImportRows(big, Infinity)).toHaveLength(IMPORT_ROW_CAP + 200);
   });
 
   it('empty input returns empty', () => {

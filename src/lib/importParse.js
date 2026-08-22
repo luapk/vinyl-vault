@@ -3,6 +3,13 @@
 // since exports come from all over (Discogs CSV, spreadsheets, notes apps).
 // Returns [{ artist, title }] with blanks and in-file duplicates removed.
 
+// How many records one file may import in a single run. The per-row Discogs
+// lookup shares a rate limit with everyone else's scanning, so an unbounded
+// file is one person degrading the app for all of them. Callers that want to
+// tell the user what was left behind pass Infinity and apply the cap
+// themselves.
+export const IMPORT_ROW_CAP = 1000;
+
 export const IMPORT_ARTIST_KEYS = ['artist', 'artists', 'artist name', 'performer', 'band'];
 export const IMPORT_TITLE_KEYS = ['title', 'album', 'album title', 'release', 'release title', 'record', 'name'];
 
@@ -29,7 +36,7 @@ export function splitDashLine(line) {
   return { artist: '', title: line };
 }
 
-export function parseImportRows(text) {
+export function parseImportRows(text, limit = IMPORT_ROW_CAP) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (!lines.length) return [];
 
@@ -73,5 +80,5 @@ export function parseImportRows(text) {
     seen.add(key);
     out.push({ artist, title });
   }
-  return out.slice(0, 500);
+  return out.slice(0, limit);
 }

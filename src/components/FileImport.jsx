@@ -5,7 +5,7 @@
 // duplicate-aware import loop would be two sets of rules to keep in step.
 import { useState, useRef, useEffect } from 'react';
 import { Check } from '@phosphor-icons/react';
-import { parseImportRows } from '../lib/importParse.js';
+import { parseImportRows, IMPORT_ROW_CAP } from '../lib/importParse.js';
 
 // Live per-row status list for the file import: a green tick lands on each
 // row as it is saved; drafts and skipped duplicates are labelled inline.
@@ -77,9 +77,14 @@ export function useFileImport(onAddRecordsBulk) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || fileImporting) return;
-    let rows;
+    let rows, overflow = 0;
     try {
-      rows = parseImportRows(await file.text());
+      // Parse everything, then apply the cap here so the count left behind is
+      // known and can be reported. Silently truncating is how a 900-record
+      // file used to look like a 500-record one that had finished.
+      const all = parseImportRows(await file.text(), Infinity);
+      rows = all.slice(0, IMPORT_ROW_CAP);
+      overflow = all.length - rows.length;
     } catch {
       setFileError('Could not read that file.');
       return;
@@ -144,7 +149,7 @@ export function useFileImport(onAddRecordsBulk) {
       // Pace the Discogs fan-out to stay inside the shared rate limit.
       if (i < rows.length - 1) await new Promise(r => setTimeout(r, 650));
     }
-    setFileResult({ added, skipped, matched, drafts, stopped });
+    setFileResult({ added, skipped, matched, drafts, stopped, overflow });
     setFileImporting(false);
   }
 

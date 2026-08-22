@@ -25,6 +25,7 @@ import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { useFileImport, ImportStatusList } from './FileImport.jsx';
+import { IMPORT_ROW_CAP } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
@@ -1985,6 +1986,13 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, g
                 {fileResult.skipped > 0 && (
                   <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
                     {fileResult.skipped} already in your collection -- skipped as duplicates
+                  </p>
+                )}
+                {/* Never silent: a file over the cap used to finish looking
+                    exactly like one that fitted, with the remainder gone. */}
+                {fileResult.overflow > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
+                    {fileResult.overflow} more {fileResult.overflow === 1 ? 'record was' : 'records were'} in the file but not imported: one file adds up to {IMPORT_ROW_CAP} at a time. Upload the rest in a second file.
                   </p>
                 )}
                 <div style={{ marginTop: 8 }}><ImportStatusList items={fileItems} listRef={importListRef} /></div>
@@ -4602,6 +4610,11 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                 {fileResult.skipped > 0 && (
                   <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
                     {fileResult.skipped} already in your collection -- skipped as duplicates
+                  </p>
+                )}
+                {fileResult.overflow > 0 && (
+                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
+                    {fileResult.overflow} more {fileResult.overflow === 1 ? 'record was' : 'records were'} in the file but not imported: one file adds up to {IMPORT_ROW_CAP} at a time. Upload the rest in a second file.
                   </p>
                 )}
                 <div style={{ marginTop: 8 }}>
