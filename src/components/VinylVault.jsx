@@ -3589,7 +3589,7 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
         if (r.coverUrl) extractDominantColor(r.coverUrl).then(setLocalAccent).catch(() => {});
         setReplaced({
           prev,
-          name: [r.artist || record.artist, r.title || record.title].filter(Boolean).join(' — ')
+          name: [r.artist || record.artist, r.title || record.title].filter(Boolean).join(' - ')
             + (r.year ? ` (${r.year})` : ''),
         });
         clearTimeout(replacedTimer.current);
@@ -3810,22 +3810,31 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
             Undo (restores the pre-replacement snapshot), which is what makes
             an instant, confirmation-free swap safe. Auto-dismisses. */}
         {replaced && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: '#cafe04', color: '#08080c', animation: 'fadeUp 0.3s ease-out' }}>
-            <Check size={16} weight="bold" className="shrink-0" />
-            <div className="flex-1 min-w-0 text-[13px] font-mono leading-snug">
-              <span style={{ fontWeight: 700 }}>Release replaced.</span> Now filed as {replaced.name}.
+          // Stacked on a phone, one row from sm up. Two shrink-0 buttons and a
+          // flex-1 message do not share 360px: the buttons held their width and
+          // squeezed the release name down to a word per line, running under
+          // them. The message gets the full width on mobile and the actions sit
+          // beneath it.
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl" style={{ background: '#cafe04', color: '#08080c', animation: 'fadeUp 0.3s ease-out' }}>
+            <div className="flex items-start gap-2.5 min-w-0 sm:flex-1">
+              <Check size={16} weight="bold" className="shrink-0" style={{ marginTop: 1 }} />
+              <div className="min-w-0 text-[13px] font-mono leading-snug">
+                <span style={{ fontWeight: 700 }}>Release replaced.</span> Now filed as {replaced.name}.
+              </div>
             </div>
             {/* Two different intents: Undo puts back what you had, Pick another
                 goes straight back to the alternatives. The list is still in
                 state, so this reopens it without touching the network. */}
-            {reidentifyResults?.length > 0 && (
-              <button onClick={showPreviousResults} className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95" style={{ background: 'transparent', color: '#08080c', border: '1px solid rgba(8,8,12,0.35)' }}>
-                Pick another
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              {reidentifyResults?.length > 0 && (
+                <button onClick={showPreviousResults} className="px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95 whitespace-nowrap" style={{ background: 'transparent', color: '#08080c', border: '1px solid rgba(8,8,12,0.35)' }}>
+                  Pick another
+                </button>
+              )}
+              <button onClick={undoReplace} className="px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95 whitespace-nowrap" style={{ background: '#08080c', color: '#cafe04' }}>
+                Undo
               </button>
-            )}
-            <button onClick={undoReplace} className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-mono font-bold uppercase tracking-[0.08em] transition-all active:scale-95" style={{ background: '#08080c', color: '#cafe04' }}>
-              Undo
-            </button>
+            </div>
           </div>
         )}
 
