@@ -1,15 +1,9 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
+import { tierForPrice, pricingConfigured } from './lib/pricing.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-
-// Map Price IDs to tier names so the webhook knows what to grant
-const PRICE_TO_TIER = {
-  [process.env.STRIPE_PRICE_SELECTOR_YEAR]:     'selector',
-  [process.env.STRIPE_PRICE_SELECTOR_FOUNDING]: 'selector',
-  [process.env.STRIPE_PRICE_RESIDENT_YEAR]:     'resident',
-};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -21,7 +15,12 @@ export default async function handler(req, res) {
   if (!priceId) return res.status(400).json({ error: 'priceId required' });
   const userId = authUser.id;
 
-  const tier = PRICE_TO_TIER[priceId];
+  // No prices configured at all is a deployment fault, not the caller's.
+  if (!pricingConfigured()) {
+    console.error('[stripe-checkout] no STRIPE_PRICE_* or VITE_STRIPE_PRICE_* set');
+    return res.status(500).json({ error: 'Pricing is not configured. Please try again shortly.' });
+  }
+  const tier = tierForPrice(priceId);
   if (!tier) return res.status(400).json({ error: 'Unknown price' });
 
   const appUrl = process.env.VITE_APP_URL || 'https://vinyl-vault-teal.vercel.app';

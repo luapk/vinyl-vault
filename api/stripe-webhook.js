@@ -3,19 +3,13 @@ export const config = { api: { bodyParser: false } };
 
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { tierForPrice } from './lib/pricing.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Tier granted for a given price ID
-const PRICE_TO_TIER = {
-  [process.env.STRIPE_PRICE_SELECTOR_YEAR]:     'selector',
-  [process.env.STRIPE_PRICE_SELECTOR_FOUNDING]: 'selector',
-  [process.env.STRIPE_PRICE_RESIDENT_YEAR]:     'resident',
-};
-
 function tierForLineItems(lineItems) {
   for (const item of lineItems?.data || []) {
-    const tier = PRICE_TO_TIER[item.price?.id];
+    const tier = tierForPrice(item.price?.id);
     if (tier) return tier;
   }
   return null;

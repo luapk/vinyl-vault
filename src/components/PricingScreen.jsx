@@ -46,9 +46,9 @@ const TIERS = [
     founding:  `or £${PRICE_FOUNDING} lifetime -- first ${FOUNDING_SEATS}`,
     features: [
       'Unlimited AI scans',
+      'Tracks view: BPM and key for every track',
       'BPM label printing',
-      'CSV export',
-      'Multi-device sync',
+      'CSV export and multi-device sync',
       'All Digger features',
     ],
   },
@@ -61,7 +61,6 @@ const TIERS = [
     comingSoon: false,
     priceEnvKey: 'VITE_STRIPE_PRICE_RESIDENT_YEAR',
     features: [
-      'Individual BPM track detection for set building',
       'Saved, reorderable set crates',
       'Offline booth mode',
       'Priority support and early access',
@@ -89,7 +88,7 @@ const ROUNDEL_INSIDE = ROUNDEL - OVERLAP;
 // What the next tier up buys you. Named, not vague: the panel edge peeking at
 // the right says "there is more", this says what the more actually is.
 const UPSELL = {
-  Digger:   'Selector adds unlimited scans',
+  Digger:   'Selector adds unlimited scans and Tracks',
   Selector: 'Resident adds set crates and booth mode',
 };
 

@@ -1,6 +1,19 @@
 import { useState } from 'react';
 
-export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, initialMode = 'signup' }) {
+// Google's own mark, inlined: an external asset would be one more thing that
+// can fail to load on the very first screen a new user sees.
+function GoogleMark() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z" />
+      <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z" />
+      <path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z" />
+      <path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z" />
+    </svg>
+  );
+}
+
+export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: authLoading, initialMode = 'signup' }) {
   const [mode, setMode]               = useState(initialMode);
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
@@ -8,6 +21,7 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, i
   const [busy, setBusy]               = useState(false);
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState('');
+  const [googleBusy, setGoogleBusy]   = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -32,7 +46,21 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, i
     }
   }
 
-  const isLoading = busy || authLoading;
+  async function handleGoogle() {
+    setError('');
+    setSuccess('');
+    setGoogleBusy(true);
+    try {
+      // On success this navigates away to Google, so busy is never cleared
+      // here: leaving the spinner up is right until the redirect happens.
+      await onGoogle();
+    } catch (err) {
+      setError(err.message || 'Could not start Google sign-in');
+      setGoogleBusy(false);
+    }
+  }
+
+  const isLoading = busy || authLoading || googleBusy;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{
@@ -67,6 +95,35 @@ export default function AuthScreen({ onSignIn, onSignUp, loading: authLoading, i
           <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.9)', marginBottom: 20, letterSpacing: '-0.01em' }}>
             {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h2>
+
+          {onGoogle && (
+            <>
+              <button
+                type="button"
+                onClick={handleGoogle}
+                disabled={isLoading}
+                style={{
+                  width: '100%', padding: '10px 0', borderRadius: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  fontSize: 13, fontWeight: 600, color: '#1f1f1f',
+                  background: googleBusy ? 'rgba(255,255,255,0.6)' : '#fff',
+                  border: '1px solid rgba(var(--fg),0.18)',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'opacity 0.15s',
+                  opacity: isLoading && !googleBusy ? 0.6 : 1,
+                }}>
+                <GoogleMark />
+                {googleBusy ? 'Opening Google...' : 'Continue with Google'}
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
+                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
+                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>or</span>
+                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {mode === 'signup' && (

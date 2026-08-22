@@ -5,7 +5,7 @@ import {
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
-  MusicNotes, Waveform, Export, DeviceMobile, Rows,
+  MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -1020,7 +1020,7 @@ export default function VinylVault() {
         />
       );
     }
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} loading={authLoading} initialMode={authInitialMode} />;
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onGoogle={signInWithGoogle} loading={authLoading} initialMode={authInitialMode} />;
   }
 
   // POST to /api/scan with a guaranteed-fresh access token. If the token is
@@ -1377,7 +1377,9 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
-    ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes }] : []),
+    // Tracks is a Selector feature. Free users still see the tab, with a lock:
+    // hiding it means nobody ever discovers what they would be paying for.
+    ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes, locked: !isPaid }] : []),
     ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
   ];
 
@@ -1397,10 +1399,11 @@ export default function VinylVault() {
         </div>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
-          {navItems.map(({ id, label, icon: Icon, badge }) => (
+          {navItems.map(({ id, label, icon: Icon, badge, locked }) => (
             <button
               key={id}
               onClick={() => {
+                if (locked) { setShowPricingModal(true); return; }
                 if (id === "community") { openCommunityHome(); return; }
                 setAppView(id);
                 // Nav goes to the scan home screen and stops there. Opening the
@@ -1420,6 +1423,11 @@ export default function VinylVault() {
                 {badge > 0 && (
                   <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 14, height: 14, borderRadius: 7, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#000', lineHeight: 1, padding: '0 3px' }}>
                     {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
+                {locked && (
+                  <span style={{ position: 'absolute', top: -5, right: -6, width: 13, height: 13, borderRadius: 7, background: 'rgba(var(--bg),0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: `rgba(var(--fg),${isDark ? 0.5 : 0.65})` }}>
+                    <LockSimple size={9} weight="fill" />
                   </span>
                 )}
               </span>
@@ -1486,7 +1494,7 @@ export default function VinylVault() {
         {appView === "collection" && (
           <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} userId={userId} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
         )}
-        {appView === "tracks" && (
+        {appView === "tracks" && isPaid && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
         )}
         {appView === "batch" && (

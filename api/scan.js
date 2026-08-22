@@ -10,7 +10,7 @@ import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
 
-const SCAN_LIMITS = { digger: 50, selector: Infinity, resident: Infinity };
+const SCAN_LIMITS = { digger: 30, selector: Infinity, resident: Infinity };
 
 async function _doCheckAndIncrementScanLimit(userId) {
   if (!userId) return null; // unauthenticated: allow (will be rate-limited separately)
@@ -29,18 +29,24 @@ async function _doCheckAndIncrementScanLimit(userId) {
 
   const tier   = profile.subscription_tier || 'digger';
   const status = profile.subscription_status || 'active';
-  const limit  = SCAN_LIMITS[tier] ?? SCAN_LIMITS.digger;
 
   // Treat past_due as still having access (Stripe gives a grace period)
   const hasAccess = status === 'active' || status === 'trialing' || status === 'past_due';
+
+  // A lapsed or cancelled subscriber is a free user, not an exempt one. The
+  // limit used to be skipped entirely unless hasAccess was true, so cancelling
+  // granted unlimited scans: the one status that should restrict a person was
+  // the one that let them through.
+  const effectiveTier = hasAccess ? tier : 'digger';
+  const limit = SCAN_LIMITS[effectiveTier] ?? SCAN_LIMITS.digger;
 
   // Auto-reset if period has rolled over
   const now = new Date();
   const periodEnd = new Date(profile.scans_period_end);
   const currentCount = now >= periodEnd ? 0 : (profile.scans_this_period || 0);
 
-  if (hasAccess && currentCount >= limit) {
-    return { blocked: true, tier, limit, used: currentCount };
+  if (currentCount >= limit) {
+    return { blocked: true, tier: effectiveTier, limit, used: currentCount };
   }
 
   // Increment counter (the RPC handles reset atomically)

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { FREE_SCANS } from '../lib/pricing.js';
 
 export function useSubscription(user, profile) {
   const tier   = profile?.subscription_tier   || 'digger';
@@ -7,10 +8,13 @@ export function useSubscription(user, profile) {
   const scansUsed   = profile?.scans_this_period || 0;
   const scansPeriodEnd = profile?.scans_period_end || null;
 
-  const LIMITS = { digger: 50, selector: Infinity, resident: Infinity };
-  const scanLimit = LIMITS[tier] ?? LIMITS.digger;
-  const isPaid = tier === 'selector' || tier === 'resident';
+  const LIMITS = { digger: FREE_SCANS, selector: Infinity, resident: Infinity };
   const isActive = status === 'active' || status === 'trialing' || status === 'past_due';
+  // Mirrors api/scan.js: a lapsed subscription falls back to the free tier, so
+  // the count shown here matches the count the server actually enforces.
+  const effectiveTier = isActive ? tier : 'digger';
+  const scanLimit = LIMITS[effectiveTier] ?? LIMITS.digger;
+  const isPaid = effectiveTier === 'selector' || effectiveTier === 'resident';
   const scansRemaining = isPaid ? Infinity : Math.max(0, scanLimit - scansUsed);
 
   const startCheckout = useCallback(async (priceId) => {
