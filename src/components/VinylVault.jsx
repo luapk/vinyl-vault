@@ -3587,10 +3587,17 @@ function RecordDetailModal({ record, onClose, onRemove, onUpdate, accentRGB, acc
           notes: r.notes || '',
         });
         if (r.coverUrl) extractDominantColor(r.coverUrl).then(setLocalAccent).catch(() => {});
+        // Year and country together, because the country is usually what
+        // separates two pressings of the same release, which is exactly the
+        // choice being confirmed here. Resolved the same way the update above
+        // resolves them, so the message names what was actually filed.
+        const filedYear = r.year ?? record.year;
+        const filedCountry = r.country ?? record.country;
+        const filedMeta = [filedYear, filedCountry].filter(Boolean).join(', ');
         setReplaced({
           prev,
           name: [r.artist || record.artist, r.title || record.title].filter(Boolean).join(' - ')
-            + (r.year ? ` (${r.year})` : ''),
+            + (filedMeta ? ` (${filedMeta})` : ''),
         });
         clearTimeout(replacedTimer.current);
         replacedTimer.current = setTimeout(() => setReplaced(null), 10000);
