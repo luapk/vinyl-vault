@@ -72,6 +72,10 @@ begin
 end;
 $$;
 
+-- A trigger function, never something to call over the API. Triggers run as
+-- the table owner, so revoking this changes nothing about sign-up.
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users

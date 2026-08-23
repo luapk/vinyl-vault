@@ -78,3 +78,20 @@ BEGIN
   WHERE stripe_customer_id = p_stripe_customer_id;
 END;
 $$;
+
+-- ─── Lock the billing RPCs to the service role ────────────────────────────────
+--
+-- Both of these are SECURITY DEFINER and both were, by default, executable by
+-- anon and authenticated over PostgREST. That made upsert_subscription a way to
+-- buy nothing: a signed-in user can read their own stripe_customer_id (the
+-- checkout endpoint writes it to their profile the first time they open
+-- checkout), then call
+--   POST /rest/v1/rpc/upsert_subscription
+--   { p_stripe_customer_id: <theirs>, p_tier: 'resident', p_status: 'active' }
+-- and hold the top tier for free. The anon key is in the browser bundle, so
+-- nothing about that is hard.
+--
+-- Only /api/stripe-webhook and /api/scan call these, and both use the service
+-- role key, which bypasses grants. Nothing else should reach them.
+REVOKE EXECUTE ON FUNCTION public.upsert_subscription(text, text, text, text) FROM public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.increment_scan_count(uuid) FROM public, anon, authenticated;
