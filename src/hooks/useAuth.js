@@ -26,7 +26,10 @@ export function useAuth() {
     if (!supabase || !userId) return null;
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, role, avatar_url, display_name, username, bio, is_public, preferences, subscription_tier, subscription_status, scans_this_period, scans_period_end')
+      // No email: it is on the auth session already (user.email), and the
+      // column is revoked from anon/authenticated so a public profile cannot
+      // hand somebody else's address to anyone holding the anon key.
+      .select('id, role, avatar_url, display_name, username, bio, is_public, preferences, subscription_tier, subscription_status, scans_this_period, scans_period_end')
       .eq('id', userId)
       .single();
     // Don't swallow failures silently: the self-healing effect below retries

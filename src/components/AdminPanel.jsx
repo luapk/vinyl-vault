@@ -22,11 +22,11 @@ export default function AdminPanel({ onBack }) {
   async function loadUsers() {
     setLoading(true);
     try {
-      // Admins can see all profiles via the RLS policy.
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, email, role, created_at, display_name, username, is_public, subscription_tier, subscription_status')
-        .order('created_at', { ascending: true });
+      // Through a definer function, not the table: email is revoked from the
+      // authenticated role (see supabase/profile-privacy.sql) precisely so a
+      // public profile cannot leak it, and an admin is just another
+      // authenticated user. The function checks is_admin() before answering.
+      const { data: profiles, error } = await supabase.rpc('admin_list_users');
       if (error) throw error;
 
       // Count records per user.

@@ -111,6 +111,7 @@ supabase/
   schema.sql           # full schema (run on a fresh project)
   storage.sql          # storage buckets: avatars (profile photos), covers (cached cover art)
   import-jobs.sql      # background import queue + claim_import_job
+  profile-privacy.sql  # column grants that keep email + Stripe ids off public profiles
   bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
 ```
 
@@ -118,7 +119,7 @@ supabase/
 
 - **All API keys (Anthropic, Discogs, Spotify) live in Vercel environment variables and are accessed only from `/api/*.js` handlers. Never expose them to the client.**
 - **A `SECURITY DEFINER` function is public unless you revoke it.** Postgres grants EXECUTE to everyone by default, and Supabase exposes every function in `public` at `/rest/v1/rpc/<name>`, so a definer function is reachable with the anon key that ships in the browser bundle. `upsert_subscription` was live like that: read your own `stripe_customer_id` (checkout writes it to your profile), POST it back with `p_tier: 'resident'`, and you hold the top tier for nothing. Every definer function called only by `/api/*` (which uses the service role, and so bypasses grants) must end with a `REVOKE EXECUTE ... FROM public, anon, authenticated` -- see the end of `payments-schema.sql`. `get_advisors` (Supabase MCP, type `security`) lists any that are still open.
-- **RLS is row-level, not column-level.** `profiles_select` exposes a public profile's whole row, `email` and `stripe_customer_id` included, to anyone holding the anon key. Column grants cannot fix it on their own, because a user must still read those columns on their own row. Closing it means serving community profiles through a view or definer function that returns only the safe columns.
+- **RLS is row-level, not column-level.** `profiles_select` lets anyone read a profile whose `is_public` is true, and that means the whole row. The app's own queries ask for a safe handful of columns; nothing stops a client with the anon key asking PostgREST for the rest, and four public profiles were handing out their email address that way. Fixed in `supabase/profile-privacy.sql` with column privileges (`revoke select (email, stripe_customer_id, stripe_subscription_id) ... from anon, authenticated`), which apply per role rather than per row. **The policy itself must keep `is_public = true`**: the community screens read profiles through PostgREST embeds (comment authors, reactors, follower lists) that resolve against this table under this policy, so removing it blanks every name in the community view. Nothing in the browser needs those three columns -- the signed-in user's address is on the auth session as `user.email`, and the Stripe ids are read only by `/api/*` with the service role. The admin panel is the exception and goes through `admin_list_users()`, a definer function that checks `is_admin()` before answering. Anything else added to `profiles` that a stranger should not see needs the same revoke.
 - **Any endpoint that spends money or third-party quota must call `requireAuth`** (see `api/lib/auth.js`), and the client must send `Authorization: Bearer <token>` using `freshAccessToken()`. Endpoints that legitimately cannot: `stripe-webhook` (verified by Stripe signature), `unsubscribe` (clicked from email, HMAC-signed), and `image-proxy` / `audio-proxy` (loaded by `<img>` / `<audio>`, which cannot send headers). `import-worker` accepts the `CRON_SECRET` bearer (or the `x-vercel-cron` stamp) for the scheduled run and `requireAuth` for the on-demand kick, and is never open. Still unprotected and worth closing: `discogs-search`, `discogs-release`, `discogs-import`, `spotify-features` -- these burn the shared Discogs/Spotify rate limit rather than money, so abuse degrades scanning for everyone.
 - No em dashes anywhere -- in code comments, docs, copy, or UI strings.
 
@@ -181,6 +182,7 @@ create policy "profiles_self_update" on public.profiles
 Also run when updating an existing database:
 - the `records_exist` function from `supabase/social-schema.sql` (accurate chat thumbnail existence check)
 - the `covers` bucket section from `supabase/storage.sql` (cover art caching)
+- `supabase/profile-privacy.sql` (stops a public profile exposing its email and Stripe ids; also adds `admin_list_users`, which the admin panel now calls instead of selecting the table)
 - `supabase/import-jobs.sql` (background file imports; until it is run, imports keep running in the browser and stop when the tab does)
 - `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
 
