@@ -28,8 +28,10 @@ models refresh-token rotation + reuse revocation. It covers the session
 lifecycle (revoked sessions, unreachable auth server, sign-out always works),
 the no-data-loss sync invariant under database faults, and the PWA + tab
 concurrent-refresh race that guards the auth lock, account isolation on a
-shared device, the smart-crate runs (which may only ever ADD crate names), and
-the rule that a community profile can never become somebody's home page.
+shared device, the smart-crate runs (which may only ever ADD crate names), the
+file import under Discogs rate limiting (a 429 must never be saved as an
+unmatched record), and the rule that a community profile can never become
+somebody's home page.
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -284,6 +286,24 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   itself, so it knows how many rows were left behind and says so in the result.
   It used to truncate silently at 500, which made a 900-record file finish
   looking exactly like a 500-record one that had succeeded.
+- **A rate limit is never an answer about a record**: an unmatched import row
+  is saved as a draft, so anything that reports "no match" decides what a
+  record is. `/api/discogs-search` therefore answers **429** (not an empty
+  200) when Discogs rate limits it, and reports the remaining budget so a long
+  run can pace itself (`src/lib/importBudget.js`, unit-tested). The import
+  waits out a 429 and retries the row; after a full 60s window it stops the
+  run rather than drafting the rest of the file. Two things caused the
+  original incident, and both must hold: a manual lookup costs **one** Discogs
+  request, with the fuzzy `q` query held back as a fallback and fired only
+  when the targeted search comes up empty (`searchDiscogs`, `manual: true`);
+  and rows are paced off Discogs's own `X-Discogs-Ratelimit-Remaining`.
+  Guarded by `stress/import.spec.mjs`.
+- **Unmatched imports can only be repaired in place**: de-duplication keys on
+  the Discogs release id (`addRecordsBulk`) and a draft has none, so importing
+  the same file again adds a second copy of every unmatched row rather than
+  fixing it. `retryUnmatched` (`useFileImport`) looks each draft up again and
+  patches the existing record, reached from "Match unmatched" on the import
+  result and in the account panel's import section.
 - **Failed BPM lookups must be cached**: `detectBPM` (`VinylVault.jsx`) keys
   `bpmCache` by preview URL, and EVERY exit including the fetch failures must
   `bpmCache.set(previewUrl, null)`. Two failure paths once returned without

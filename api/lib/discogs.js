@@ -62,7 +62,7 @@ export function barcodeVariants(barcode) {
   return [...out];
 }
 
-export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, rawText, manual = false }) {
+export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, rawText, manual = false, meta = null }) {
   const headers = authHeaders();
 
   // Run search strategies in parallel. Vision sometimes misassigns fields
@@ -138,8 +138,10 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   // the query focused. For manual searches, fall back to joined fields only when
   // no catno is present (catno searches already cover the targeted case).
   const fuzzyQ = (rawText ? rawText.slice(0, 80).trim() : '') || [artist, title, label].filter(Boolean).join(' ');
+  let fuzzyUrl = null;
   if (fuzzyQ && (!manual || !catalogNumber)) {
-    urls.add(buildSearchUrl({ q: fuzzyQ }));
+    fuzzyUrl = buildSearchUrl({ q: fuzzyQ });
+    urls.add(fuzzyUrl);
   }
 
   // Title-keyword fallback: only for image scans where artist field may be unreliable.
@@ -152,25 +154,55 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   // while catching the long tail. Worst case per URL: 5+1+5 = 11s, but all
   // URLs run in parallel so the batch ceiling stays ~11s.
   const urlList = [...urls];
-  const batches = await Promise.all(
-    urlList.map(async url => {
+
+  // Report the rate-limit state to the caller. Discogs sends the remaining
+  // budget on every response, and a 429 has to reach the caller as a rate
+  // limit: flattened into an empty result it is indistinguishable from "no
+  // such record", which is how a file import came to save a draft for every
+  // row after the limiter tripped.
+  const noteLimits = (res) => {
+    if (!meta || !res) return;
+    if (res.status === 429) meta.rateLimited = true;
+    const left = res.headers?.get?.('X-Discogs-Ratelimit-Remaining');
+    const n = left == null || left === '' ? NaN : parseInt(left, 10);
+    if (!Number.isNaN(n)) {
+      meta.remaining = meta.remaining == null ? n : Math.min(meta.remaining, n);
+    }
+  };
+
+  const runUrls = (list) => Promise.all(
+    list.map(async url => {
       try {
         const res = await fetchWithRetry(url, { headers }, 1, 5000);
-        if (!res.ok) return [];
+        noteLimits(res);
+        if (!res.ok) return { url, rows: [] };
         const data = await res.json();
-        return data.results || [];
+        return { url, rows: data.results || [] };
       } catch {
-        return [];
+        return { url, rows: [] };
       }
     })
   );
+
+  // The fuzzy free-text query is a fallback, not a parallel strategy. Fired
+  // alongside the targeted search it doubled the cost of every manual lookup,
+  // and the file import does one lookup per row: at two requests a row it spent
+  // the whole 60-per-minute Discogs budget in about thirty rows and drafted the
+  // rest of the file. Hold it back until the targeted searches come up empty.
+  const deferFuzzy = manual && fuzzyUrl && urlList.length > 1;
+  const firstPass = deferFuzzy ? urlList.filter(u => u !== fuzzyUrl) : urlList;
+  let batches = await runUrls(firstPass);
+  if (deferFuzzy && !batches.some(b => b.rows.length)) {
+    batches = batches.concat(await runUrls([fuzzyUrl]));
+  }
+
   // Which releases came back from a barcode query. A barcode search is exact:
   // a misread digit returns nothing rather than the wrong record, so a hit here
   // is the highest-confidence signal available and scoring leans on it.
   const barcodeHitIds = new Set();
-  urlList.forEach((url, i) => {
-    if (barcodeUrls.has(url)) for (const r of batches[i]) barcodeHitIds.add(r.id);
-  });
+  for (const b of batches) {
+    if (barcodeUrls.has(b.url)) for (const r of b.rows) barcodeHitIds.add(r.id);
+  }
 
   // Merge and deduplicate — earlier strategies (catNo first) win on ordering.
   // Safety net for the format=Vinyl query filter: drop anything whose format is
@@ -184,7 +216,7 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   const seen = new Set();
   const merged = [];
   for (const batch of batches) {
-    for (const r of batch) {
+    for (const r of batch.rows) {
       if (!seen.has(r.id) && isVinyl(r)) {
         seen.add(r.id);
         merged.push(r);

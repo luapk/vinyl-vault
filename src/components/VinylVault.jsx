@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
-  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp,
+  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
   MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
@@ -24,7 +24,7 @@ import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
-import { useFileImport, ImportStatusList } from './FileImport.jsx';
+import { useFileImport, ImportStatusList, ImportSummary } from './FileImport.jsx';
 import { IMPORT_ROW_CAP } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
@@ -1470,7 +1470,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
@@ -1577,6 +1577,8 @@ export default function VinylVault() {
           onPrintLabels={() => { setShowAccount(false); setAppView('collection'); enterLabelMode(); }}
           onDownloadCSV={() => downloadCSV(collection)}
           onAddRecordsBulk={addRecordsBulk}
+          collection={collection}
+          onUpdateRecord={updateRecord}
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
           onUpgrade={() => { setShowAccount(false); setShowPricingModal(true); }}
@@ -1808,14 +1810,15 @@ function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'button', index =
   );
 }
 
-function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
+function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   // Same hook the account panel uses, so a list imported from here is matched
   // and de-duplicated by exactly the same rules.
   const {
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     cancelFileImport, importFileRef, importListRef, resetFileImport, handleImportFile,
-  } = useFileImport(onAddRecordsBulk);
+    unmatchedCount, retryUnmatched,
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord });
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
 
@@ -1982,32 +1985,20 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, accentRGB, g
 
             {!fileImporting && fileResult && (
               <>
-                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Check size={14} weight="bold" />
-                  {fileResult.stopped ? `Stopped -- ${fileResult.added} of ${fileProgress.total} added` : `Added ${fileResult.added} record${fileResult.added === 1 ? '' : 's'}`}
-                </p>
-                {fileResult.drafts > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
-                    {fileResult.drafts} couldn't be matched -- added as drafts. Open each and use Re-identify to pin the exact release.
-                  </p>
-                )}
-                {fileResult.skipped > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
-                    {fileResult.skipped} already in your collection -- skipped as duplicates
-                  </p>
-                )}
-                {/* Never silent: a file over the cap used to finish looking
-                    exactly like one that fitted, with the remainder gone. */}
-                {fileResult.overflow > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
-                    {fileResult.overflow} more {fileResult.overflow === 1 ? 'record was' : 'records were'} in the file but not imported: one file adds up to {IMPORT_ROW_CAP} at a time. Upload the rest in a second file.
-                  </p>
-                )}
+                <ImportSummary result={fileResult} total={fileProgress.total} />
                 <div style={{ marginTop: 8 }}><ImportStatusList items={fileItems} listRef={importListRef} /></div>
-                <button onClick={resetFileImport}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)', border: 'none', cursor: 'pointer' }}>
-                  Done
-                </button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button onClick={resetFileImport}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)', border: 'none', cursor: 'pointer' }}>
+                    Done
+                  </button>
+                  {unmatchedCount > 0 && (
+                    <button onClick={retryUnmatched}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.75)', background: 'transparent', border: '1px solid rgba(var(--fg),0.2)', cursor: 'pointer' }}>
+                      Match unmatched ({unmatchedCount})
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -4119,7 +4110,7 @@ function AccountLink({ label, onClick }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
+function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -4204,7 +4195,8 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     cancelFileImport, importFileRef, importListRef,
     resetFileImport, handleImportFile,
-  } = useFileImport(onAddRecordsBulk);
+    unmatchedCount, retryUnmatched,
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord });
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
@@ -4596,6 +4588,27 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                   }}>
                   <Upload size={15} />Choose file
                 </button>
+
+                {/* A standing way back to the rows an earlier import could not
+                    match. They cannot be fixed by importing the file again:
+                    de-duplication keys on the Discogs id and a draft has none,
+                    so a second upload would just add a second copy of each. */}
+                {unmatchedCount > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(var(--fg),0.08)' }}>
+                    <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.8)', marginBottom: 8, lineHeight: 1.5 }}>
+                      {unmatchedCount} imported record{unmatchedCount === 1 ? '' : 's'} never matched a release.
+                    </p>
+                    <button onClick={retryUnmatched}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 13px', borderRadius: 9, fontSize: 15,
+                        color: 'rgba(var(--fg),0.7)', background: 'rgba(var(--fg),0.05)',
+                        border: '1px solid rgba(var(--fg),0.12)', cursor: 'pointer',
+                      }}>
+                      <ArrowsClockwise size={15} />Match unmatched
+                    </button>
+                  </div>
+                )}
                 {fileError && (
                   <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginTop: 10 }}>{fileError}</p>
                 )}
@@ -4622,25 +4635,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             )}
             {!fileImporting && fileResult && (
               <div>
-                <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(120,220,140,0.9)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Check size={14} weight="bold" />
-                  {fileResult.stopped ? `Stopped -- ${fileResult.added} of ${fileProgress.total} added` : `Added ${fileResult.added} record${fileResult.added === 1 ? '' : 's'}`}
-                </p>
-                {fileResult.drafts > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
-                    {fileResult.drafts} couldn't be matched -- added as drafts, marked amber below. Open each and use Re-identify to pin the exact release.
-                  </p>
-                )}
-                {fileResult.skipped > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 4 }}>
-                    {fileResult.skipped} already in your collection -- skipped as duplicates
-                  </p>
-                )}
-                {fileResult.overflow > 0 && (
-                  <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.85)', marginBottom: 4 }}>
-                    {fileResult.overflow} more {fileResult.overflow === 1 ? 'record was' : 'records were'} in the file but not imported: one file adds up to {IMPORT_ROW_CAP} at a time. Upload the rest in a second file.
-                  </p>
-                )}
+                <ImportSummary result={fileResult} total={fileProgress.total} />
                 <div style={{ marginTop: 8 }}>
                   <ImportStatusList items={fileItems} listRef={importListRef} />
                 </div>
@@ -4663,6 +4658,17 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                     }}>
                     <Upload size={14} />Import another file
                   </button>
+                  {unmatchedCount > 0 && (
+                    <button onClick={retryUnmatched}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 14px', borderRadius: 9, fontSize: 15,
+                        color: 'rgba(var(--fg),0.6)', background: 'rgba(var(--fg),0.05)',
+                        border: '1px solid rgba(var(--fg),0.1)', cursor: 'pointer',
+                      }}>
+                      <ArrowsClockwise size={14} />Match unmatched ({unmatchedCount})
+                    </button>
+                  )}
                 </div>
               </div>
             )}
