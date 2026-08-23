@@ -4205,7 +4205,8 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     importFileRef, importListRef,
     resetFileImport, handleImportFile, stopImport,
     unmatchedCount, retryUnmatched,
-  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, userId, onReload });
+    duplicateCount, confirmDedupe, removeDuplicateDrafts,
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId: user?.id, onReload });
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
