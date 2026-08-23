@@ -7,7 +7,6 @@ import {
   FOUNDING_SEATS,
   FREE_SCANS,
   FREE_LABELS,
-  TIERS as TIER_IDS,
 } from '../lib/pricing.js';
 
 // Brand acid + ink. This screen is deliberately theme-independent: acid page,

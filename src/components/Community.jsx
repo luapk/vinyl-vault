@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X, CaretLeft, MagnifyingGlass, Users, ShareNetwork, PaperPlaneRight,
-  Trash, VinylRecord, ChatCircle, Check, Clock, Bell, PaperPlaneTilt, Plus, Sparkle,
+  Trash, VinylRecord, ChatCircle, Check, Bell, PaperPlaneTilt, Plus, Sparkle,
 } from "@phosphor-icons/react";
 import {
   getProfileByUsername, getPublicCollection, getCollectionCount,
@@ -9,18 +9,13 @@ import {
   getLatestMembers,
   REACTION_EMOJI, getReactionsForRecords, getReactions, toggleReaction,
   getComments, addComment, deleteComment, sendMessage,
-  getNotifications, getLastSeenTs, bustFollowCache,
+  getNotifications, getLastSeenTs,
 } from "../lib/social.js";
 import { spaceIconFor } from "../lib/avatarIcon.js";
 import TrackRow from "./TrackRow.jsx";
 import { BadgeChip } from "./Badges.jsx";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-
-function initials(profile) {
-  const s = profile?.display_name || profile?.username || profile?.email || '?';
-  return s[0].toUpperCase();
-}
 
 function nameFor(profile) {
   return profile?.display_name || (profile?.username ? `@${profile.username}` : 'Collector');

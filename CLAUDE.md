@@ -15,10 +15,11 @@ A vinyl record collection manager. Scan a record sleeve photo, identify it via A
 npm install
 npm run dev      # localhost:5173
 npm run build    # production build
+npm run lint     # eslint: correctness only (no-undef, unused vars, rules of hooks)
 npm test         # unit tests (vitest)
 npm run stress   # fault-injection E2E suite (Playwright; see stress/README.md)
 npm run bench:barcode # 100-barcode on-device decode benchmark
-npm run test:all # both
+npm run test:all # lint + unit + stress
 ```
 
 ### Stress suite
@@ -35,6 +36,19 @@ somebody's home page.
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
+
+### Lint
+`eslint.config.js` is deliberately narrow: it reports code that is **wrong**,
+never code that is merely written differently. The rule that earns its keep is
+`no-undef`. All the UI lives in one 7000-line file, Vite bundles an unbound
+identifier without a murmur, and the unit tests never render most of it, so an
+undefined variable used to reach the browser and show the crash screen there:
+`userId` was passed to a hook inside a component that had no such variable, and
+only the 12-minute stress suite caught it. `react-hooks/rules-of-hooks` is on
+for the same reason. `react-hooks/exhaustive-deps` is off on purpose -- several
+effects here deliberately omit dependencies (the auth deadlock guard, the badge
+celebration delay), each with a comment saying why, and the rule would bury the
+ones that matter. CI runs it on every push.
 
 ### Barcode scanning
 The camera's Barcode mode decodes on-device from the live preview (no shutter,

@@ -159,8 +159,6 @@ describe('scoreMatch()', () => {
 // bestMatch() -- filter and pick winner
 // ---------------------------------------------------------------------------
 
-const MIN_SCORE = 3;
-
 describe('bestMatch()', () => {
 
   it('returns null when no results', () => {

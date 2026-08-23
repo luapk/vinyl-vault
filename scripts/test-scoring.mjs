@@ -63,8 +63,7 @@ function rankCandidates(candidates, vision) {
   return result.map(x => x.c);
 }
 
-// The auto-select & fallback thresholds from scan.js
-const AUTO_SELECT_SOLE = -1;  // if soleScore < this AND vision has info -> visionFallback
+// The fallback threshold from scan.js
 const ALL_BAD_THRESHOLD = -1; // if every candidate scores < this -> visionFallback
 
 // ─── Test runner ─────────────────────────────────────────────────────────────

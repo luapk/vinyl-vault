@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slimForCache, cacheCandidates, writeCollectionCache, safeSetItem, photosToKeep } from '../localCache.js';
+import { slimForCache, writeCollectionCache, safeSetItem, photosToKeep } from '../localCache.js';
 
 const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(2000);
 const HOSTED = 'https://example.com/cover.jpg';

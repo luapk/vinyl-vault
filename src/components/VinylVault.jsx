@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight, Clock,
+  Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
-  Scan, Info, Crown, SignOut, UserCircle, GearSix, ChartBar, Users,
+  Scan, Crown, SignOut, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
   MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple,
 } from "@phosphor-icons/react";
@@ -25,7 +25,6 @@ import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary } from './FileImport.jsx';
-import { IMPORT_ROW_CAP } from '../lib/importParse.js';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
@@ -688,8 +687,8 @@ function getGreeting(name) {
 
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, signInWithFacebook, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
-  const { tier, scansRemaining, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
+  const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
+  const { tier, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
 
   // Splash stays up for one full loop of the chosen WebP clip (its duration),
   // and for as long as auth is genuinely still loading. WebP <img> has no
@@ -3302,7 +3301,6 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 const GRID_PAGE = 60;
 
 function RecordCard({ record, onSelect, onRemove, accentRGB, selectMode = false, selected = false, onToggleSelect, localOnly = false }) {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   return (
     <div className="relative group cursor-pointer" onClick={selectMode ? onToggleSelect : onSelect} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 240px' }}>
       {/* Selection ring is an outline, not another shadow layer: outline follows
@@ -4158,8 +4156,6 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
   const [profileSavedOk, setProfileSavedOk] = useState(false);
   const [profileErr, setProfileErr] = useState('');
 
-  const initials = (user?.user_metadata?.display_name || user?.email || '?')[0].toUpperCase();
-
   // Discogs import state
   const [discogsUser, setDiscogsUser] = useState('');
   const [importing, setImporting] = useState(false);
@@ -4785,6 +4781,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
 
 // ----- CrateManagerModal -----------------------------------------------------
 
+// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function CrateManagerModal({ crates, onClose, onRename, onDelete, crateColors = {}, onSetColor }) {
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState("");
@@ -5513,6 +5510,7 @@ function HowStep({ num, title, desc, Icon, video, poster }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function AboutView({ accentRGB }) {
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
@@ -6411,6 +6409,7 @@ function TagCloud({ tags, genres, accentRGB }) {
 
 // ----- ExploreView -----------------------------------------------------------
 
+// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function ExploreView({ collection, accentRGB, onSelectRecord }) {
   const [selectedTag, setSelectedTag] = useState(null);
 
@@ -7034,6 +7033,7 @@ function BatchLabelModal({ records, accentRGB, onClose }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function LabelModal({ record, accentRGB, onClose }) {
   const canvasRef = useRef(null);
   const [gelatoStatus, setGelatoStatus] = useState(null);
@@ -7239,6 +7239,7 @@ function WalkthroughOverlay({ onDismiss }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function RoadmapFooter({ accentRGB }) {
   const items = [
     { label: "Phase 1", title: "Scan and Identify", desc: "Vision · Discogs · Spotify · Done", done: true },

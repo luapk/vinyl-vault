@@ -58,7 +58,6 @@ function scoreCandidate(candidate, vision) {
 // ─── URL generation logic (mirrors api/lib/discogs.js) ───────────────────────
 
 function buildSearchUrls({ catalogNumber, artist, title, label, rawText }) {
-  const BASE = 'https://api.discogs.com';
   const urls = new Set();
 
   if (catalogNumber) {
@@ -111,26 +110,6 @@ const WRONG_CATNO_COLLISION = {
   label: 'Pure Frequency',
   catalogNumber: 'PF013',
 };
-
-// A wrong title match (different artist, same title words)
-const WRONG_ARTIST_MATCH = {
-  artist: 'The Prodigy',
-  recordTitle: 'Circuit Funk',
-  label: 'XL Recordings',
-  catalogNumber: 'XL123',
-};
-
-// ─── Would this search strategy find the correct release? ────────────────────
-
-function wouldFindCorrect(urls) {
-  // Strategies that would reliably surface PF013 Stasis Circuit Funk
-  return urls.some(u =>
-    (u.includes('PF013') || u.includes('PF 013') || u.includes('PF-013')) ||
-    (u.includes('Stasis') || u.includes('STASIS') || u.includes('stasis')) ||
-    (u.includes('Circuit') || u.includes('circuit') || u.includes('CIRCUIT')) ||
-    (u.includes('Peacefrog') || u.includes('PEACEFROG') || u.includes('peacefrog'))
-  );
-}
 
 function findStrategies(urls) {
   const hits = [];
@@ -240,7 +219,6 @@ for (const { id, label: caseLabel, v } of cases) {
   // 2. The correct candidate scores >= 0 (not filtered as bad), AND
   // 3. The correct candidate is not cut off by merged.slice(0, 5)
 
-  const correctWouldScore = scoreCorrect >= 0;
   const correctWouldSurface = strategies !== 'none';
   // If there is a catno+artist or artist+title strategy, those are highly targeted
   // and would likely surface the release even if catno-only returns collisions.
