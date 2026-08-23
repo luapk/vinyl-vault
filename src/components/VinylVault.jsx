@@ -933,7 +933,7 @@ export default function VinylVault() {
   }, []);
 
   const userId = user?.id ?? null;
-  const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, addRecordsBulk } = useCollection(userId);
+  const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, addRecordsBulk, reloadFromCloud } = useCollection(userId);
 
   // ----- Milestone badges ----------------------------------------------------
   // Watched off the collection size rather than hooked into each save, so every
@@ -1470,7 +1470,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} onRemoveRecord={removeRecord} userId={userId} onReload={reloadFromCloud} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
@@ -1579,6 +1579,8 @@ export default function VinylVault() {
           onAddRecordsBulk={addRecordsBulk}
           collection={collection}
           onUpdateRecord={updateRecord}
+          onRemoveRecord={removeRecord}
+          onReload={reloadFromCloud}
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
           onUpgrade={() => { setShowAccount(false); setShowPricingModal(true); }}
@@ -1810,15 +1812,16 @@ function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'button', index =
   );
 }
 
-function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
+function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, onRemoveRecord, userId, onReload, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   // Same hook the account panel uses, so a list imported from here is matched
   // and de-duplicated by exactly the same rules.
   const {
     fileImporting, fileProgress, fileResult, fileError, fileItems,
-    cancelFileImport, importFileRef, importListRef, resetFileImport, handleImportFile,
-    unmatchedCount, retryUnmatched,
-  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord });
+    importFileRef, importListRef, resetFileImport, handleImportFile,
+    stopImport, unmatchedCount, retryUnmatched,
+    duplicateCount, confirmDedupe, removeDuplicateDrafts,
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload });
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
 
@@ -1976,7 +1979,7 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
                   {fileProgress.done} / {fileProgress.total} · {fileProgress.matched} matched
                 </p>
                 <ImportStatusList items={fileItems} listRef={importListRef} />
-                <button onClick={() => { cancelFileImport.current = true; }}
+                <button onClick={stopImport}
                   style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Stop here
                 </button>
@@ -1996,6 +1999,12 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
                     <button onClick={retryUnmatched}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.75)', background: 'transparent', border: '1px solid rgba(var(--fg),0.2)', cursor: 'pointer' }}>
                       Match unmatched ({unmatchedCount})
+                    </button>
+                  )}
+                  {duplicateCount > 0 && (
+                    <button onClick={removeDuplicateDrafts}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, fontSize: 15, fontWeight: 600, color: confirmDedupe ? '#fca5a5' : 'rgba(var(--fg),0.75)', background: 'transparent', border: `1px solid ${confirmDedupe ? 'rgba(252,165,165,0.5)' : 'rgba(var(--fg),0.2)'}`, cursor: 'pointer' }}>
+                      {confirmDedupe ? `Delete ${duplicateCount}? Tap again` : `Remove duplicates (${duplicateCount})`}
                     </button>
                   )}
                 </div>
@@ -4110,7 +4119,7 @@ function AccountLink({ label, onClick }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
+function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, onRemoveRecord, onReload, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -4193,10 +4202,10 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
   // so both run exactly the same matching and duplicate rules.
   const {
     fileImporting, fileProgress, fileResult, fileError, fileItems,
-    cancelFileImport, importFileRef, importListRef,
-    resetFileImport, handleImportFile,
+    importFileRef, importListRef,
+    resetFileImport, handleImportFile, stopImport,
     unmatchedCount, retryUnmatched,
-  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord });
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, userId, onReload });
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
@@ -4597,16 +4606,33 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(var(--fg),0.08)' }}>
                     <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(240,190,80,0.8)', marginBottom: 8, lineHeight: 1.5 }}>
                       {unmatchedCount} imported record{unmatchedCount === 1 ? '' : 's'} never matched a release.
+                      {duplicateCount > 0 && ` ${duplicateCount} of them ${duplicateCount === 1 ? 'is a duplicate' : 'are duplicates'}.`}
                     </p>
-                    <button onClick={retryUnmatched}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '8px 13px', borderRadius: 9, fontSize: 15,
-                        color: 'rgba(var(--fg),0.7)', background: 'rgba(var(--fg),0.05)',
-                        border: '1px solid rgba(var(--fg),0.12)', cursor: 'pointer',
-                      }}>
-                      <ArrowsClockwise size={15} />Match unmatched
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={retryUnmatched}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '8px 13px', borderRadius: 9, fontSize: 15,
+                          color: 'rgba(var(--fg),0.7)', background: 'rgba(var(--fg),0.05)',
+                          border: '1px solid rgba(var(--fg),0.12)', cursor: 'pointer',
+                        }}>
+                        <ArrowsClockwise size={15} />Match unmatched
+                      </button>
+                      {/* Deleting records cannot be undone, so it asks once. */}
+                      {duplicateCount > 0 && (
+                        <button onClick={removeDuplicateDrafts}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '8px 13px', borderRadius: 9, fontSize: 15,
+                            color: confirmDedupe ? '#fca5a5' : 'rgba(var(--fg),0.7)',
+                            background: 'rgba(var(--fg),0.05)',
+                            border: `1px solid ${confirmDedupe ? 'rgba(252,165,165,0.5)' : 'rgba(var(--fg),0.12)'}`,
+                            cursor: 'pointer',
+                          }}>
+                          <Trash size={15} />{confirmDedupe ? `Delete ${duplicateCount}? Tap again` : `Remove duplicates (${duplicateCount})`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
                 {fileError && (
@@ -4627,7 +4653,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                   {fileProgress.done} / {fileProgress.total} · {fileProgress.matched} matched
                 </p>
                 <ImportStatusList items={fileItems} listRef={importListRef} />
-                <button onClick={() => { cancelFileImport.current = true; }}
+                <button onClick={stopImport}
                   style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                   Stop here
                 </button>

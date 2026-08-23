@@ -172,6 +172,10 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
 
   const runUrls = (list) => Promise.all(
     list.map(async url => {
+      // Counted before the call so a thrown request still shows up: the
+      // importer paces itself on what a lookup actually spent, and an
+      // uncounted request is one the pacing does not know it made.
+      if (meta) meta.requests = (meta.requests || 0) + 1;
       try {
         const res = await fetchWithRetry(url, { headers }, 1, 5000);
         noteLimits(res);

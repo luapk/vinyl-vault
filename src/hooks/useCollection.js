@@ -101,7 +101,9 @@ function saveDirty(userId, set) {
 function markDirty(userId, id) { const d = loadDirty(userId); if (!d.has(id)) { d.add(id); saveDirty(userId, d); } }
 function clearDirty(userId, id) { const d = loadDirty(userId); if (d.has(id)) { d.delete(id); saveDirty(userId, d); } }
 
-function recordFromRelease(release, crates) {
+// Exported for the drift check in api/lib/__tests__/import-record.test.js: the
+// background import worker writes this same shape and must not fall behind it.
+export function recordFromRelease(release, crates) {
   const tags = [
     ...(release.suggestedBoxes || []),
     ...(release.genres || []),
@@ -302,7 +304,10 @@ export function useCollection(userId = null) {
     }
   }, [useDb, userId]);
 
-  // Load from Supabase when userId arrives or changes.
+  // Merge the cloud view into the local one. Runs on login, and again on
+  // demand: a background import writes records server-side, so the app needs a
+  // way to pick them up that is not "reload the page".
+  //
   // MERGE, never replace: the cloud view and the local view are combined so a
   // record present on this device can only leave the collection via an
   // explicit user delete. This is the invariant that ends the data-loss bugs:
@@ -310,9 +315,9 @@ export function useCollection(userId = null) {
   // record whose insert had failed (e.g. every scan made while the session was
   // expired) was dropped from state -- and the debounced localStorage write
   // then destroyed the only remaining copy.
-  useEffect(() => {
-    if (!useDb) { dbHasData.current = false; return; }
-    dbLoad(userId).then(async rows => {
+  const reloadFromCloud = useCallback(() => {
+    if (!useDb) { dbHasData.current = false; return Promise.resolve(); }
+    return dbLoad(userId).then(async rows => {
       // The merge decision is a pure, unit-tested function (collectionMerge.js).
       // Its invariant: local records are NEVER dropped -- whether or not their
       // upload succeeded -- unless the user explicitly deleted them
@@ -373,6 +378,9 @@ export function useCollection(userId = null) {
       for (const r of uncached) await cacheCoverFor(r);
     }).catch(console.error);
   }, [useDb, userId, cacheCoverFor]);
+
+  // Load from Supabase when userId arrives or changes.
+  useEffect(() => { reloadFromCloud(); }, [reloadFromCloud]);
 
   // Background retry: any record still without a DB row is re-attempted every
   // 25s while logged in. Transient failures -- an expired session mid-scan, a
@@ -586,6 +594,7 @@ export function useCollection(userId = null) {
     renameCrate,
     deleteCrate,
     addRecordsBulk,
+    reloadFromCloud,
   };
 }
 

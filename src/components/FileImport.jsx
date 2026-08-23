@@ -3,12 +3,20 @@
 // Extracted so the Import card on the home screen and the Import section in
 // the account panel run the same code. Two copies of a rate-limited,
 // duplicate-aware import loop would be two sets of rules to keep in step.
-import { useState, useRef, useEffect } from 'react';
+//
+// An import runs server-side when public.import_jobs exists: the rows become a
+// job, this tab kicks the worker off and then only watches it, and a cron
+// finishes anything still outstanding. That is what makes an import survive a
+// locked phone or a closed browser. Without the table (the migration has not
+// been run) the same work runs here in the browser, as it always did.
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Check } from '@phosphor-icons/react';
 import { parseImportRows, IMPORT_ROW_CAP } from '../lib/importParse.js';
-import { gapFor, LIMIT_BACKOFF_MS, unmatchedImports } from '../lib/importBudget.js';
+import { gapFor, createRateWindow, LIMIT_BACKOFF_MS, unmatchedImports } from '../lib/importBudget.js';
+import { planDraftDedupe } from '../lib/draftDuplicates.js';
+import { supabase } from '../lib/supabase.js';
 
-// Sleep in slices so cancelling does not have to wait out a 60s backoff.
+// Sleep in slices so cancelling does not have to wait out a long backoff.
 async function sleep(ms, isCancelled) {
   const step = 400;
   for (let waited = 0; waited < ms; waited += step) {
@@ -33,22 +41,36 @@ async function lookupRelease({ artist, title }) {
     return { outcome: 'error', remaining: null };
   }
   const remaining = typeof data?.remaining === 'number' ? data.remaining : null;
-  if (res.status === 429 || data?.rateLimited) return { outcome: 'limited', remaining };
-  if (!res.ok) return { outcome: 'error', remaining };
+  // What the lookup actually spent. A miss costs two (targeted, then fuzzy),
+  // so assuming one is how a list of obscure records outruns the limit.
+  const requests = typeof data?.requests === 'number' ? data.requests : 1;
+  if (res.status === 429 || data?.rateLimited) return { outcome: 'limited', remaining, requests };
+  if (!res.ok) return { outcome: 'error', remaining, requests };
   const matches = data.matches || [];
   const match = matches.find(x => x.coverUrl) || matches[0];
-  return match ? { outcome: 'match', match, remaining } : { outcome: 'nomatch', remaining };
+  return match ? { outcome: 'match', match, remaining, requests } : { outcome: 'nomatch', remaining, requests };
 }
 
 // One row, carried all the way to an answer worth saving. A rate limit is
 // never an answer: it is waited out and retried. A transient error gets two
 // quick retries and then counts as no match, since one bad row is not the
 // cascading failure a rate limit is.
-async function resolveRow(row, { isCancelled, onWaiting }) {
+async function resolveRow(row, { isCancelled, onWaiting, budget }) {
   let errorTries = 0, limitTries = 0;
   for (;;) {
     if (isCancelled()) return { outcome: 'cancelled', remaining: null };
+    // Hold until the window has room for the worst case (a miss, two
+    // requests). This is the backstop under the even pacing between rows.
+    if (budget) {
+      const hold = budget.waitFor(2);
+      if (hold > 0) {
+        onWaiting?.(hold);
+        await sleep(hold, isCancelled);
+        if (isCancelled()) return { outcome: 'cancelled', remaining: null };
+      }
+    }
     const r = await lookupRelease(row);
+    budget?.record(r.requests);
     if (r.outcome === 'limited') {
       if (limitTries >= LIMIT_BACKOFF_MS.length) return { outcome: 'ratelimited', remaining: 0 };
       const wait = LIMIT_BACKOFF_MS[limitTries++];
@@ -96,9 +118,11 @@ function ImportStatusList({ items, listRef }) {
           <span style={{ fontSize: 13, fontFamily: 'monospace', color: it.status === 'skipped' ? 'rgba(var(--fg),0.3)' : 'rgba(var(--fg),0.65)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
             {it.artist ? `${it.artist} - ${it.title}` : (it.title || '(untitled)')}
           </span>
-          {it.status === 'draft'    && tag('draft', 'rgba(240,190,80,0.75)')}
-          {it.status === 'waiting'  && tag('waiting', 'rgba(240,190,80,0.75)')}
-          {it.status === 'skipped'  && tag('duplicate', 'rgba(var(--fg),0.3)')}
+          {it.status === 'draft'   && tag('draft', 'rgba(240,190,80,0.75)')}
+          {/* Name the wait and its length. A bare "waiting" for two minutes
+              reads as a hang; "Discogs busy, 20s" reads as a queue. */}
+          {it.status === 'waiting' && tag(it.waitSec ? `discogs busy ${it.waitSec}s` : 'waiting', 'rgba(240,190,80,0.75)')}
+          {it.status === 'skipped' && tag('duplicate', 'rgba(var(--fg),0.3)')}
         </div>
       ))}
     </div>
@@ -164,11 +188,63 @@ function ImportSummary({ result, total }) {
 
 export { ImportSummary };
 
+// ---- The server-side queue ---------------------------------------------------
+
+const JOB_POLL_MS = 1500;
+const UNFINISHED = ['queued', 'running'];
+
+async function accessToken() {
+  const { data } = await supabase?.auth.getSession() ?? { data: {} };
+  return data?.session?.access_token || null;
+}
+
+// Start the worker now rather than waiting for the next cron tick. Failure is
+// survivable by design: the cron picks the job up within a couple of minutes.
+async function kickWorker() {
+  try {
+    const token = await accessToken();
+    if (!token) return;
+    await fetch('/api/import-worker', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+  } catch { /* the cron is the backstop */ }
+}
+
+async function createJob(userId, kind, rows, overflow) {
+  if (!supabase || !userId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('import_jobs')
+      .insert({ user_id: userId, kind, rows, total: rows.length, overflow })
+      .select('*')
+      .single();
+    if (error || !data?.id) return null;
+    return data;
+  } catch {
+    return null; // no table: run it in the browser instead
+  }
+}
+
+function resultFromJob(job) {
+  return {
+    mode: job.kind === 'retry' ? 'retry' : 'import',
+    added: job.added || 0,
+    skipped: job.skipped || 0,
+    matched: job.matched || 0,
+    drafts: job.drafts || 0,
+    stillUnmatched: (job.total || 0) - (job.matched || 0),
+    stopped: job.status === 'cancelled' || job.status === 'failed',
+    stoppedReason: null,
+    overflow: job.overflow || 0,
+  };
+}
+
+// ---- The hook ----------------------------------------------------------------
+
 // Owns the whole import: parsing, the Discogs fan-out, per-row status, and
 // the final tally. The caller supplies onAddRecordsBulk and renders whatever
-// UI it likes around these values. Pass collection + onUpdateRecord as well to
-// enable the retry pass over rows an earlier import could not match.
-export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } = {}) {
+// UI it likes around these values. collection + onUpdateRecord enable the
+// retry pass over rows an earlier import could not match; userId + onReload
+// enable the server-side queue (onReload pulls in what the worker wrote).
+export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload } = {}) {
   // File import (CSV / text) state
   const [fileImporting, setFileImporting] = useState(false);
   const [fileProgress, setFileProgress] = useState({ done: 0, total: 0, matched: 0 });
@@ -179,12 +255,29 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
   const cancelFileImport = useRef(false);
   const importFileRef = useRef(null);
   const importListRef = useRef(null);
+  // The job this tab is watching, when the run is server-side.
+  const jobIdRef = useRef(null);
 
   // The retry pass reads the collection at the moment it runs, not at the
   // moment the hook rendered.
   const collectionRef = useRef(collection);
   useEffect(() => { collectionRef.current = collection; }, [collection]);
   const unmatchedCount = unmatchedImports(collection).length;
+  // Duplicate drafts, which only exist because a re-import cannot recognise
+  // them: an unmatched row has no Discogs id to de-duplicate on.
+  const dupePlan = planDraftDedupe(collection);
+  const duplicateCount = dupePlan.count;
+
+  // Deleting records is not undoable, so the button asks once. The plan is
+  // recomputed at the moment of the click rather than reusing the one this
+  // render saw, in case the collection moved underneath it.
+  const [confirmDedupe, setConfirmDedupe] = useState(false);
+  function removeDuplicateDrafts() {
+    if (!onRemoveRecord) return;
+    if (!confirmDedupe) { setConfirmDedupe(true); return; }
+    setConfirmDedupe(false);
+    for (const id of planDraftDedupe(collectionRef.current).remove) onRemoveRecord(id);
+  }
 
   // Keep the row currently being processed visible in the scrolling list.
   useEffect(() => {
@@ -196,47 +289,74 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
     setFileResult(null);
     setFileItems([]);
     setFileError('');
+    jobIdRef.current = null;
   }
 
-  const setItemStatus = (idx, status) => setFileItems(prev => {
+  const setItemStatus = (idx, status, extra) => setFileItems(prev => {
     const next = [...prev];
-    if (next[idx]) next[idx] = { ...next[idx], status };
+    if (next[idx]) next[idx] = { ...next[idx], status, ...extra };
     return next;
   });
 
   const isCancelled = () => cancelFileImport.current;
 
-  // Resolve each parsed row against Discogs (vinyl-only search) and bulk-add.
-  // Maximum-recall policy: a row is NEVER dropped. Best match wins (preferring
-  // one with cover art); a row with no match is still added as a draft record
-  // (identified: false) carrying the artist/title, which the user fine-tunes
-  // via Re-identify in the record detail panel, or in bulk via retryUnmatched.
-  // Matched rows use source 'discogs_import' so the existing lazy enrichment
-  // pulls their tracklist on first open.
-  async function handleImportFile(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || fileImporting) return;
-    let rows, overflow = 0;
-    try {
-      // Parse everything, then apply the cap here so the count left behind is
-      // known and can be reported. Silently truncating is how a 900-record
-      // file used to look like a 500-record one that had finished.
-      const all = parseImportRows(await file.text(), Infinity);
-      rows = all.slice(0, IMPORT_ROW_CAP);
-      overflow = all.length - rows.length;
-    } catch {
-      setFileError('Could not read that file.');
-      return;
-    }
-    if (!rows.length) {
-      setFileError('No records found. Use CSV columns like artist,title or lines like "Artist - Title".');
-      return;
-    }
-    cancelFileImport.current = false;
+  // Watch a server-side job until it finishes. Everything shown while it runs
+  // comes from the job row, so closing the tab and coming back mid-import
+  // rejoins the same run rather than starting a new one.
+  const watchJob = useCallback((jobId) => {
+    jobIdRef.current = jobId;
     setFileImporting(true);
-    setFileError('');
-    setFileResult(null);
+    let stop = false;
+    const tick = async () => {
+      if (stop || jobIdRef.current !== jobId) return;
+      const { data: job, error } = await supabase.from('import_jobs').select('*').eq('id', jobId).single();
+      if (error || !job) { setFileImporting(false); return; }
+      const rows = Array.isArray(job.rows) ? job.rows : [];
+      setFileItems(rows.map((r, i) => ({
+        artist: r.artist, title: r.title,
+        status: r.status && r.status !== 'pending' ? r.status : (i === job.cursor && job.status === 'running' ? 'searching' : 'pending'),
+      })));
+      setFileProgress({ done: job.cursor || 0, total: job.total || rows.length, matched: job.matched || 0 });
+      if (UNFINISHED.includes(job.status)) { setTimeout(tick, JOB_POLL_MS); return; }
+      // Done: the records were written by the worker, so pull them in.
+      setFileResult(resultFromJob(job));
+      setFileImporting(false);
+      jobIdRef.current = null;
+      onReload?.();
+    };
+    tick();
+    return () => { stop = true; };
+  }, [onReload]);
+
+  // Rejoin an import left running by an earlier session. This is the whole
+  // point of the queue: the phone locked, the tab closed, the import carried
+  // on, and opening the app shows where it got to.
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('import_jobs').select('*')
+          .eq('user_id', userId).in('status', UNFINISHED)
+          .order('created_at', { ascending: false }).limit(1);
+        const job = data?.[0];
+        if (!job || cancelled) return;
+        watchJob(job.id);
+        kickWorker();
+      } catch { /* no table: nothing to rejoin */ }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, watchJob]);
+
+  // ---- The in-browser fallback ----------------------------------------------
+  //
+  // Resolve each row against Discogs and bulk-add. Maximum-recall policy: a row
+  // is NEVER dropped. Best match wins (preferring one with cover art); a row
+  // with no match is still added as a draft record (identified: false) carrying
+  // the artist/title, fine-tuned later via Re-identify or retryUnmatched.
+  async function runInBrowser(rows, overflow) {
+    const budget = createRateWindow();
     setFileItems(rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })));
     setFileProgress({ done: 0, total: rows.length, matched: 0 });
 
@@ -246,7 +366,10 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
       const row = rows[i];
       setItemStatus(i, 'searching');
 
-      const r = await resolveRow(row, { isCancelled, onWaiting: () => setItemStatus(i, 'waiting') });
+      const r = await resolveRow(row, {
+        isCancelled, budget,
+        onWaiting: (ms) => setItemStatus(i, 'waiting', { waitSec: Math.max(1, Math.round(ms / 1000)) }),
+      });
       if (r.outcome === 'cancelled') { stopped = true; setItemStatus(i, 'pending'); break; }
       if (r.outcome === 'ratelimited') {
         // Rows from here on would all be drafted for a reason that has nothing
@@ -280,10 +403,44 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
       setItemStatus(i, res.skipped ? 'skipped' : (isDraft ? 'draft' : 'added'));
       setFileProgress({ done: i + 1, total: rows.length, matched });
       // Pace the Discogs fan-out off the budget Discogs itself reports.
-      if (i < rows.length - 1) await sleep(gapFor(r.remaining), isCancelled);
+      if (i < rows.length - 1) await sleep(gapFor(r.remaining, r.requests), isCancelled);
     }
     setFileResult({ mode: 'import', added, skipped, matched, drafts, stopped, stoppedReason, overflow });
     setFileImporting(false);
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || fileImporting) return;
+    let rows, overflow = 0;
+    try {
+      // Parse everything, then apply the cap here so the count left behind is
+      // known and can be reported. Silently truncating is how a 900-record
+      // file used to look like a 500-record one that had finished.
+      const all = parseImportRows(await file.text(), Infinity);
+      rows = all.slice(0, IMPORT_ROW_CAP);
+      overflow = all.length - rows.length;
+    } catch {
+      setFileError('Could not read that file.');
+      return;
+    }
+    if (!rows.length) {
+      setFileError('No records found. Use CSV columns like artist,title or lines like "Artist - Title".');
+      return;
+    }
+    cancelFileImport.current = false;
+    setFileImporting(true);
+    setFileError('');
+    setFileResult(null);
+
+    const job = await createJob(userId, 'import', rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })), overflow);
+    if (job) {
+      watchJob(job.id);
+      kickWorker();
+      return;
+    }
+    await runInBrowser(rows, overflow);
   }
 
   // Second pass over rows an earlier import could not match. They cannot be
@@ -294,12 +451,23 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
   async function retryUnmatched() {
     if (fileImporting) return;
     const drafts = unmatchedImports(collectionRef.current);
-    if (!drafts.length || !onUpdateRecord) return;
+    if (!drafts.length) return;
 
     cancelFileImport.current = false;
     setFileImporting(true);
     setFileError('');
     setFileResult(null);
+
+    const job = await createJob(userId, 'retry',
+      drafts.map(d => ({ artist: d.artist, title: d.title, recordId: d.id, status: 'pending' })), 0);
+    if (job) {
+      watchJob(job.id);
+      kickWorker();
+      return;
+    }
+
+    if (!onUpdateRecord) { setFileImporting(false); return; }
+    const budget = createRateWindow();
     setFileItems(drafts.map(d => ({ artist: d.artist, title: d.title, status: 'pending' })));
     setFileProgress({ done: 0, total: drafts.length, matched: 0 });
 
@@ -309,7 +477,10 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
       const draft = drafts[i];
       setItemStatus(i, 'searching');
 
-      const r = await resolveRow({ artist: draft.artist, title: draft.title }, { isCancelled, onWaiting: () => setItemStatus(i, 'waiting') });
+      const r = await resolveRow({ artist: draft.artist, title: draft.title }, {
+        isCancelled, budget,
+        onWaiting: (ms) => setItemStatus(i, 'waiting', { waitSec: Math.max(1, Math.round(ms / 1000)) }),
+      });
       if (r.outcome === 'cancelled') { stopped = true; setItemStatus(i, 'pending'); break; }
       if (r.outcome === 'ratelimited') { stopped = true; stoppedReason = 'ratelimit'; setItemStatus(i, 'pending'); break; }
 
@@ -337,7 +508,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
         setItemStatus(i, 'draft');
       }
       setFileProgress({ done: i + 1, total: drafts.length, matched });
-      if (i < drafts.length - 1) await sleep(gapFor(r.remaining), isCancelled);
+      if (i < drafts.length - 1) await sleep(gapFor(r.remaining, r.requests), isCancelled);
     }
     setFileResult({
       mode: 'retry', matched, drafts: 0, added: 0, skipped: 0,
@@ -346,10 +517,19 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord } =
     setFileImporting(false);
   }
 
+  // Stop here. A server-side run is cancelled by marking the job: the worker
+  // checks before every few rows, so it stops wherever it has got to.
+  function stopImport() {
+    cancelFileImport.current = true;
+    const jobId = jobIdRef.current;
+    if (jobId && supabase) supabase.from('import_jobs').update({ status: 'cancelled' }).eq('id', jobId).then(() => {}, () => {});
+  }
+
   return {
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     cancelFileImport, importFileRef, importListRef,
-    resetFileImport, handleImportFile,
+    resetFileImport, handleImportFile, stopImport,
     unmatchedCount, retryUnmatched,
+    duplicateCount, confirmDedupe, removeDuplicateDrafts,
   };
 }

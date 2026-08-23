@@ -76,6 +76,7 @@ api/                   # Vercel serverless functions (all secret keys live here)
   scan.js              # image -> Claude vision -> record identification
   identify.js          # single record identification
   discogs-search.js    # Discogs search proxy
+  import-worker.js     # background file-import worker (cron + on-demand)
   spotify-features.js  # Spotify preview lookup (audio-features is dead; see lib/spotify.js)
   bpm-report.js        # client waveform BPM results -> shared track_bpm cache
   bpm-arbiter.js       # Claude picks between octave-ambiguous BPM candidates (87 vs 174)
@@ -95,13 +96,14 @@ scripts/
 supabase/
   schema.sql           # full schema (run on a fresh project)
   storage.sql          # storage buckets: avatars (profile photos), covers (cached cover art)
+  import-jobs.sql      # background import queue + claim_import_job
   bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
 ```
 
 ## Security rules
 
 - **All API keys (Anthropic, Discogs, Spotify) live in Vercel environment variables and are accessed only from `/api/*.js` handlers. Never expose them to the client.**
-- **Any endpoint that spends money or third-party quota must call `requireAuth`** (see `api/lib/auth.js`), and the client must send `Authorization: Bearer <token>` using `freshAccessToken()`. Endpoints that legitimately cannot: `stripe-webhook` (verified by Stripe signature), `unsubscribe` (clicked from email, HMAC-signed), and `image-proxy` / `audio-proxy` (loaded by `<img>` / `<audio>`, which cannot send headers). Still unprotected and worth closing: `discogs-search`, `discogs-release`, `discogs-import`, `spotify-features` -- these burn the shared Discogs/Spotify rate limit rather than money, so abuse degrades scanning for everyone.
+- **Any endpoint that spends money or third-party quota must call `requireAuth`** (see `api/lib/auth.js`), and the client must send `Authorization: Bearer <token>` using `freshAccessToken()`. Endpoints that legitimately cannot: `stripe-webhook` (verified by Stripe signature), `unsubscribe` (clicked from email, HMAC-signed), and `image-proxy` / `audio-proxy` (loaded by `<img>` / `<audio>`, which cannot send headers). `import-worker` accepts the `CRON_SECRET` bearer (or the `x-vercel-cron` stamp) for the scheduled run and `requireAuth` for the on-demand kick, and is never open. Still unprotected and worth closing: `discogs-search`, `discogs-release`, `discogs-import`, `spotify-features` -- these burn the shared Discogs/Spotify rate limit rather than money, so abuse degrades scanning for everyone.
 - No em dashes anywhere -- in code comments, docs, copy, or UI strings.
 
 ## Environment variables
@@ -112,6 +114,7 @@ supabase/
 - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` -- Spotify BPM/key lookup
 - `GETSONGBPM_API_KEY` -- GetSongBPM (first-pass BPM by artist + title). Free key from getsongbpm.com/api. Requires a visible dofollow backlink to getsongbpm.com (rendered in the Tracks view) or the account is suspended.
 - `UNSUBSCRIBE_SECRET` -- HMAC secret for campaign unsubscribe links (`/api/unsubscribe`). Must match the value used by `scripts/send-campaign.mjs` at send time.
+- `CRON_SECRET` -- shared secret Vercel sends as the bearer on cron requests to `/api/import-worker`. Optional but recommended: without it the endpoint falls back to trusting the `x-vercel-cron` header (which Vercel strips from external requests) or a signed-in user's token.
 
 ### Vercel (client-side, exposed to browser)
 - `VITE_SUPABASE_URL` -- Supabase project URL
@@ -162,6 +165,7 @@ create policy "profiles_self_update" on public.profiles
 Also run when updating an existing database:
 - the `records_exist` function from `supabase/social-schema.sql` (accurate chat thumbnail existence check)
 - the `covers` bucket section from `supabase/storage.sql` (cover art caching)
+- `supabase/import-jobs.sql` (background file imports; until it is run, imports keep running in the browser and stop when the tab does)
 - `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
 
 ## Data model
@@ -293,11 +297,42 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   run can pace itself (`src/lib/importBudget.js`, unit-tested). The import
   waits out a 429 and retries the row; after a full 60s window it stops the
   run rather than drafting the rest of the file. Two things caused the
-  original incident, and both must hold: a manual lookup costs **one** Discogs
-  request, with the fuzzy `q` query held back as a fallback and fired only
-  when the targeted search comes up empty (`searchDiscogs`, `manual: true`);
-  and rows are paced off Discogs's own `X-Discogs-Ratelimit-Remaining`.
-  Guarded by `stress/import.spec.mjs`.
+  original incident, and both must hold: a lookup that matches costs **one**
+  Discogs request, with the fuzzy `q` query held back as a fallback and fired
+  only when the targeted search comes up empty (`searchDiscogs`,
+  `manual: true`); and the run is paced **per request, not per row**.
+  `/api/discogs-search` reports both `remaining`
+  (`X-Discogs-Ratelimit-Remaining`) and `requests` (what the lookup actually
+  spent) for that reason: a row that misses costs two requests, so a list of
+  obscure records paced per row runs at nearly double the budget and trips the
+  limiter anyway. That was the second version of this bug. `IMPORT_RATE_CAP`
+  (`src/lib/importBudget.js`) is 45 of the 60 a minute, leaving the rest for
+  live scanning, and `createRateWindow` is a sliding-window backstop under the
+  even pacing. Guarded by `stress/import.spec.mjs`.
+- **Duplicate drafts, and why they exist**: record identity is the Discogs
+  release id, so an unmatched row (which has none) cannot be de-duplicated on
+  import: upload the same file twice and every unmatched row lands twice.
+  `planDraftDedupe` (`src/lib/draftDuplicates.js`, unit-tested) finds the
+  redundant copies, drives "Remove duplicates" beside "Match unmatched", and
+  follows two rules that must not be relaxed: an identified record always beats
+  a draft (a draft is the copy that loses, never the other way round), and a
+  bracketed suffix is part of the title, because with no release id to check
+  against, "Acid Cowboy (Multi Culti)" and "Acid Cowboy" may well be different
+  pressings and deleting a record cannot be undone.
+- **An import outlives the tab that started it**: rows become a row in
+  `public.import_jobs` (`supabase/import-jobs.sql`), `/api/import-worker`
+  drains them with the service role, and a Vercel cron (`vercel.json`, every
+  two minutes) re-claims anything unfinished. The tab that creates a job calls
+  the worker once so it starts immediately, then only watches the job row, so
+  a locked phone or a closed browser no longer abandons the rest of the list;
+  reopening the app rejoins the same run. Double-processing is prevented by
+  `claim_import_job` (`for update skip locked` + `locked_until`) -- a double
+  claim would add every record twice, and a bulk import cannot be un-done.
+  **The in-browser loop is still there and still maintained**: it is the
+  fallback whenever the job insert fails (the migration has not been run on
+  this database), so the two paths must keep producing the same records.
+  `api/lib/importRecord.js` mirrors `recordFromRelease`'s whitelist for exactly
+  that reason, checked by `api/lib/__tests__/import-record.test.js`.
 - **Unmatched imports can only be repaired in place**: de-duplication keys on
   the Discogs release id (`addRecordsBulk`) and a draft has none, so importing
   the same file again adds a second copy of every unmatched row rather than

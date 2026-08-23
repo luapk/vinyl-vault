@@ -24,7 +24,7 @@ async function stubSearch(context, handler) {
     }
     return route.fulfill({
       status: 200, contentType: 'application/json',
-      body: JSON.stringify({ matches: reply.matches || [], remaining: 55 }),
+      body: JSON.stringify({ matches: reply.matches || [], remaining: 55, requests: reply.matches?.length ? 1 : 2 }),
     });
   });
 }
@@ -39,8 +39,8 @@ test('a rate-limited lookup waits, and never files the record as unmatched', asy
     { artist: 'Konduku', title: 'Parlama' },
   ]));
 
-  // The row parks itself rather than resolving to a draft.
-  await expect(page.getByText('waiting', { exact: true })).toBeVisible({ timeout: 20_000 });
+  // The row parks itself rather than resolving to a draft, and says why.
+  await expect(page.getByText(/discogs busy/i)).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('draft', { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Stop here' }).click();
@@ -87,4 +87,34 @@ test('Match unmatched repairs rows an earlier import could not match', async ({ 
 
   await expect(page.getByText('Matched 2 of 2')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('draft', { exact: true })).toHaveCount(0);
+});
+
+test('duplicate drafts can be cleared out in one go', async ({ page, context }) => {
+  await stubApi(context);
+  await stubSearch(context, () => ({ matches: [] }));
+  await signIn(page);
+
+  const file = () => csvFile([
+    { artist: 'Herbert', title: 'Part 4' },
+    { artist: 'Klockworks', title: '04' },
+  ]);
+
+  await fileImportInput(page).setInputFiles(file());
+  await expect(page.getByText('Added 2 records')).toBeVisible({ timeout: 30_000 });
+
+  // The same file again. An unmatched row has no Discogs id, so nothing
+  // recognises it as already present and both rows land a second time.
+  await page.getByRole('button', { name: 'Done' }).click();
+  await fileImportInput(page).setInputFiles(file());
+  await expect(page.getByText('Added 2 records')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('draft', { exact: true })).toHaveCount(2);
+
+  // Two of the four are now redundant. Deleting is not undoable, so it asks.
+  await page.getByRole('button', { name: /Remove duplicates \(2\)/ }).click();
+  await page.getByRole('button', { name: /Delete 2\? Tap again/ }).click();
+
+  await expect(page.getByRole('button', { name: /Remove duplicates/ })).toHaveCount(0);
+  await expect.poll(async () => (await mockState()).records.length, {
+    timeout: 20_000, message: 'the two duplicate drafts should be deleted',
+  }).toBe(2);
 });
