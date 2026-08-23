@@ -14,6 +14,7 @@ import { Check } from '@phosphor-icons/react';
 import { parseImportRows, IMPORT_ROW_CAP } from '../lib/importParse.js';
 import { gapFor, createRateWindow, LIMIT_BACKOFF_MS, unmatchedImports } from '../lib/importBudget.js';
 import { planDraftDedupe } from '../lib/draftDuplicates.js';
+import { inspectImportShape } from '../lib/importShape.js';
 import { supabase } from '../lib/supabase.js';
 
 // Sleep in slices so cancelling does not have to wait out a long backoff.
@@ -188,6 +189,46 @@ function ImportSummary({ result, total }) {
 
 export { ImportSummary };
 
+// Shown instead of importing when the file looks like a tracklist rather than
+// a list of releases. It offers the thing the user almost certainly meant:
+// column one held the release all along, so the same file read that way is a
+// list of records. Importing it as it stands is still offered, because being
+// told what your own file is and not being allowed to proceed is worse than
+// the mistake.
+function ImportShapeWarning({ shape, rowCount, onReleases, onAsIs, onCancel }) {
+  const amber = 'rgba(240,190,80,0.85)';
+  const button = (primary) => ({
+    display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 9,
+    fontSize: 15, fontWeight: primary ? 600 : 500, cursor: 'pointer',
+    color: primary ? 'var(--bg-hex)' : 'rgba(var(--fg),0.7)',
+    background: primary ? 'rgba(var(--fg),0.9)' : 'rgba(var(--fg),0.05)',
+    border: primary ? 'none' : '1px solid rgba(var(--fg),0.12)',
+  });
+  return (
+    <div>
+      <p style={{ fontSize: 15, fontFamily: 'monospace', color: amber, marginBottom: 8 }}>
+        This file looks like a tracklist, not a list of records.
+      </p>
+      <ul style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', lineHeight: 1.6, marginBottom: 10, paddingLeft: 16 }}>
+        {shape.reasons.map(r => <li key={r} style={{ listStyle: 'disc' }}>{r}</li>)}
+      </ul>
+      <p style={{ fontSize: 14, fontFamily: 'monospace', color: 'rgba(var(--fg),0.5)', lineHeight: 1.6, marginBottom: 12 }}>
+        Imported as it stands that is {rowCount} rows, one per track, and most
+        will not match a release. Read as records it is {shape.releases.length}.
+      </p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={onReleases} style={button(true)}>
+          Import {shape.releases.length} record{shape.releases.length === 1 ? '' : 's'}
+        </button>
+        <button onClick={onAsIs} style={button(false)}>Import all {rowCount} rows as they are</button>
+        <button onClick={onCancel} style={{ ...button(false), background: 'transparent', border: 'none' }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+export { ImportShapeWarning };
+
 // ---- The server-side queue ---------------------------------------------------
 
 const JOB_POLL_MS = 1500;
@@ -257,6 +298,9 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
   const importListRef = useRef(null);
   // The job this tab is watching, when the run is server-side.
   const jobIdRef = useRef(null);
+  // Set when a file's shape is questioned: the parsed rows are held here
+  // rather than imported, until the user says how to read them.
+  const [fileConfirm, setFileConfirm] = useState(null);
 
   // The retry pass reads the collection at the moment it runs, not at the
   // moment the hook rendered.
@@ -289,6 +333,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     setFileResult(null);
     setFileItems([]);
     setFileError('');
+    setFileConfirm(null);
     jobIdRef.current = null;
   }
 
@@ -409,6 +454,22 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     setFileImporting(false);
   }
 
+  async function startImport(rows, overflow) {
+    cancelFileImport.current = false;
+    setFileConfirm(null);
+    setFileImporting(true);
+    setFileError('');
+    setFileResult(null);
+
+    const job = await createJob(userId, 'import', rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })), overflow);
+    if (job) {
+      watchJob(job.id);
+      kickWorker();
+      return;
+    }
+    await runInBrowser(rows, overflow);
+  }
+
   async function handleImportFile(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -429,18 +490,28 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
       setFileError('No records found. Use CSV columns like artist,title or lines like "Artist - Title".');
       return;
     }
-    cancelFileImport.current = false;
-    setFileImporting(true);
-    setFileError('');
-    setFileResult(null);
 
-    const job = await createJob(userId, 'import', rows.map(r => ({ artist: r.artist, title: r.title, status: 'pending' })), overflow);
-    if (job) {
-      watchJob(job.id);
-      kickWorker();
+    // Ask before importing a file whose shape says tracklist. The parser reads
+    // column one as the artist, which is right for every ordinary export and
+    // exactly wrong for a release/track listing -- 432 unmatchable rows wrong,
+    // the one time it happened.
+    const shape = inspectImportShape(rows);
+    if (shape.looksLikeTracklist && shape.releases.length) {
+      setFileError('');
+      setFileResult(null);
+      setFileConfirm({ rows, overflow, shape });
       return;
     }
-    await runInBrowser(rows, overflow);
+
+    await startImport(rows, overflow);
+  }
+
+  // The user's answer to that question.
+  function confirmImport(how) {
+    const pending = fileConfirm;
+    if (!pending) return;
+    if (how === 'releases') return startImport(pending.shape.releases, pending.overflow);
+    return startImport(pending.rows, pending.overflow);
   }
 
   // Second pass over rows an earlier import could not match. They cannot be
@@ -529,6 +600,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     cancelFileImport, importFileRef, importListRef,
     resetFileImport, handleImportFile, stopImport,
+    fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
   };

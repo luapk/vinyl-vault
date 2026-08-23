@@ -73,6 +73,16 @@ export function csvFile(rows) {
   return { name: 'import.csv', mimeType: 'text/csv', buffer: Buffer.from(body) };
 }
 
+// A file in the shape that caused the incident: column one is the release,
+// column two is a track, so every release appears once per track.
+export function trackListFile(releases) {
+  const lines = [];
+  for (const [release, tracks] of releases) {
+    tracks.forEach((t, i) => lines.push(`"${release}","${'AB'[i % 2]}${i + 1}. ${t}"`));
+  }
+  return { name: 'tracks.csv', mimeType: 'text/csv', buffer: Buffer.from(lines.join('\n')) };
+}
+
 // Open Account modal -> Import from file section.
 // The file import is reached straight from the home screen's Import card, so
 // there is nothing to open first. The account panel offers the same import

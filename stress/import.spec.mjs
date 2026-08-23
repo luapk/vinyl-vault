@@ -7,7 +7,7 @@
 // importer read as "no such record" and filed accordingly. A rate limit must
 // never decide what a record is.
 import { test, expect } from '@playwright/test';
-import { resetMock, mockState, signIn, stubApi, csvFile, discogsMatch, fileImportInput } from './helpers.mjs';
+import { resetMock, mockState, signIn, stubApi, csvFile, trackListFile, discogsMatch, fileImportInput } from './helpers.mjs';
 
 test.beforeEach(async () => { await resetMock(); });
 
@@ -117,4 +117,45 @@ test('duplicate drafts can be cleared out in one go', async ({ page, context }) 
   await expect.poll(async () => (await mockState()).records.length, {
     timeout: 20_000, message: 'the two duplicate drafts should be deleted',
   }).toBe(2);
+});
+
+test('a tracklist is questioned before it becomes hundreds of unmatchable rows', async ({ page, context }) => {
+  await stubApi(context);
+  let n = 0;
+  await stubSearch(context, () => ({ matches: [discogsMatch(++n)] }));
+  await signIn(page);
+
+  // Four releases, thirteen tracks between them. Imported as it stands that is
+  // thirteen records, none of them a release.
+  await fileImportInput(page).setInputFiles(trackListFile([
+    ['Bicep - Isles LP', ['Sundial', 'Atlas', 'Apricots', 'Cazenove']],
+    ['Gunnar Haslam - Seasick Acid', ['Seasick Acid', 'Tidal Lock', 'Undertow']],
+    ['Aloka - View Source', ['Blind Spot', 'Refract', 'Third Rail']],
+    ['Axel Boman - LUZ', ['Jeremy Irons', 'Ocelot', 'Fantasia']],
+  ]));
+
+  // Nothing is imported until the question is answered.
+  await expect(page.getByText(/looks like a tracklist/i)).toBeVisible({ timeout: 20_000 });
+  expect((await mockState()).records).toHaveLength(0);
+
+  await page.getByRole('button', { name: /Import 4 records/ }).click();
+
+  await expect(page.getByText('Added 4 records')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await mockState()).records.length, { timeout: 20_000 }).toBe(4);
+});
+
+test('an ordinary release list is never questioned', async ({ page, context }) => {
+  await stubApi(context);
+  let n = 0;
+  await stubSearch(context, () => ({ matches: [discogsMatch(++n)] }));
+  await signIn(page);
+
+  await fileImportInput(page).setInputFiles(csvFile([
+    { artist: 'Kraftwerk', title: 'The Mix' },
+    { artist: 'Daniel Avery', title: 'Drone Logic' },
+    { artist: 'Maurizio', title: 'M6' },
+  ]));
+
+  await expect(page.getByText('Added 3 records')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/looks like a tracklist/i)).toHaveCount(0);
 });

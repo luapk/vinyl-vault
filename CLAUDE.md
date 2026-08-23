@@ -325,6 +325,20 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   (`src/lib/importBudget.js`) is 45 of the 60 a minute, leaving the rest for
   live scanning, and `createRateWindow` is a sliding-window backstop under the
   even pacing. Guarded by `stress/import.spec.mjs`.
+- **A file that looks like a tracklist is questioned, not imported**: the
+  parser reads column one as the artist, which is right for every ordinary
+  export and exactly wrong for a release/track listing, where column one is the
+  release and column two a track. That shape once produced 432 unmatchable
+  drafts in a single upload before anyone noticed. `inspectImportShape`
+  (`src/lib/importShape.js`, unit-tested) looks for the giveaways -- titles
+  opening with a side and position ("B1."), a separator in the first column, an
+  entry repeating once per track -- and the import stops to ask. The offer that
+  matters is the third one: column one held the release all along, so
+  `releasesFromTrackRows` reads the same file as records and the user imports
+  those instead. Importing as it stands stays available, because being told
+  what your own file is and not being allowed to proceed is worse than the
+  mistake. Thresholds are deliberately not near-certain: asking about a good
+  file costs one tap. Guarded by `stress/import.spec.mjs`, both ways round.
 - **Duplicate drafts, and why they exist**: record identity is the Discogs
   release id, so an unmatched row (which has none) cannot be de-duplicated on
   import: upload the same file twice and every unmatched row lands twice.

@@ -24,7 +24,7 @@ import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
-import { useFileImport, ImportStatusList, ImportSummary } from './FileImport.jsx';
+import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
@@ -1818,7 +1818,8 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
   const {
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     importFileRef, importListRef, resetFileImport, handleImportFile,
-    stopImport, unmatchedCount, retryUnmatched,
+    stopImport, fileConfirm, confirmImport,
+    unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
   } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload });
   const [recs, setRecs] = useState([]);
@@ -1948,10 +1949,10 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
 
       {/* Import progress. A sheet rather than inline, so a long list does not
           push the three cards off the screen they were just made to fit. */}
-      {(fileImporting || fileResult || fileError) && (
+      {(fileImporting || fileResult || fileError || fileConfirm) && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-          onClick={() => { if (!fileImporting) resetFileImport(); }}>
+          onClick={() => { if (!fileImporting && !fileConfirm) resetFileImport(); }}>
           <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6"
             style={{ background: 'rgba(var(--bg),0.97)', border: '1px solid rgba(var(--fg),0.10)', boxShadow: '0 32px 64px rgba(0,0,0,0.5)', maxHeight: '92vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}>
@@ -1964,6 +1965,16 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
                 </button>
               )}
             </div>
+
+            {fileConfirm && !fileImporting && (
+              <ImportShapeWarning
+                shape={fileConfirm.shape}
+                rowCount={fileConfirm.rows.length}
+                onReleases={() => confirmImport('releases')}
+                onAsIs={() => confirmImport('asis')}
+                onCancel={resetFileImport}
+              />
+            )}
 
             {fileError && !fileImporting && !fileResult && (
               <p style={{ fontSize: 14, color: '#fca5a5', fontFamily: 'monospace', marginBottom: 12 }}>{fileError}</p>
@@ -4200,6 +4211,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     importFileRef, importListRef,
     resetFileImport, handleImportFile, stopImport,
+    fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
   } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId: user?.id, onReload });
@@ -4572,7 +4584,16 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
 
           <AccountSection label="Import from file" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
             <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
-            {!fileImporting && !fileResult && (
+            {fileConfirm && !fileImporting && (
+              <ImportShapeWarning
+                shape={fileConfirm.shape}
+                rowCount={fileConfirm.rows.length}
+                onReleases={() => confirmImport('releases')}
+                onAsIs={() => confirmImport('asis')}
+                onCancel={resetFileImport}
+              />
+            )}
+            {!fileImporting && !fileResult && !fileConfirm && (
               <>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', lineHeight: 1.6, marginBottom: 12 }}>
                   Upload a list of records. Each row is matched to the most likely vinyl release; anything unmatched is added as a draft to fine-tune with Re-identify.
