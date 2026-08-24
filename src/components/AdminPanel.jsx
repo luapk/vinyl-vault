@@ -26,8 +26,24 @@ export default function AdminPanel({ onBack }) {
       // authenticated role (see supabase/profile-privacy.sql) precisely so a
       // public profile cannot leak it, and an admin is just another
       // authenticated user. The function checks is_admin() before answering.
-      const { data: profiles, error } = await supabase.rpc('admin_list_users');
-      if (error) throw error;
+      //
+      // The table read stays as the fallback for a database where that
+      // migration has not been run yet. Shipping the client ahead of the SQL
+      // is exactly what happened here: the panel came up empty, reporting a
+      // missing function, on a database that was answering perfectly well.
+      // A screen must not break because a migration is outstanding.
+      const rpc = await supabase.rpc('admin_list_users');
+      let profiles = Array.isArray(rpc.data) ? rpc.data : null;
+      if (!profiles) {
+        const direct = await supabase
+          .from('profiles')
+          .select('id, email, role, created_at, display_name, username, is_public, subscription_tier, subscription_status')
+          .order('created_at', { ascending: true });
+        // Both routes failing means the migration is half-applied; the RPC
+        // error is the one that says so.
+        if (direct.error) throw rpc.error || direct.error;
+        profiles = direct.data || [];
+      }
 
       // Count records per user.
       const { data: counts } = await supabase
