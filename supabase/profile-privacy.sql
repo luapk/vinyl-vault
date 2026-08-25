@@ -20,8 +20,20 @@
 --
 -- Run this in the Supabase SQL editor.
 
-revoke select (email, stripe_customer_id, stripe_subscription_id)
-  on public.profiles from anon, authenticated;
+-- A column-level REVOKE cannot subtract from a table-wide GRANT. anon and
+-- authenticated held plain SELECT on the whole table, so
+--   revoke select (email, ...) on public.profiles from anon, authenticated;
+-- reported success and changed nothing at all: has_column_privilege still
+-- said true afterwards. Drop the table-wide grant, then grant back every
+-- column except the three. A new column added to this table is NOT readable
+-- until it is added to this list, which is the right way round.
+revoke select on public.profiles from anon, authenticated;
+
+grant select (
+  id, role, avatar_url, marketing_opt_out, is_public, created_at,
+  display_name, username, bio, preferences,
+  subscription_tier, subscription_status, scans_this_period, scans_period_end
+) on public.profiles to anon, authenticated;
 
 -- The admin panel is the one screen that legitimately shows other people's
 -- email addresses. It cannot go through the grant above (an admin is just
@@ -56,3 +68,10 @@ $$;
 -- out, there is nothing to be an admin of.
 revoke all on function public.admin_list_users() from public, anon;
 grant execute on function public.admin_list_users() to authenticated;
+
+-- Verify, rather than assume it took:
+--   select column_name,
+--          has_column_privilege('anon','public.profiles',column_name,'SELECT')
+--     from information_schema.columns
+--    where table_schema='public' and table_name='profiles';
+-- email, stripe_customer_id and stripe_subscription_id must come back false.
