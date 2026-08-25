@@ -22,7 +22,27 @@ describe('flagFor', () => {
 
   it('treats Discogs regions as regions', () => {
     expect(flagFor('Europe')).toBe('🇪🇺');
-    expect(flagFor('UK & Europe')).toBe('🇪🇺');
+    expect(flagFor('EU')).toBe('🇪🇺');
+  });
+
+  // A third of this collection's non-UK records are multi-territory presses.
+  it('shows every territory of a combined release', () => {
+    expect(flagFor('UK & Europe')).toBe('🇬🇧🇪🇺');
+    expect(flagFor('UK, Europe & US')).toBe('🇬🇧🇪🇺🇺🇸');
+    expect(flagFor('USA & Canada')).toBe('🇺🇸🇨🇦');
+    expect(flagFor('UK & Ireland')).toBe('🇬🇧🇮🇪');
+    expect(flagFor('USA, Canada & UK')).toBe('🇺🇸🇨🇦🇬🇧');
+  });
+
+  // The whole string is tried first, or this would split into two countries.
+  it('does not mistake Trinidad & Tobago for a combined release', () => {
+    expect(flagFor('Trinidad & Tobago')).toBe('🇹🇹');
+  });
+
+  // Showing a lone French flag would read as a French pressing, which it is not.
+  it('is all or nothing on a combination it cannot fully resolve', () => {
+    expect(flagFor('France & Benelux')).toBe(null);
+    expect(countryLabel('France & Benelux')).toBe('France & Benelux');
   });
 
   // Inventing a successor state's flag would be wrong on the sleeve in the
@@ -60,5 +80,28 @@ describe('countryLabel', () => {
   it('is empty for no country, so a meta row does not show a stray separator', () => {
     expect(countryLabel(null)).toBe('');
     expect(countryLabel('   ')).toBe('');
+  });
+});
+
+// Every distinct country string in the live collection, most common first.
+// Read from the database rather than assumed: these are Discogs' own spellings.
+const REAL = [
+  'UK', 'Europe', 'US', 'Germany', 'UK & Europe', 'South Africa', 'Netherlands',
+  'Italy', 'France', 'UK, Europe & US', 'Belgium', 'Canada', 'Sweden',
+  'USA & Europe', 'Spain', 'Unknown', 'Japan', 'Portugal', 'Norway', 'Worldwide',
+  'Australia', 'Poland', 'UK & Ireland', 'Czech Republic', 'EU', 'Greece',
+  'Iceland', 'Singapore', 'USA & Canada', 'USA, Canada & Europe', 'Denmark',
+  'France & Benelux', 'Romania', 'Scandinavia', 'South Korea', 'Switzerland',
+  'Thailand', 'UK & US', 'USA, Canada & UK',
+];
+
+describe('against the countries actually in the collection', () => {
+  it('never loses the country name, flag or no flag', () => {
+    for (const c of REAL) expect(countryLabel(c)).toContain(c);
+  });
+
+  it('has a flag for all but the four that cannot have one', () => {
+    const flagless = REAL.filter(c => !flagFor(c));
+    expect(flagless.sort()).toEqual(['France & Benelux', 'Scandinavia', 'Unknown', 'Worldwide']);
   });
 });

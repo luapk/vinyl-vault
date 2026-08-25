@@ -30,10 +30,17 @@ const ISO = {
   egypt: 'EG', nigeria: 'NG', ghana: 'GH', kenya: 'KE', jamaica: 'JM',
   cuba: 'CU', 'puerto rico': 'PR', 'trinidad & tobago': 'TT',
 
-  // Regions Discogs uses in place of a country.
-  europe: 'EU', 'uk & europe': 'EU', 'europe & uk': 'EU',
-  'usa & canada': 'US', 'us & canada': 'US',
+  // Regions Discogs uses in place of a country. "EU" and "Europe" both occur.
+  europe: 'EU', eu: 'EU',
 };
+
+// Discogs joins territories with commas and ampersands: "UK, Europe & US",
+// "USA & Canada", "UK & Ireland". Split on these AFTER trying the whole string,
+// because "Trinidad & Tobago" is one country carrying an ampersand.
+const TERRITORY_SEPARATOR = /\s*(?:,|&|\band\b)\s*/i;
+// Three is the widest combination that occurs. More than that would be a wall
+// of flags in a meta row that also has to carry the year and the format.
+const MAX_TERRITORIES = 3;
 
 // No emoji flag exists for a state that no longer does, and inventing a
 // successor's flag would be wrong on the sleeve in the user's hand. These are
@@ -51,8 +58,19 @@ function toFlag(iso) {
 export function flagFor(country) {
   const key = String(country || '').trim().toLowerCase();
   if (!key || NO_FLAG.has(key)) return null;
-  const iso = ISO[key];
-  return iso ? toFlag(iso) : null;
+  if (ISO[key]) return toFlag(ISO[key]);
+
+  // A combined release shows each territory it was pressed for.
+  const parts = key.split(TERRITORY_SEPARATOR).map(p => p.trim()).filter(Boolean);
+  if (parts.length < 2 || parts.length > MAX_TERRITORIES) return null;
+  const flags = [];
+  for (const part of parts) {
+    // All or nothing. "France & Benelux" has no flag for Benelux, and showing
+    // a lone French flag would read as a French pressing, which it is not.
+    if (NO_FLAG.has(part) || !ISO[part]) return null;
+    flags.push(toFlag(ISO[part]));
+  }
+  return flags.join('');
 }
 
 // Country with its flag, for a one-line meta row. Falls back to the bare name.
@@ -62,3 +80,28 @@ export function countryLabel(country) {
   const flag = flagFor(name);
   return flag ? `${flag} ${name}` : name;
 }
+
+// Suggestions for the country field on the manual search.
+//
+// The first block is every country string that actually appears in a real
+// collection, read from the database and ordered by how often it occurs, so
+// the common answers are the first ones offered. Discogs has its own
+// spellings ("UK", not "United Kingdom"), and typing a near miss is the whole
+// problem this list exists to prevent. The rest are ordinary Discogs country
+// names, alphabetically, for the pressings a collection has not reached yet.
+export const DISCOGS_COUNTRIES = [
+  'UK', 'Europe', 'US', 'Germany', 'UK & Europe', 'South Africa', 'Netherlands',
+  'Italy', 'France', 'UK, Europe & US', 'Belgium', 'Canada', 'Sweden',
+  'USA & Europe', 'Spain', 'Japan', 'Portugal', 'Norway', 'Australia', 'Poland',
+  'UK & Ireland', 'Czech Republic', 'Greece', 'Iceland', 'Singapore',
+  'USA & Canada', 'USA, Canada & Europe', 'Denmark', 'Romania', 'South Korea',
+  'Switzerland', 'Thailand', 'UK & US',
+
+  'Argentina', 'Austria', 'Brazil', 'Bulgaria', 'Chile', 'China', 'Colombia',
+  'Croatia', 'Cuba', 'Cyprus', 'Egypt', 'Estonia', 'Finland', 'Ghana',
+  'Hong Kong', 'Hungary', 'India', 'Indonesia', 'Ireland', 'Israel', 'Jamaica',
+  'Kenya', 'Latvia', 'Lithuania', 'Luxembourg', 'Malaysia', 'Malta', 'Mexico',
+  'New Zealand', 'Nigeria', 'Peru', 'Philippines', 'Puerto Rico', 'Russia',
+  'Serbia', 'Slovakia', 'Slovenia', 'Taiwan', 'Trinidad & Tobago', 'Turkey',
+  'Ukraine', 'Uruguay', 'Venezuela',
+];

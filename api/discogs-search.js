@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'Discogs not configured', matches: [] });
   }
 
-  const { artist, title, catalogNumber } = req.body || {};
+  const { artist, title, catalogNumber, country } = req.body || {};
 
   // meta carries Discogs's own rate-limit state back out of the search. A
   // caller has to be able to tell "Discogs would not answer" from "no such
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const meta = { rateLimited: false, remaining: null, requests: 0 };
 
   try {
-    const matches = await searchDiscogs({ artist, title, catalogNumber, manual: true, meta });
+    const matches = await searchDiscogs({ artist, title, catalogNumber, country, manual: true, meta });
     if (!matches.length && meta.rateLimited) {
       return res.status(429).json({
         error: 'Discogs rate limit reached', rateLimited: true,

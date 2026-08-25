@@ -407,13 +407,23 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   record are not offers about the next one. Shown only when there was a real
   choice (more than one result). Guarded by `stress/import.spec.mjs`, which
   asserts the return costs zero extra Discogs requests.
-- **Country carries a flag**: `countryLabel` (`src/lib/countryFlag.js`,
-  unit-tested) prefixes the flag emoji on every candidate card, in the
-  disambiguation grid and the manual search alike, because country is what
-  tells a UK pressing from a German one. Discogs uses its own vocabulary
-  ("UK", not "United Kingdom") and includes states that no longer exist, so
-  anything unrecognised returns null and the name prints alone. Yugoslavia,
-  the USSR and the GDR deliberately get no flag rather than a successor's.
+- **Country carries a flag, and can be searched on**: `countryLabel`
+  (`src/lib/countryFlag.js`, unit-tested) prefixes the flag emoji on every
+  candidate card, in the disambiguation grid and the manual search alike,
+  because country is what tells a UK pressing from a German one. The manual
+  search has a country field whose suggestions (`DISCOGS_COUNTRIES`) are
+  Discogs' own strings, ordered by how often each actually occurs in a real
+  collection -- read from the database, not assumed, because "United Kingdom"
+  instead of "UK" narrows the search to nothing. It is still free text, so a
+  country not on the list is searchable. The value reaches the **targeted**
+  Discogs query only, never the fuzzy fallback, which exists for when the
+  targeted search was too narrow.
+  Discogs also combines territories ("UK, Europe & US"), which renders as one
+  flag each. Two rules there: the whole string is matched before splitting,
+  or "Trinidad & Tobago" becomes two countries; and a combination is
+  all-or-nothing, so "France & Benelux" keeps its plain name rather than
+  showing a lone French flag and reading as a French pressing. Yugoslavia, the
+  USSR and the GDR deliberately get no flag rather than a successor's.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
 - **Smart crates**: two runs. `mode: 'full'` sorts the whole collection from
   scratch and replaces the suggestion list. `mode: 'unfiled'` (the default action

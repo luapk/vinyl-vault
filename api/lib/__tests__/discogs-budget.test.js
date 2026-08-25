@@ -77,3 +77,28 @@ describe('rate limit is reported, never flattened into "no matches"', () => {
     await expect(searchDiscogs({ artist: 'A', title: 'B', manual: true })).resolves.toHaveLength(1);
   });
 });
+
+describe('country narrows the targeted search, and only that one', () => {
+  it('adds country to the targeted artist + title search', async () => {
+    stubFetch(() => reply({ results: [RESULT] }));
+    await searchDiscogs({ artist: 'Kraftwerk', title: 'The Mix', country: 'UK', manual: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('country=UK');
+  });
+
+  // The fuzzy query is the fallback for when the targeted search was too
+  // narrow. Narrowing it the same way would defeat the point of having it.
+  it('never adds country to the fuzzy fallback', async () => {
+    stubFetch((url) => reply({ results: url.includes('q=') ? [RESULT] : [] }));
+    await searchDiscogs({ artist: 'Kraftwerk', title: 'The Mix', country: 'UK', manual: true });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain('q=');
+    expect(calls[1]).not.toContain('country=');
+  });
+
+  it('is left out entirely when the user did not give one', async () => {
+    stubFetch(() => reply({ results: [RESULT] }));
+    await searchDiscogs({ artist: 'Kraftwerk', title: 'The Mix', manual: true });
+    expect(calls[0]).not.toContain('country=');
+  });
+});

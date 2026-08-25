@@ -62,7 +62,7 @@ export function barcodeVariants(barcode) {
   return [...out];
 }
 
-export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, rawText, manual = false, meta = null }) {
+export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, country, rawText, manual = false, meta = null }) {
   const headers = authHeaders();
 
   // Run search strategies in parallel. Vision sometimes misassigns fields
@@ -98,7 +98,12 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
     }
   }
   if (artist && title) {
-    urls.add(buildSearchUrl({ artist, release_title: title }));
+    // Country narrows a targeted search to the pressing in the user's hands:
+    // the difference between a UK and a German press of the same record is
+    // often every field except this one. It is never added to the fuzzy
+    // fallback below, which exists precisely for when the targeted search is
+    // too narrow to match anything.
+    urls.add(buildSearchUrl({ artist, release_title: title, ...(country ? { country } : {}) }));
   }
   // Loose fallbacks: only needed for image scans where Vision may misidentify fields.
   // Skip for manual searches -- the user typed explicit values, so field confusion

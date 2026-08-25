@@ -19,7 +19,7 @@ import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { camelotColor } from '../lib/camelot.js';
-import { countryLabel } from '../lib/countryFlag.js';
+import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
 import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
@@ -5703,10 +5703,12 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
   const [artist, setArtist] = useState(priorSearch?.query?.artist ?? initial?.artist ?? "");
   const [title, setTitle] = useState(priorSearch?.query?.title ?? initial?.title ?? "");
   const [catno, setCatno] = useState(priorSearch?.query?.catno ?? initial?.catalogNumber ?? "");
+  const [country, setCountry] = useState(priorSearch?.query?.country ?? "");
   const [results, setResults] = useState(priorSearch?.list ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Country alone is not a search: it narrows one, it cannot be one.
   const canSearch = !!(artist.trim() || title.trim() || catno.trim());
 
   const runSearch = async (e) => {
@@ -5719,7 +5721,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
       const res = await fetch('/api/discogs-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ artist: artist.trim(), title: title.trim(), catalogNumber: catno.trim() }),
+        body: JSON.stringify({ artist: artist.trim(), title: title.trim(), catalogNumber: catno.trim(), country: country.trim() }),
       });
       const data = await res.json();
       // A failed search must never masquerade as "no matches" -- rate limits
@@ -5728,7 +5730,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
       const matches = data.matches || [];
       setResults(matches);
       // Hand the list up so "Back to results" can return to it.
-      onResults?.(matches, { artist: artist.trim(), title: title.trim(), catno: catno.trim() });
+      onResults?.(matches, { artist: artist.trim(), title: title.trim(), catno: catno.trim(), country: country.trim() });
     } catch (err) {
       setError(`Search failed: ${err.message}. Try again in a moment.`);
     }
@@ -5760,6 +5762,19 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
           <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Catalogue number <span className="text-white/20">(optional)</span></label>
           <input value={catno} onChange={(e) => setCatno(e.target.value)} placeholder="e.g. RACCIDENT 004"
             className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
+        </div>
+        {/* Country separates a UK pressing from a German one. The suggestions
+            are Discogs' own spellings, commonest first, because "United
+            Kingdom" instead of "UK" narrows the search to nothing. Still a
+            free text field: a country not on the list is still searchable. */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Country <span className="text-white/20">(optional)</span></label>
+          <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. UK"
+            list="vv-discogs-countries" autoComplete="off"
+            className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
+          <datalist id="vv-discogs-countries">
+            {DISCOGS_COUNTRIES.map(c => <option key={c} value={c} />)}
+          </datalist>
         </div>
         <div className="flex items-center gap-3 mt-2">
           <button type="submit" disabled={!canSearch || loading}
