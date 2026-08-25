@@ -398,6 +398,16 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   switch away, and the tab the phone restores hours later reopens a stranger's
   profile. Guarded by `stress/profile-link.spec.mjs`. Sharing is unaffected --
   the share button builds its link from `window.location.origin`.
+- **The active nav tab must not be the faintest one**: the header's active tab
+  is drawn from the artwork accent, and `reset()` parks that accent at a pale
+  grey until a cover is read, so on any scan screen before a record loads the
+  tab you were on was lighter than the three you were not -- it read as
+  disabled. `legibleAccentRGB` (`src/lib/accentContrast.js`, unit-tested)
+  clamps the accent's luminance for the current theme before the header uses
+  it. The thresholds are set against the INACTIVE tabs, not against the page:
+  readable is not enough, the active tab has to be the strongest of the row.
+  Clamping rather than replacing keeps the hue, so a record with a strong
+  cover still tints its own chrome.
 - **Back to results**: picking the wrong pressing is easy, and the list Discogs
   returned has already been fetched, so going back to it costs no network and
   no rate-limit quota. `priorSearch` (`VinylVault.jsx`) holds the last list the

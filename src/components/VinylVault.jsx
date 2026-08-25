@@ -20,6 +20,7 @@ import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCo
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { camelotColor } from '../lib/camelot.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
+import { legibleAccentRGB } from '../lib/accentContrast.js';
 import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
@@ -1391,6 +1392,11 @@ export default function VinylVault() {
 
   const allCrates = [...new Set(collection.flatMap((r) => r.crates || []))].sort();
   const accentRGB = `${accent.r}, ${accent.g}, ${accent.b}`;
+  // The header is chrome, not artwork: the tab you are on has to look like the
+  // tab you are on whatever colour the cover happened to be. Before a record
+  // is read the accent is a pale grey, which on a near-white page made the
+  // active tab the faintest of the four -- it read as disabled.
+  const navAccentRGB = legibleAccentRGB(accent, isDark);
 
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
@@ -1432,7 +1438,7 @@ export default function VinylVault() {
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
-                ? { background: `rgba(${accentRGB},0.15)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})`, boxShadow: `0 0 12px -4px rgba(${accentRGB},0.3)` }
+                ? { background: `rgba(${navAccentRGB},0.15)`, border: `1px solid rgba(${navAccentRGB},0.35)`, color: `rgb(${navAccentRGB})`, boxShadow: `0 0 12px -4px rgba(${navAccentRGB},0.3)` }
                 : { background: "transparent", border: `1px solid rgba(var(--fg),${isDark ? 0.07 : 0.15})`, color: `rgba(var(--fg),${isDark ? 0.4 : 0.6})` }
               }
             >
