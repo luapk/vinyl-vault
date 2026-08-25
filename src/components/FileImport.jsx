@@ -301,6 +301,9 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
   // Set when a file's shape is questioned: the parsed rows are held here
   // rather than imported, until the user says how to read them.
   const [fileConfirm, setFileConfirm] = useState(null);
+  // What is in the paste box, when a list is typed or pasted rather than
+  // uploaded.
+  const [pastedList, setPastedList] = useState('');
 
   // The retry pass reads the collection at the moment it runs, not at the
   // moment the hook rendered.
@@ -470,20 +473,21 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     await runInBrowser(rows, overflow);
   }
 
-  async function handleImportFile(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || fileImporting) return;
+  // One text blob in, an import out. A pasted list and an uploaded file are the
+  // same thing by the time they get here, so they cannot drift: the cap, the
+  // shape check and the run are shared.
+  async function importText(text, { badSource = 'Could not read that.' } = {}) {
+    if (fileImporting) return;
     let rows, overflow = 0;
     try {
       // Parse everything, then apply the cap here so the count left behind is
       // known and can be reported. Silently truncating is how a 900-record
       // file used to look like a 500-record one that had finished.
-      const all = parseImportRows(await file.text(), Infinity);
+      const all = parseImportRows(text, Infinity);
       rows = all.slice(0, IMPORT_ROW_CAP);
       overflow = all.length - rows.length;
     } catch {
-      setFileError('Could not read that file.');
+      setFileError(badSource);
       return;
     }
     if (!rows.length) {
@@ -491,7 +495,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
       return;
     }
 
-    // Ask before importing a file whose shape says tracklist. The parser reads
+    // Ask before importing a list whose shape says tracklist. The parser reads
     // column one as the artist, which is right for every ordinary export and
     // exactly wrong for a release/track listing -- 432 unmatchable rows wrong,
     // the one time it happened.
@@ -504,6 +508,32 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     }
 
     await startImport(rows, overflow);
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || fileImporting) return;
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      setFileError('Could not read that file.');
+      return;
+    }
+    await importText(text, { badSource: 'Could not read that file.' });
+  }
+
+  // Pasting beats saving a file and hunting for it in the picker, which on a
+  // phone is most of the work.
+  async function importPastedList() {
+    const text = pastedList;
+    if (!text.trim()) {
+      setFileError('Paste a list first: one record per line, as "Artist - Title".');
+      return;
+    }
+    await importText(text);
+    setPastedList('');
   }
 
   // The user's answer to that question.
@@ -600,6 +630,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     cancelFileImport, importFileRef, importListRef,
     resetFileImport, handleImportFile, stopImport,
+    pastedList, setPastedList, importPastedList,
     fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,

@@ -301,6 +301,13 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   block above them. The import itself is `useFileImport`
   (`src/components/FileImport.jsx`), shared with the account panel so both
   routes match and de-duplicate by identical rules.
+- **A list can be pasted, not just uploaded**: the account panel's import
+  section takes a pasted list in the same formats as a file, because on a phone
+  saving a file and then finding it in the picker is most of the work. Both
+  routes funnel through one `importText` in `useFileImport`, so the row cap,
+  the tracklist-shape check and the run itself cannot drift between them.
+  Guarded by `stress/import.spec.mjs`, including that a pasted tracklist is
+  questioned exactly like an uploaded one.
 - **The import cap must stay visible**: one file adds up to `IMPORT_ROW_CAP`
   (`src/lib/importParse.js`, 1000) records, because the per-row Discogs lookup
   shares a rate limit with everyone else's scanning. The parser applies the cap

@@ -91,3 +91,13 @@ export function trackListFile(releases) {
 export function fileImportInput(page) {
   return page.locator('input[accept*=".csv"]');
 }
+
+// The paste route lives in the account panel's import section, so it has to be
+// opened first. Returns the textarea, ready to fill.
+export async function openPasteImport(page) {
+  await page.locator('button[title="Account settings"]').click();
+  await page.getByText('Import a list').click();
+  const box = page.getByLabel('Paste a list of records');
+  await expect(box).toBeVisible({ timeout: 10_000 });
+  return box;
+}

@@ -7,7 +7,7 @@
 // importer read as "no such record" and filed accordingly. A rate limit must
 // never decide what a record is.
 import { test, expect } from '@playwright/test';
-import { resetMock, mockState, signIn, stubApi, csvFile, trackListFile, discogsMatch, fileImportInput } from './helpers.mjs';
+import { resetMock, mockState, signIn, stubApi, csvFile, trackListFile, discogsMatch, fileImportInput, openPasteImport } from './helpers.mjs';
 
 test.beforeEach(async () => { await resetMock(); });
 
@@ -158,4 +158,45 @@ test('an ordinary release list is never questioned', async ({ page, context }) =
 
   await expect(page.getByText('Added 3 records')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/looks like a tracklist/i)).toHaveCount(0);
+});
+
+test('a list can be pasted instead of uploaded', async ({ page, context }) => {
+  await stubApi(context);
+  let n = 0;
+  await stubSearch(context, () => ({ matches: [discogsMatch(++n)] }));
+  await signIn(page);
+
+  const box = await openPasteImport(page);
+  await box.fill('The Adverts - The Peel Sessions\nAerosmith - Live Bootleg\nAll About Eve - Scarlet and Other Stories');
+  await page.getByRole('button', { name: /Import pasted list/ }).click();
+
+  await expect(page.getByText('Added 3 records')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await mockState()).records.length, { timeout: 20_000 }).toBe(3);
+});
+
+test('a pasted tracklist is questioned, exactly like an uploaded one', async ({ page, context }) => {
+  await stubApi(context);
+  let n = 0;
+  await stubSearch(context, () => ({ matches: [discogsMatch(++n)] }));
+  await signIn(page);
+
+  const box = await openPasteImport(page);
+  await box.fill([
+    'Bicep - Isles LP,A1. Sundial',
+    'Bicep - Isles LP,A2. Atlas',
+    'Bicep - Isles LP,B1. Apricots',
+    'Bicep - Isles LP,B2. Cazenove',
+    'Aloka - View Source,A1. Blind Spot',
+    'Aloka - View Source,A2. Refract',
+    'Aloka - View Source,B1. Third Rail',
+    'Axel Boman - LUZ,A1. Jeremy Irons',
+    'Axel Boman - LUZ,B2. Ocelot',
+  ].join('\n'));
+  await page.getByRole('button', { name: /Import pasted list/ }).click();
+
+  await expect(page.getByText(/looks like a tracklist/i)).toBeVisible({ timeout: 20_000 });
+  expect((await mockState()).records).toHaveLength(0);
+
+  await page.getByRole('button', { name: /Import 3 records/ }).click();
+  await expect(page.getByText('Added 3 records')).toBeVisible({ timeout: 30_000 });
 });

@@ -4211,6 +4211,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     fileImporting, fileProgress, fileResult, fileError, fileItems,
     importFileRef, importListRef,
     resetFileImport, handleImportFile, stopImport,
+    pastedList, setPastedList, importPastedList,
     fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
@@ -4582,7 +4583,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             )}
           </AccountSection>
 
-          <AccountSection label="Import from file" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
+          <AccountSection label="Import a list" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
             <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
             {fileConfirm && !fileImporting && (
               <ImportShapeWarning
@@ -4596,7 +4597,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             {!fileImporting && !fileResult && !fileConfirm && (
               <>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', lineHeight: 1.6, marginBottom: 12 }}>
-                  Upload a list of records. Each row is matched to the most likely vinyl release; anything unmatched is added as a draft to fine-tune with Re-identify.
+                  Paste a list of records, or upload one. Each row is matched to the most likely vinyl release; anything unmatched is added as a draft to fine-tune with Re-identify.
                 </p>
                 <div style={{ borderRadius: 10, background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', padding: '10px 14px', marginBottom: 14 }}>
                   {[['CSV', 'artist,title'], ['Text', 'Artist - Title']].map(([kind, example]) => (
@@ -4606,15 +4607,44 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
                     </div>
                   ))}
                 </div>
-                <button onClick={() => importFileRef.current?.click()}
+                {/* Paste first: on a phone, saving a file and then finding it
+                    in the picker is most of the work. Same parser, same cap,
+                    same tracklist check as an upload. */}
+                <textarea
+                  value={pastedList}
+                  onChange={e => setPastedList(e.target.value)}
+                  rows={5}
+                  spellCheck={false}
+                  aria-label="Paste a list of records"
+                  placeholder={'The Adverts - The Peel Sessions\nAerosmith - Live Bootleg'}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
-                    color: 'var(--bg-hex)', background: 'rgba(var(--fg),0.9)',
-                    border: 'none', cursor: 'pointer',
-                  }}>
-                  <Upload size={15} />Choose file
-                </button>
+                    width: '100%', boxSizing: 'border-box', resize: 'vertical',
+                    padding: '10px 12px', borderRadius: 10, marginBottom: 10,
+                    fontSize: 14, fontFamily: 'monospace', lineHeight: 1.6,
+                    color: 'rgba(var(--fg),0.85)', background: 'rgba(var(--fg),0.04)',
+                    border: '1px solid rgba(var(--fg),0.12)', outline: 'none',
+                  }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <button onClick={importPastedList} disabled={!pastedList.trim()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
+                      color: 'var(--bg-hex)',
+                      background: pastedList.trim() ? 'rgba(var(--fg),0.9)' : 'rgba(var(--fg),0.25)',
+                      border: 'none', cursor: pastedList.trim() ? 'pointer' : 'not-allowed',
+                    }}>
+                    <Rows size={15} />Import pasted list
+                  </button>
+                  <button onClick={() => importFileRef.current?.click()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 13px', borderRadius: 9, fontSize: 16,
+                      color: 'rgba(var(--fg),0.7)', background: 'rgba(var(--fg),0.05)',
+                      border: '1px solid rgba(var(--fg),0.12)', cursor: 'pointer',
+                    }}>
+                    <Upload size={15} />Choose file
+                  </button>
+                </div>
 
                 {/* A standing way back to the rows an earlier import could not
                     match. They cannot be fixed by importing the file again:
