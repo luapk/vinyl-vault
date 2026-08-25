@@ -200,3 +200,38 @@ test('a pasted tracklist is questioned, exactly like an uploaded one', async ({ 
   await page.getByRole('button', { name: /Import 3 records/ }).click();
   await expect(page.getByText('Added 3 records')).toBeVisible({ timeout: 30_000 });
 });
+
+// Picking the wrong pressing used to mean searching Discogs again from
+// scratch to get back a list that had already been fetched.
+test('back to results returns to the pressings already fetched, for free', async ({ page, context }) => {
+  await stubApi(context);
+  let searches = 0;
+  await context.route('**/api/discogs-search', (route) => {
+    searches += 1;
+    route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ matches: [discogsMatch(1), discogsMatch(2), discogsMatch(3)], remaining: 55, requests: 1 }),
+    });
+  });
+  await signIn(page);
+
+  await page.getByRole('button', { name: /type artist & title to search/i }).click();
+  await page.getByPlaceholder('e.g. Nelly Furtado').fill('Kraftwerk');
+  await page.getByRole('button', { name: /Search Discogs/i }).click();
+
+  await expect(page.getByText('Stress Album 1').first()).toBeVisible({ timeout: 20_000 });
+  expect(searches).toBe(1);
+  // Country is what tells one pressing from another, so it carries a flag.
+  await expect(page.getByText(/🇬🇧 UK/).first()).toBeVisible();
+
+  // Pick one, land on the result, then think better of it.
+  await page.getByText('Stress Album 1').first().click();
+  const back = page.getByRole('button', { name: /Back to results/i });
+  await expect(back).toBeVisible({ timeout: 20_000 });
+  await back.click();
+
+  // The same three pressings, and not a single extra Discogs request.
+  await expect(page.getByText('Stress Album 2').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Stress Album 3').first()).toBeVisible();
+  expect(searches).toBe(1);
+});

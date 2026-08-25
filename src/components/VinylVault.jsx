@@ -19,6 +19,7 @@ import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { camelotColor } from '../lib/camelot.js';
+import { countryLabel } from '../lib/countryFlag.js';
 import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
@@ -707,6 +708,10 @@ export default function VinylVault() {
   const [accent, setAccent] = useState({ r: 200, g: 200, b: 200 });
   const [errorMsg, setErrorMsg] = useState("");
   const [candidates, setCandidates] = useState([]);
+  // The list of pressings the user last chose from, and which screen showed
+  // it. Picking the wrong pressing is easy, and the list has already been
+  // fetched: going back to it should cost nothing and no Discogs quota.
+  const [priorSearch, setPriorSearch] = useState(null);
   const [visionData, setVisionData] = useState(null);
   const [pendingCrates, setPendingCrates] = useState([]);
   const [savedId, setSavedId] = useState(null);
@@ -1093,6 +1098,7 @@ export default function VinylVault() {
         if (data.release.coverUrl) { const c = await extractDominantColor(data.release.coverUrl); setAccent(c); }
       } else if (data.status === "disambiguation") {
         setCandidates(data.candidates);
+        setPriorSearch({ source: 'scan', list: data.candidates });
         setVisionData(data.vision);
         setPhase("disambiguation");
       } else if (data.status === "not_found") {
@@ -1137,6 +1143,7 @@ export default function VinylVault() {
       if (controller.signal.aborted) return;
       if (data.status === "disambiguation") {
         setCandidates(data.candidates);
+        setPriorSearch({ source: 'scan', list: data.candidates });
         setVisionData(data.vision);
         setPhase("disambiguation");
       } else if (data.status === "complete") {
@@ -1168,6 +1175,15 @@ export default function VinylVault() {
     scanAbortRef.current?.abort();
     scanAbortRef.current = null;
     // Don't reset() -- stay on batch view so user can see completed items
+  };
+
+  // Straight back to the pressings already fetched, whichever screen offered
+  // them. No network, no Discogs quota: the list is still in state.
+  const backToResults = () => {
+    if (!priorSearch?.list?.length) return;
+    if (priorSearch.source === 'manual') { setPhase("manual"); return; }
+    setCandidates(priorSearch.list);
+    setPhase("disambiguation");
   };
 
   const pickCandidate = async (candidate) => {
@@ -1232,6 +1248,9 @@ export default function VinylVault() {
     setVisionData(null);
     setPendingCrates([]);
     setSavedId(null);
+    // The pressings offered for the last record are not offers about the next
+    // one: a new scan must not be able to go "back" into someone else's list.
+    setPriorSearch(null);
   };
 
   // NEW SCAN means exactly that: a clean scan screen with the viewfinder
@@ -1472,7 +1491,11 @@ export default function VinylVault() {
             {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} onRemoveRecord={removeRecord} userId={userId} onReload={reloadFromCloud} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
-              <ManualSearchView initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset} />
+              <ManualSearchView
+                initial={visionData} accentRGB={accentRGB} onPick={pickCandidate} onCancel={reset}
+                priorSearch={priorSearch?.source === 'manual' ? priorSearch : null}
+                onResults={(list, query) => setPriorSearch({ source: 'manual', list, query })}
+              />
             )}
             {phase === "disambiguation" && (
               <>
@@ -1485,7 +1508,7 @@ export default function VinylVault() {
               </>
             )}
             {phase === "result" && release && (
-              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} userId={userId} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onNewScan={newScan} onManual={() => setPhase("manual")} collection={collection} smartCrateNames={smartCrateNames} />
+              <ResultView release={release} imageUrl={imageUrl} accentRGB={accentRGB} userId={userId} pendingCrates={pendingCrates} setPendingCrates={setPendingCrates} allCrates={allCrates} onSave={saveRecord} saved={!!savedId} onBpmDetected={updateReleaseBpm} onHotToggle={toggleReleaseHot} onReset={reset} onNewScan={newScan} onManual={() => setPhase("manual")} onBackToResults={priorSearch?.list?.length > 1 ? backToResults : null} collection={collection} smartCrateNames={smartCrateNames} />
             )}
             {phase === "error" && <ErrorView message={errorMsg} onReset={reset} onManual={() => setPhase("manual")} onSignOut={signOut} />}
           </>
@@ -2155,7 +2178,7 @@ function AddCoverTile({ px = 48, userId, onAdd, label = "Add your own cover" }) 
   );
 }
 
-function ResultView({ release, imageUrl, accentRGB, userId, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onNewScan, onManual, collection = [], smartCrateNames = [] }) {
+function ResultView({ release, imageUrl, accentRGB, userId, pendingCrates, setPendingCrates, allCrates, onSave, saved, onBpmDetected, onHotToggle, onReset, onNewScan, onManual, onBackToResults, collection = [], smartCrateNames = [] }) {
   const audioRef = useRef(null);
   const [playingPreview, setPlayingPreview] = useState(null);
   const [crateInput, setCrateInput] = useState("");
@@ -2262,6 +2285,15 @@ function ResultView({ release, imageUrl, accentRGB, userId, pendingCrates, setPe
         <button onClick={onNewScan || onReset} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all" style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
           <CaretLeft size={12} />New scan
         </button>
+        {/* The pressings Discogs offered a moment ago. Picking the wrong one
+            is easy and used to mean searching again from scratch to get back
+            a list that had already been fetched. */}
+        {onBackToResults && (
+          <button onClick={onBackToResults} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
+            style={{ border: "1px solid rgba(var(--fg),0.13)", color: "rgba(var(--fg),0.55)", background: "rgba(var(--fg),0.04)" }}>
+            <CaretLeft size={12} />Back to results
+          </button>
+        )}
         {onManual && (
           <button onClick={onManual} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
             style={release.identified
@@ -5645,7 +5677,10 @@ function CandidateCard({ candidate, index = 0, accentRGB, onPick }) {
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%)" }} />
       </div>
       <div className="relative p-4">
-        <div className="text-[13px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, candidate.country, candidate.format].filter(Boolean).join(" · ")}</div>
+        {/* Country is the field that tells a UK pressing from a German one,
+            which for a lot of records is the whole question. The flag makes it
+            findable at a glance instead of a word among three. */}
+        <div className="text-[13px] tracking-[0.18em] uppercase text-white/35 mb-1.5 font-mono">{[candidate.year, countryLabel(candidate.country), candidate.format].filter(Boolean).join(" · ")}</div>
         <div className="text-sm leading-snug mb-2 font-display">
           {candidate.artist && <span className="italic text-white/80">{candidate.artist}</span>}
           {candidate.artist && candidate.recordTitle && <span className="text-white/25"> / </span>}
@@ -5662,11 +5697,13 @@ function CandidateCard({ candidate, index = 0, accentRGB, onPick }) {
 
 // Manual fallback when a scan can't be read or none of the pressings match:
 // the user types whatever they can read off the label and we search Discogs.
-function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
-  const [artist, setArtist] = useState(initial?.artist || "");
-  const [title, setTitle] = useState(initial?.title || "");
-  const [catno, setCatno] = useState(initial?.catalogNumber || "");
-  const [results, setResults] = useState(null);
+function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, onResults }) {
+  // priorSearch is what this screen last returned. Coming back to it after
+  // picking the wrong pressing must show the same list, not an empty form.
+  const [artist, setArtist] = useState(priorSearch?.query?.artist ?? initial?.artist ?? "");
+  const [title, setTitle] = useState(priorSearch?.query?.title ?? initial?.title ?? "");
+  const [catno, setCatno] = useState(priorSearch?.query?.catno ?? initial?.catalogNumber ?? "");
+  const [results, setResults] = useState(priorSearch?.list ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -5688,7 +5725,10 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel }) {
       // A failed search must never masquerade as "no matches" -- rate limits
       // and Discogs hiccups were being shown as not-found.
       if (!res.ok) throw new Error(data.error || `Search failed (${res.status})`);
-      setResults(data.matches || []);
+      const matches = data.matches || [];
+      setResults(matches);
+      // Hand the list up so "Back to results" can return to it.
+      onResults?.(matches, { artist: artist.trim(), title: title.trim(), catno: catno.trim() });
     } catch (err) {
       setError(`Search failed: ${err.message}. Try again in a moment.`);
     }

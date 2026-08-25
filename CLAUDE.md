@@ -398,6 +398,22 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   switch away, and the tab the phone restores hours later reopens a stranger's
   profile. Guarded by `stress/profile-link.spec.mjs`. Sharing is unaffected --
   the share button builds its link from `window.location.origin`.
+- **Back to results**: picking the wrong pressing is easy, and the list Discogs
+  returned has already been fetched, so going back to it costs no network and
+  no rate-limit quota. `priorSearch` (`VinylVault.jsx`) holds the last list the
+  user chose from and which screen showed it, so the button returns to the scan
+  disambiguation grid or to the manual search with its results and its query
+  still filled in. `reset()` clears it: the pressings offered for the last
+  record are not offers about the next one. Shown only when there was a real
+  choice (more than one result). Guarded by `stress/import.spec.mjs`, which
+  asserts the return costs zero extra Discogs requests.
+- **Country carries a flag**: `countryLabel` (`src/lib/countryFlag.js`,
+  unit-tested) prefixes the flag emoji on every candidate card, in the
+  disambiguation grid and the manual search alike, because country is what
+  tells a UK pressing from a German one. Discogs uses its own vocabulary
+  ("UK", not "United Kingdom") and includes states that no longer exist, so
+  anything unrecognised returns null and the name prints alone. Yugoslavia,
+  the USSR and the GDR deliberately get no flag rather than a successor's.
 - **Batch scan**: assigns no crates automatically -- crates are user-organisational only.
 - **Smart crates**: two runs. `mode: 'full'` sorts the whole collection from
   scratch and replaces the suggestion list. `mode: 'unfiled'` (the default action
