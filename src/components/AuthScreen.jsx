@@ -13,6 +13,17 @@ function GoogleMark() {
   );
 }
 
+function EyeIcon({ open }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.8 12S5.4 5.4 12 5.4 22.2 12 22.2 12 18.6 18.6 12 18.6 1.8 12 1.8 12Z" />
+      <circle cx="12" cy="12" r="3.2" />
+      {!open && <path d="M3.5 3.5l17 17" />}
+    </svg>
+  );
+}
+
 export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: authLoading, initialMode = 'signup' }) {
   const [mode, setMode]               = useState(initialMode);
   const [email, setEmail]             = useState('');
@@ -22,6 +33,8 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
   const [error, setError]             = useState('');
   const [success, setSuccess]         = useState('');
   const [googleBusy, setGoogleBusy]   = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -140,7 +153,7 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     padding: '10px 14px', borderRadius: 12,
-                    fontSize: 13, color: '#fff',
+                    fontSize: 13, color: 'rgba(var(--fg),0.92)',
                     background: 'rgba(var(--fg),0.05)',
                     border: '1px solid rgba(var(--fg),0.1)',
                     outline: 'none', transition: 'border-color 0.15s',
@@ -166,7 +179,7 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
                 style={{
                   width: '100%', boxSizing: 'border-box',
                   padding: '10px 14px', borderRadius: 12,
-                  fontSize: 13, color: '#fff',
+                  fontSize: 13, color: 'rgba(var(--fg),0.92)',
                   background: 'rgba(var(--fg),0.05)',
                   border: '1px solid rgba(var(--fg),0.1)',
                   outline: 'none', transition: 'border-color 0.15s',
@@ -181,29 +194,47 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
               <label style={{ display: 'block', fontSize: 11, color: 'rgba(var(--fg),0.4)', marginBottom: 6, fontFamily: 'monospace' }}>
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '10px 14px', borderRadius: 12,
-                  fontSize: 13, color: '#fff',
-                  background: 'rgba(var(--fg),0.05)',
-                  border: '1px solid rgba(var(--fg),0.1)',
-                  outline: 'none', transition: 'border-color 0.15s',
-                }}
-                className="placeholder-white/20"
-                onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.35)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
-              />
+              {/* The reveal toggle sits inside the field. Typing a password
+                  blind on a phone keyboard is where sign-in attempts die. */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '10px 44px 10px 14px', borderRadius: 12,
+                    fontSize: 13, color: 'rgba(var(--fg),0.92)',
+                    background: 'rgba(var(--fg),0.05)',
+                    border: '1px solid rgba(var(--fg),0.1)',
+                    outline: 'none', transition: 'border-color 0.15s',
+                  }}
+                  className="placeholder-white/20"
+                  onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.35)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    color: 'rgba(var(--fg),0.45)',
+                  }}>
+                  <EyeIcon open={showPassword} />
+                </button>
+              </div>
             </div>
 
             {error && (
-              <p style={{ fontSize: 12, borderRadius: 10, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.2)', margin: 0 }}>
+              <p style={{ fontSize: 12, borderRadius: 10, padding: '8px 12px', background: 'rgba(239,68,68,0.12)', color: isLight ? '#b3261e' : '#fca5a5', border: '1px solid rgba(239,68,68,0.28)', margin: 0 }}>
                 {error}
               </p>
             )}
@@ -219,12 +250,10 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
               style={{
                 width: '100%', padding: '11px 0', borderRadius: 12,
                 fontSize: 13, fontWeight: 600,
-                color: isLoading ? 'rgba(0,0,0,0.5)' : '#000',
-                background: isLoading
-                  ? 'rgba(var(--fg),0.25)'
-                  : 'linear-gradient(160deg, rgba(var(--fg),0.95) 0%, rgba(220,220,220,0.9) 100%)',
-                border: '1px solid rgba(var(--fg),0.2)',
-                boxShadow: isLoading ? 'none' : '0 4px 20px rgba(var(--fg),0.15), inset 0 1px 0 rgba(var(--fg),0.6)',
+                color: isLoading ? 'rgba(var(--bg),0.6)' : 'var(--bg-hex)',
+                background: isLoading ? 'rgba(var(--fg),0.35)' : 'var(--fg-hex)',
+                border: 'none',
+                boxShadow: 'none',
                 cursor: isLoading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s',
                 marginTop: 4,

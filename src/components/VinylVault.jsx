@@ -7250,28 +7250,32 @@ function LabelModal({ record, accentRGB, onClose }) {
 // has a mascot clip in /walkthrough (see public/walkthrough/BRIEFS.md for the
 // animation briefs); until a clip is dropped in, the step falls back to its
 // Phosphor icon, so this ships and looks right either way.
+// Bump when a clip's bytes change at the same path, to bust browser and CDN
+// caches -- the same reason SPLASH_V exists.
+const WALKTHROUGH_V = '2';
+
 const WALKTHROUGH_STEPS = [
   {
     icon: Camera,
-    clip: '/walkthrough/step-scan.webp',
+    clip: `/walkthrough/step-scan.webp?v=${WALKTHROUGH_V}`,
     title: 'Scan the record',
     body: 'Point the camera at the label, the sleeve or the barcode. It reads the catalogue number and finds your exact pressing, not just the album.',
   },
   {
     icon: Check,
-    clip: '/walkthrough/step-confirm.webp',
+    clip: `/walkthrough/step-confirm.webp?v=${WALKTHROUGH_V}`,
     title: 'Check the pressing',
     body: 'Wrong repress? Hit Re-identify and pick the right one. Tracklist, year and cover art come along with it.',
   },
   {
     icon: Stack,
-    clip: '/walkthrough/step-file.webp',
+    clip: `/walkthrough/step-file.webp?v=${WALKTHROUGH_V}`,
     title: 'File it in crates',
     body: 'Sort by hand or let Smart Crates group the collection for you. Browse as a carousel, a grid, or a sortable list you can export.',
   },
   {
     icon: MusicNotes,
-    clip: '/walkthrough/step-play.webp',
+    clip: `/walkthrough/step-play.webp?v=${WALKTHROUGH_V}`,
     title: 'Play out',
     body: 'Every track gets a BPM for building sets, and you can print sleeve labels for the records you are taking to the booth.',
   },
