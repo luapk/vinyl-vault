@@ -86,12 +86,14 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
       }} />
 
       <div className="w-full max-w-sm relative">
-        {/* Logo */}
+        {/* Wordmark only -- the crate illustration that used to sit above it
+            is the app's own icon, and repeating it here just pushed the form
+            down the screen. */}
         <div className="flex justify-center mb-10">
           <img
-            src="/logo.png"
+            src={isLight ? '/logo-black.png' : '/logo-white.png'}
             alt="Vinyl Vault"
-            style={{ height: 180, opacity: 0.92 }}
+            style={{ width: 200, height: 'auto', opacity: 0.92 }}
           />
         </div>
 
@@ -108,35 +110,6 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
           <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.9)', marginBottom: 20, letterSpacing: '-0.01em' }}>
             {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h2>
-
-          {onGoogle && (
-            <>
-              <button
-                type="button"
-                onClick={handleGoogle}
-                disabled={isLoading}
-                style={{
-                  width: '100%', padding: '10px 0', borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  fontSize: 13, fontWeight: 600, color: '#1f1f1f',
-                  background: googleBusy ? 'rgba(255,255,255,0.6)' : '#fff',
-                  border: '1px solid rgba(var(--fg),0.18)',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 0.15s',
-                  opacity: isLoading && !googleBusy ? 0.6 : 1,
-                }}>
-                <GoogleMark />
-                {googleBusy ? 'Opening Google...' : 'Continue with Google'}
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
-                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>or</span>
-                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
-              </div>
-            </>
-          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {mode === 'signup' && (
@@ -261,6 +234,35 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
               {isLoading ? 'Please wait...' : mode === 'signup' ? 'Create account' : 'Sign in'}
             </button>
           </form>
+
+          {onGoogle && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '16px 0' }}>
+                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
+                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.3)' }}>or</span>
+                <span style={{ flex: 1, height: 1, background: 'rgba(var(--fg),0.12)' }} />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogle}
+                disabled={isLoading}
+                style={{
+                  width: '100%', padding: '10px 0', borderRadius: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  fontSize: 13, fontWeight: 600, color: '#1f1f1f',
+                  background: googleBusy ? 'rgba(255,255,255,0.6)' : '#fff',
+                  border: '1px solid rgba(var(--fg),0.18)',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'opacity 0.15s',
+                  opacity: isLoading && !googleBusy ? 0.6 : 1,
+                }}>
+                <GoogleMark />
+                {googleBusy ? 'Opening Google...' : 'Continue with Google'}
+              </button>
+            </>
+          )}
 
           <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(var(--fg),0.25)', marginTop: 20, marginBottom: 0 }}>
             {mode === 'signup' ? (
