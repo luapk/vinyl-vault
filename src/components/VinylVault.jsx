@@ -229,32 +229,55 @@ const resizeImage = (file, maxDim = 1500, quality = 0.85) =>
     reader.readAsDataURL(file);
   });
 
+// A status code is not something to show a person. 503 in particular is the
+// common one here: it means the auth check could not be completed, the client
+// has already retried it, and the right advice is to wait rather than to sign
+// out.
+function describeScanFailure(status) {
+  if (status === 503) return 'Could not verify your session just now -- the service is busy. Give it a moment and try again.';
+  if (status === 504 || status === 408) return 'That took too long to load. Try it again in a moment.';
+  if (status >= 500) return 'Something went wrong pulling the release. Try it again in a moment.';
+  return `Could not load that release (error ${status}).`;
+}
+
+const GREY = { r: 200, g: 200, b: 200 };
+
 const extractDominantColor = (imageSrc) =>
   new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
+    // Never leave this promise pending. A cover that neither loads nor errors
+    // (a stalled CDN) used to hang every caller that awaited it.
+    const timer = setTimeout(() => resolve(GREY), 6000);
+    const settle = (colour) => { clearTimeout(timer); resolve(colour); };
     img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const size = 60;
-      canvas.width = size; canvas.height = size;
-      ctx.drawImage(img, 0, 0, size, size);
-      const data = ctx.getImageData(0, 0, size, size).data;
-      let r = 0, g = 0, b = 0, total = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        const pr = data[i], pg = data[i + 1], pb = data[i + 2];
-        const brightness = (pr + pg + pb) / 3;
-        if (brightness < 20 || brightness > 240) continue;
-        const max = Math.max(pr, pg, pb), min = Math.min(pr, pg, pb);
-        const sat = max === 0 ? 0 : (max - min) / max;
-        const weight = sat * sat + 0.08;
-        r += pr * weight; g += pg * weight; b += pb * weight; total += weight;
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const size = 60;
+        canvas.width = size; canvas.height = size;
+        ctx.drawImage(img, 0, 0, size, size);
+        const data = ctx.getImageData(0, 0, size, size).data;
+        let r = 0, g = 0, b = 0, total = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const pr = data[i], pg = data[i + 1], pb = data[i + 2];
+          const brightness = (pr + pg + pb) / 3;
+          if (brightness < 20 || brightness > 240) continue;
+          const max = Math.max(pr, pg, pb), min = Math.min(pr, pg, pb);
+          const sat = max === 0 ? 0 : (max - min) / max;
+          const weight = sat * sat + 0.08;
+          r += pr * weight; g += pg * weight; b += pb * weight; total += weight;
+        }
+        if (total > 0) { r = Math.round(r / total); g = Math.round(g / total); b = Math.round(b / total); }
+        else { r = GREY.r; g = GREY.g; b = GREY.b; }
+        settle({ r, g, b });
+      } catch {
+        // Tainted canvas (SecurityError). The accent is decoration; the record
+        // is not. Fall back to grey rather than take the caller down with it.
+        settle(GREY);
       }
-      if (total > 0) { r = Math.round(r / total); g = Math.round(g / total); b = Math.round(b / total); }
-      else { r = 200; g = 200; b: 200; }
-      resolve({ r, g, b });
     };
-    img.onerror = () => resolve({ r: 200, g: 200, b: 200 });
+    img.onerror = () => settle(GREY);
     img.src = imageSrc;
   });
 
@@ -1053,11 +1076,17 @@ export default function VinylVault() {
       } catch { /* fall through with the original 401 */ }
     }
     // 503 means the auth service could not answer, not that the session is
-    // dead. Back off briefly and try again rather than troubling the user:
-    // scanning a stack of records in quick succession is exactly when this
-    // happens, and it clears within a second.
-    for (let attempt = 0; attempt < 2 && response.status === 503; attempt++) {
-      await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+    // dead. Back off and try again rather than troubling the user. The delays
+    // used to be 600ms and 1.2s, which put all three attempts inside the same
+    // wobble: production logs showed bursts of exactly three 503s, one user
+    // action each, several times an hour. Jitter keeps a roomful of scanners
+    // from retrying in lockstep. Three requests at up to 12.4s of server-side
+    // verification each, plus the waits, stays inside pickCandidate's 50s
+    // ceiling -- otherwise the abort fires mid-retry and reports the wrong
+    // reason.
+    const backoffs = [1000, 2500];
+    for (let attempt = 0; attempt < backoffs.length && response.status === 503; attempt++) {
+      await new Promise(r => setTimeout(r, backoffs[attempt] + Math.random() * 400));
       response = await send(await freshAccessToken(accessToken));
     }
     return response;
@@ -1192,14 +1221,18 @@ export default function VinylVault() {
     scanAbortRef.current = controller;
     // 50s hard ceiling: abort the controller on timeout so the user never waits
     // forever. AbortSignal.any() is too new for all browsers, so use a timer instead.
-    const pickTimeoutId = setTimeout(() => controller.abort(), 50000);
+    // The flag matters: an abort the USER asked for is handled by cancelScan,
+    // which resets the view, but a timeout has nobody to do that. Returning on
+    // both left the spinner turning for ever with no way out but Cancel.
+    let timedOut = false;
+    const pickTimeoutId = setTimeout(() => { timedOut = true; controller.abort(); }, 50000);
     setPhase("processing");
     setStatus("Pulling release data");
     setErrorMsg("");
     try {
       const response = await scanFetch({ discogsId: candidate.id, vision: visionData }, controller.signal);
       if (response.status === 401) throw new Error('Your session expired. Sign out and back in, then try again.');
-      if (!response.ok) throw new Error(`API ${response.status}`);
+      if (!response.ok) throw new Error(describeScanFailure(response.status));
       const data = await response.json();
       if (controller.signal.aborted) return;
       if (data.status === "complete") {
@@ -1211,9 +1244,11 @@ export default function VinylVault() {
         throw new Error(data.error || "Unexpected response");
       }
     } catch (err) {
-      if (err.name === "AbortError") return; // user cancelled or 50s timeout fired
+      if (err.name === "AbortError" && !timedOut) return; // user cancelled; cancelScan reset the view
       console.error(err);
-      setErrorMsg(err.message || "Failed to pull release data");
+      setErrorMsg(timedOut
+        ? 'That release took too long to load. Discogs may be slow right now -- try it again.'
+        : (err.message || "Failed to pull release data"));
       setPhase("error");
     } finally {
       clearTimeout(pickTimeoutId);
@@ -1368,7 +1403,7 @@ export default function VinylVault() {
 
     try {
       const response = await scanFetch({ discogsId: candidate.id, vision }, AbortSignal.timeout(50000));
-      if (!response.ok) throw new Error(`API ${response.status}`);
+      if (!response.ok) throw new Error(describeScanFailure(response.status));
       const data = await response.json();
       // Re-snapshot from ref in case another resolve completed while we awaited
       const latest = [...batchQueueRef.current];
@@ -5794,6 +5829,16 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
 
   return (
     <div className="pt-8 md:pt-12 max-w-2xl mx-auto" style={{ animation: "fadeUp 0.4s ease-out" }}>
+      {/* The way out, at the top where it cannot scroll away. The only escape
+          from this screen used to be a ghost "Cancel" inside the form, which
+          disappears above the fold as soon as results render, so a search that
+          found nothing useful left no visible way back to the home screen. */}
+      <button type="button" onClick={onCancel}
+        className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full text-[13px] tracking-[0.1em] uppercase font-mono transition-colors"
+        style={{ background: 'rgba(var(--fg),0.05)', border: '1px solid rgba(var(--fg),0.12)', color: 'rgba(var(--fg),0.6)', cursor: 'pointer' }}>
+        <CaretLeft size={13} weight="bold" />
+        Home
+      </button>
       <div className="mb-8">
         <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">Manual search</div>
         <h2 className="text-4xl md:text-5xl leading-[1.02] mb-3 font-display tracking-tight"><span className="italic">Type what you can read</span></h2>
@@ -5834,7 +5879,9 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
             className="vv-search-btn inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-[14px] tracking-[0.1em] uppercase font-mono transition-all disabled:opacity-40">
             <MagnifyingGlass size={14} weight="bold" />{loading ? "Searching..." : "Search Discogs"}
           </button>
-          <button type="button" onClick={onCancel} className="text-[14px] font-mono text-white/35 hover:text-white/60 transition-colors px-3 py-2">
+          <button type="button" onClick={onCancel}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[14px] tracking-[0.1em] uppercase font-mono transition-colors"
+            style={{ background: 'transparent', border: '1px solid rgba(var(--fg),0.14)', color: 'rgba(var(--fg),0.55)', cursor: 'pointer' }}>
             Cancel
           </button>
         </div>

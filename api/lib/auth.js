@@ -17,6 +17,30 @@ import { createClient } from '@supabase/supabase-js';
 //    round trip to the auth server. Successful verifications are cached for a
 //    short window, so a burst of scans costs one call instead of dozens.
 
+// One client per warm instance rather than one per request. The default
+// options spin up GoTrue's session machinery (persistence, an auto-refresh
+// timer, URL detection) which a service-role, token-in-hand verification has
+// no use for, and building it on every cache miss put that cost on the
+// critical path of every scan.
+let cachedClient = null;
+function authClient() {
+  if (cachedClient) return cachedClient;
+  cachedClient = createClient(
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+  );
+  return cachedClient;
+}
+
+// A single 5s ceiling turned every brief wobble at the auth endpoint into a
+// failed scan: production logs showed bursts of three 503s (the client's one
+// try plus two retries) landing inside one slow window. Two attempts with a
+// pause between them ride out a wobble that a single attempt cannot.
+const AUTH_TIMEOUT_MS = 6000;
+const AUTH_ATTEMPTS = 2;
+const AUTH_RETRY_PAUSE_MS = 400;
+
 const CACHE_TTL_MS = 60_000;
 const CACHE_MAX = 200;
 const verified = new Map(); // token -> { user, until }
@@ -72,20 +96,34 @@ export async function requireAuth(req, res) {
   const cached = cacheGet(token);
   if (cached) return cached;
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-  let user, error;
-  try {
-    // 5s ceiling: a hung Supabase connection must not block the entire scan pipeline.
-    const result = await Promise.race([
-      supabase.auth.getUser(token),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), 5000)),
-    ]);
-    user = result.data?.user;
-    error = result.error;
-  } catch {
+  const supabase = authClient();
+  let user, error, timedOut = false;
+  for (let attempt = 0; attempt < AUTH_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, AUTH_RETRY_PAUSE_MS));
+    let timer;
+    try {
+      // A hung Supabase connection must not block the entire scan pipeline.
+      const result = await Promise.race([
+        supabase.auth.getUser(token),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('auth_timeout')), AUTH_TIMEOUT_MS); }),
+      ]);
+      user = result.data?.user;
+      error = result.error;
+      timedOut = false;
+    } catch {
+      user = undefined;
+      error = undefined;
+      timedOut = true;
+    } finally {
+      clearTimeout(timer);
+    }
+    // A rejected token is a verdict, not a wobble: stop retrying it.
+    if ((user && !error) || isTokenRejected(error)) break;
+  }
+  if (timedOut) {
+    // This path used to return 503 silently, which is exactly why a week of
+    // failed scans left no trace anyone could search for.
+    console.log(`[auth] verification timed out after ${AUTH_ATTEMPTS} attempts at ${AUTH_TIMEOUT_MS}ms`);
     res.status(503).json({ error: 'Authentication service unavailable', retryable: true });
     return null;
   }
