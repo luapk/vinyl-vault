@@ -1801,7 +1801,19 @@ function SaveConfirmation({ release, accentRGB }) {
 // three of them. On mobile the card is a row (icon beside the words) so all
 // three fit the screen without scrolling; from sm up it is the original
 // centred column.
-function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, title, onClick, children, ...rest }) {
+const VIEWFINDER_CORNERS = [
+  ['tl', { top: 10, left: 10, borderRight: 'none', borderBottom: 'none', borderRadius: '5px 0 0 0' }],
+  ['tr', { top: 10, right: 10, borderLeft: 'none', borderBottom: 'none', borderRadius: '0 5px 0 0' }],
+  ['bl', { bottom: 10, left: 10, borderRight: 'none', borderTop: 'none', borderRadius: '0 0 0 5px' }],
+  ['br', { bottom: 10, right: 10, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 5px 0' }],
+];
+
+// The four ways into the app are not equals: scanning a sleeve is what Vinyl
+// Vault is for, and the other two are how you get a backlog in. `variant`
+// carries that ranking. "hero" is the wide viewfinder panel, "compact" the
+// half-height pair beneath it.
+function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, title, subtitle, onClick, children, ...rest }) {
+  const hero = variant === 'hero';
   const style = isLight ? {
     background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
     boxShadow: `inset 0 1px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(0,0,0,0.03), 0 16px 48px -12px rgba(0,0,0,0.16), 0 4px 12px -4px rgba(0,0,0,0.09), 0 0 0 1px rgba(255,255,255,0.7)${glow ? `, 0 0 48px -10px rgba(${accentRGB},0.28)` : ''}`,
@@ -1819,20 +1831,37 @@ function AddCard({ isLight, accentRGB, glow = false, as: Tag = 'button', index =
     // area by construction, and it gets keyboard focus for free.
     <Tag
       onClick={onClick}
-      className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] p-4 sm:p-7 ${className}`}
+      className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] ${hero ? 'px-5 py-7 sm:py-9' : 'p-4'} ${className}`}
       style={{ ...style, border: 'none', cursor: 'pointer', animationDelay: `${index * 90}ms` }}
       {...rest}>
-      <div className="flex flex-row sm:flex-col items-center gap-4 sm:gap-4 text-left sm:text-center">
+      {/* Viewfinder brackets, hero only. They say "camera" before a word of
+          the label is read, which is the whole job of this card. The brand
+          acid rather than the artwork accent: on the idle screen no cover has
+          been read yet, so `accent` is still the pale grey default and the
+          brackets would be invisible. */}
+      {hero && VIEWFINDER_CORNERS.map(([corner, pos]) => (
+        <span key={corner} aria-hidden="true" style={{
+          position: 'absolute', width: 17, height: 17,
+          border: `1.5px solid ${isLight ? '#6E8A00' : '#CAFE04'}`,
+          ...pos,
+        }} />
+      ))}
+      <div className={hero
+        ? 'relative flex flex-col items-center gap-3 text-center'
+        : 'relative flex flex-col gap-3 text-left'}>
         {/* Light mode only: a black tile with a white icon, which the pale
             card needs to give the icon any weight. Dark mode keeps the glass
             tile, where a black square would sink into a near-black card. */}
-        <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0${isLight ? '' : ' vv-glass-tile'}`}
+        <div className={`${hero ? 'w-14 h-14' : 'w-10 h-10'} rounded-2xl flex items-center justify-center shrink-0${isLight ? '' : ' vv-glass-tile'}`}
           style={isLight ? { background: '#08080c' } : undefined}>
-          <Icon size={20} weight="light" style={{ color: isLight ? '#ffffff' : 'rgba(var(--fg),0.72)' }} />
+          <Icon size={hero ? 24 : 18} weight="light" style={{ color: isLight ? '#ffffff' : 'rgba(var(--fg),0.72)' }} />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] sm:text-[12px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
-          <div className="text-base sm:text-[17px] leading-snug font-display">{title}</div>
+          {kicker && (
+            <div className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
+          )}
+          <div className={`${hero ? 'text-[21px] sm:text-[24px]' : 'text-[16px] sm:text-[17px]'} leading-snug font-display`}>{title}</div>
+          {subtitle && <div className="text-[13px] mt-1 text-white/40">{subtitle}</div>}
         </div>
       </div>
       {children}
@@ -1912,8 +1941,10 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
 
   return (
     <div className="pt-10 md:pt-20 flex flex-col items-center">
-      {/* Heading section - left-aligned */}
-      <div className="w-full max-w-2xl mb-14 md:mb-20">
+      {/* Heading section - left-aligned. The margin below it used to be
+          mb-14/mb-20, which put ~140px of nothing between the greeting and
+          the first tap target and pushed the routes down a phone screen. */}
+      <div className="w-full max-w-xl mb-7 md:mb-9">
         <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
         <h1 className="text-[38px] md:text-[58px] leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
           {greeting
@@ -1925,14 +1956,14 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
             saved their first record they know what it does, so it retires
             itself rather than taking up the top of the screen forever. */}
         {collection.length === 0 && (
-          <p className="text-white/45 text-sm md:text-base max-w-lg leading-relaxed">
+          <p className="text-white/45 text-sm max-w-lg leading-relaxed">
             Photograph a sleeve. Get the pressing confirmed, the tracklist loaded, BPM data attached, and the record filed exactly where you want it.
           </p>
         )}
       </div>
 
       {/* Cards grid - centred */}
-      <div className="relative max-w-lg mx-auto w-full" style={{ overflow: 'visible' }}>
+      <div className="relative max-w-xl mx-auto w-full" style={{ overflow: 'visible' }}>
         {/* Colour blobs behind the glass panels — only rendered in light mode */}
         {isLight && (
           <div style={{ position: 'absolute', inset: '-35% -20%', pointerEvents: 'none' }}>
@@ -1941,16 +1972,19 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
             <div style={{ position: 'absolute', top: '42%', left: '38%', width: '36%', height: '38%', background: 'radial-gradient(ellipse, rgba(100,200,255,0.22), transparent 60%)', filter: 'blur(40px)' }} />
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Camera / scan card */}
-        <AddCard isLight={isLight} accentRGB={accentRGB} glow index={0} type="button"
-          icon={Camera} kicker="Single record" title="Scan label, barcode or sleeve"
+        {/* Camera / scan card. Full width and twice the height of the other
+            two, because scanning a sleeve is what the app is for and drawing
+            all three at equal weight made the user choose where there was
+            nothing to choose. */}
+        <AddCard isLight={isLight} accentRGB={accentRGB} glow variant="hero" index={0} type="button"
+          icon={Camera} title="Scan a record" subtitle="Label, barcode or sleeve"
           onClick={() => setShowCamera(true)} aria-label="Scan a record with the camera" />
 
+        <div className="grid grid-cols-2 gap-3 mt-3">
         {/* Batch queue card. A label rather than a button: the whole panel
             delegates to the file input inside it, from any child. */}
         <AddCard isLight={isLight} accentRGB={accentRGB} as="label" index={1} className="block cursor-pointer"
-          icon={GridNine} kicker="Multiple records" title="Upload photo/s">
+          icon={GridNine} kicker="Multiple" title="Upload photo/s">
           <input type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} />
         </AddCard>
@@ -1962,17 +1996,30 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
         <AddCard isLight={isLight} accentRGB={accentRGB} index={2} type="button"
           icon={Export} kicker="From a list" title="Import CSV or text"
           onClick={() => importFileRef.current?.click()} aria-label="Import a CSV or text file" />
-        </div>{/* end grid */}
+        </div>{/* end two-up */}
       </div>{/* end relative wrapper */}
 
-      <div className="mt-4 flex flex-col items-center gap-2">
-        {onManual && (
-          <button onClick={onManual} className="inline-flex items-center gap-1.5 text-[14px] font-mono text-white/28 hover:text-white/50 transition-colors">
-            <MagnifyingGlass size={11} />
-            or type artist & title to search
+      {/* Typing a name is a first-class way in, not a footnote. It used to be
+          a 28%-opacity mono line with no field around it and a 14px tap
+          target; as a full-width pill it looks like something you can type
+          into and clears the 44px minimum. */}
+      {onManual && (
+        <div className="max-w-xl mx-auto w-full mt-3">
+          <button onClick={onManual}
+            className="w-full flex items-center gap-2.5 rounded-full transition-colors hover:brightness-110"
+            style={{
+              padding: '13px 18px',
+              background: isLight ? 'rgba(255,254,250,0.75)' : 'rgba(var(--fg),0.05)',
+              border: '1px solid rgba(var(--fg),0.12)',
+              color: 'rgba(var(--fg),0.42)',
+              fontSize: 14,
+              cursor: 'pointer',
+            }}>
+            <MagnifyingGlass size={15} />
+            Artist &amp; title
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showCamera && <CameraModal onCapture={handleCapture} onBarcode={handleBarcode} onClose={() => setShowCamera(false)} />}
 

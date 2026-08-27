@@ -215,7 +215,7 @@ test('back to results returns to the pressings already fetched, for free', async
   });
   await signIn(page);
 
-  await page.getByRole('button', { name: /type artist & title to search/i }).click();
+  await page.getByRole('button', { name: /^artist & title$/i }).click();
   await page.getByPlaceholder('e.g. Nelly Furtado').fill('Kraftwerk');
   await page.getByRole('button', { name: /Search Discogs/i }).click();
 
