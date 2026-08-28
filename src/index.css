@@ -480,3 +480,52 @@ body {
     0 12px 24px -8px var(--crate-shadow),
     0 2px 4px rgba(20, 20, 30, 0.12);
 }
+
+/* ----- Trace radar -----------------------------------------------------------
+   The sweep shown while a hunt runs. It is honest theatre: the hunt really is
+   doing three network round trips, and a bare spinner would say nothing about
+   what is being looked at. The rings are the pressings, the sweep is the
+   search, and both stop the moment the answer lands.
+
+   Built from transforms and opacity only, so it composites on the GPU and does
+   not cost anything on a phone that is also decoding cover art. */
+@keyframes vv-radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes vv-radar-ping {
+  0%   { transform: scale(0.35); opacity: 0.55; }
+  70%  { opacity: 0.06; }
+  100% { transform: scale(1);    opacity: 0; }
+}
+
+.vv-radar { position: relative; border-radius: 999px; overflow: hidden; }
+.vv-radar-ring {
+  position: absolute; inset: 0; border-radius: 999px;
+  border: 1px solid rgba(var(--fg), 0.16);
+}
+.vv-radar-ping {
+  position: absolute; inset: 0; border-radius: 999px;
+  border: 1px solid var(--vv-radar-colour, #CAFE04);
+  animation: vv-radar-ping 2.4s ease-out infinite;
+}
+.vv-radar-ping:nth-of-type(2) { animation-delay: 0.8s; }
+.vv-radar-ping:nth-of-type(3) { animation-delay: 1.6s; }
+.vv-radar-sweep {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 300deg, var(--vv-radar-colour, #CAFE04) 360deg);
+  opacity: 0.5;
+  animation: vv-radar-sweep 2.4s linear infinite;
+}
+.vv-radar-dot {
+  position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px;
+  border-radius: 999px; background: var(--vv-radar-colour, #CAFE04);
+}
+
+/* A sweeping cone and three expanding rings are exactly the kind of motion
+   that makes a vestibular disorder worse. Hold the shape, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .vv-radar-sweep, .vv-radar-ping { animation: none; }
+  .vv-radar-ping:first-of-type { opacity: 0.4; transform: scale(0.7); }
+}

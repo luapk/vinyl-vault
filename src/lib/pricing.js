@@ -2,7 +2,11 @@
 // Currency: GBP. Billing: annual.
 
 export const PRICE_SELECTOR_YEAR  = 18;
-export const PRICE_RESIDENT_YEAR  = 39;
+// Resident carries Trace, which is a purchasing tool with a cost per hunt
+// rather than a catalogue feature, so it is priced against the mistake it
+// prevents rather than against collection apps. Anyone already on Resident
+// keeps their price and gets Trace; this is the number new subscribers see.
+export const PRICE_RESIDENT_YEAR  = 79;
 export const PRICE_FOUNDING       = 59;
 export const FOUNDING_SEATS       = 500;
 export const FREE_SCANS           = 30;

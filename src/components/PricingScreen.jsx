@@ -60,8 +60,9 @@ const TIERS = [
     comingSoon: false,
     priceEnvKey: 'VITE_STRIPE_PRICE_RESIDENT_YEAR',
     features: [
-      'Saved, reorderable set crates',
-      'Offline booth mode',
+      'Wishlist: keep what you are hunting in one place',
+      'Trace: every pressing, every copy for sale',
+      'True landed price, with shipping, VAT and fees',
       'Priority support and early access',
       'All Selector features',
     ],
@@ -88,7 +89,7 @@ const ROUNDEL_INSIDE = ROUNDEL - OVERLAP;
 // the right says "there is more", this says what the more actually is.
 const UPSELL = {
   Digger:   'Selector adds unlimited scans and Tracks',
-  Selector: 'Resident adds set crates and booth mode',
+  Selector: 'Resident adds the wishlist and Trace',
 };
 
 function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {

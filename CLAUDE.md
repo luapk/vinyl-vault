@@ -32,7 +32,10 @@ concurrent-refresh race that guards the auth lock, account isolation on a
 shared device, the smart-crate runs (which may only ever ADD crate names), the
 file import under Discogs rate limiting (a 429 must never be saved as an
 unmatched record), and the rule that a community profile can never become
-somebody's home page.
+somebody's home page, and the wishlist and Trace rules (a pinned record
+survives a reload with no wishlist tables on the database, a rate limit is
+never shown as no match, and Trace spends no Discogs quota for a user who
+cannot use it).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -61,6 +64,54 @@ dropped rather than looked up. The decoded number goes to `/api/scan` as
 search. `npm run bench:barcode` renders 100 barcodes under camera-like
 degradation and reports read rate and decode time.
 
+### Wishlist and Trace
+The Wishlist tab (`src/components/Wishlist.jsx`, `src/hooks/useWishlist.js`) is
+one screen doing two jobs: what you are hunting, and what each one costs. Search
+resolves through the same `/api/discogs-search` the scan screen uses, picking a
+result pins it, and the crosshair beside a pinned row fires `/api/trace`. The
+result renders under that row and is stored, so coming back shows the answer
+rather than paying for it again.
+
+- **Trace runs only on endpoints the app is permitted to use.** The release
+  document, the versions list off its master, marketplace stats and price
+  suggestions. It does not scrape marketplaces, hold a copy of the Discogs
+  database, or make model calls -- every figure is a fetch or arithmetic, which
+  is what lets the card name a source for each one. Bolting a scraper onto this
+  changes the legal position of the whole product, not just the feature.
+- **The landed cost is the point, and it is an estimate.** `src/lib/landedCost.js`
+  (unit-tested) turns an asking price plus an origin into a total: FX, corridor
+  shipping by weight band, UK import VAT, duty, courier handling, card spread.
+  It exists because sorting by asking price is wrong whenever the objects being
+  compared sit in different countries. Two rules it must keep: an unknown
+  currency returns null rather than pricing yen as pounds, and an unknown origin
+  gets the EXPENSIVE corridor, because an under-estimate is the failure that
+  costs the user money. The 135 GBP threshold moves WHERE VAT is paid, not
+  whether -- treating cheap imports as VAT-free would understate every one.
+- **Discogs reports where a pressing was MADE, not where the copy sits.** The
+  card says so in as many words. Anything that prints a landed total has to keep
+  that sentence, or the number becomes a claim about somebody's money that the
+  data does not support.
+- **The verdict is deterministic, not generated.** Thresholds live in
+  `api/lib/trace.js` so they can be argued with, they cost nothing per hunt, and
+  they cannot invent a sentence nobody can check. It never asserts authenticity
+  and never tells the user to buy.
+- **Load merges, it does not replace.** Both items and stored results keep
+  anything local the cloud does not have. An empty cloud result would otherwise
+  wipe a card added while the insert was failing -- offline, or before
+  `supabase/wishlist.sql` has been run -- which is the same no-data-loss rule the
+  collection merge follows. Both bugs were real and are guarded by
+  `stress/wishlist.spec.mjs`.
+- **Trace is gated server-side.** `api/trace.js` checks the tier before spending
+  any Discogs quota; hiding the button would leave the endpoint open to anyone
+  holding a token. The tab itself is not gated, because a locked tab teaches
+  nobody what they would be paying for.
+- **A rate limit is not an answer about a record**, the same rule the file import
+  follows: a 429 from the search must never render as "no match", or the user
+  pins a cold case that would have resolved a minute later.
+- FX uses a table in `landedCost.js` with its date shown on the card;
+  `api/lib/trace.js` tries a live ECB rate first and falls back silently. A rate
+  that fails must never leave the card with no number.
+
 ### Error tracking (Sentry)
 `src/lib/sentry.js` -- inert unless the Vercel env var `VITE_SENTRY_DSN` is
 set (create a free React project at sentry.io and paste its DSN). No PII is
@@ -77,9 +128,11 @@ src/
     AdminPanel.jsx     # admin user management
     Badges.jsx         # milestone unlock card + the grid in the account panel
     FileImport.jsx     # CSV/text import hook + status list, shared by home and account
+    Wishlist.jsx       # the Wishlist tab: pin a record, trace it, keep the answer
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
+    useWishlist.js     # wishlist items + stored trace results
   lib/
     supabase.js        # Supabase client (handles both legacy JWT and publishable keys)
     badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
@@ -97,6 +150,7 @@ api/                   # Vercel serverless functions (all secret keys live here)
   audio-proxy.js       # preview audio proxy (CORS): Apple, Spotify, Deezer CDNs
   image-proxy.js       # cover art proxy (CORS) for caching covers into storage
   price.js             # Discogs price history
+  trace.js             # one hunt: pressings, live listings, landed cost, verdict
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
 
@@ -113,6 +167,7 @@ supabase/
   import-jobs.sql      # background import queue + claim_import_job
   profile-privacy.sql  # column grants that keep email + Stripe ids off public profiles
   bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
+  wishlist.sql         # wishlist_items + trace_results (Wishlist tab)
 ```
 
 ## Security rules
@@ -185,6 +240,7 @@ Also run when updating an existing database:
 - `supabase/profile-privacy.sql` (stops a public profile exposing its email and Stripe ids; also adds `admin_list_users`, which the admin panel now calls instead of selecting the table)
 - `supabase/import-jobs.sql` (background file imports; until it is run, imports keep running in the browser and stop when the tab does)
 - `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
+- `supabase/wishlist.sql` (the Wishlist tab; until it is run the tab works but saves to this device only)
 
 ## Data model
 

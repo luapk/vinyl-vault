@@ -13,6 +13,7 @@
 //   POST /__test/revoke              -- { email } revoke every session family
 //   POST /__test/seed-records        -- { email, records: [recordJson] }
 //   POST /__test/set-profile         -- { email, username?, isPublic? }
+//   POST /__test/set-tier            -- { email, tier } subscription tier
 //   GET  /__test/state               -- { records, users, revocations }
 import http from 'node:http';
 
@@ -55,7 +56,7 @@ function profileJson(u) {
   return {
     id: u.id, email: u.email, role: u.email === 'paul@test.local' ? 'admin' : 'user',
     avatar_url: null, display_name: u.displayName, username: u.username, bio: null,
-    is_public: !!u.isPublic, preferences: null, subscription_tier: 'free',
+    is_public: !!u.isPublic, preferences: null, subscription_tier: u.tier || 'free',
     subscription_status: null, scans_this_period: 0, scans_period_end: null,
   };
 }
@@ -156,6 +157,12 @@ const server = http.createServer(async (req, res) => {
 
   // ---- control --------------------------------------------------------------
   if (path === '/__test/reset') { reset(); return send(res, 200, { ok: true }); }
+  if (path === '/__test/set-tier') {
+    const { email, tier } = await readBody(req);
+    const u = state.users.get(email);
+    if (u) u.tier = tier;
+    return send(res, 200, { ok: !!u });
+  }
   if (path === '/__test/config') {
     const body = await readBody(req);
     if (body.graceMs !== undefined) state.graceMs = body.graceMs;

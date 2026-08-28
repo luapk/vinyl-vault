@@ -1,17 +1,40 @@
 {
   "crons": [
-    { "path": "/api/import-worker", "schedule": "*/2 * * * *" }
+    {
+      "path": "/api/import-worker",
+      "schedule": "*/2 * * * *"
+    }
   ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "functions": {
-    "api/scan.js": { "maxDuration": 60 },
-    "api/discogs-search.js": { "maxDuration": 15 },
-    "api/import-worker.js": { "maxDuration": 300 },
-    "api/spotify-features.js": { "maxDuration": 30 },
-    "api/stripe-checkout.js": { "maxDuration": 15 },
-    "api/stripe-portal.js": { "maxDuration": 15 },
-    "api/stripe-webhook.js": { "maxDuration": 15 }
+    "api/scan.js": {
+      "maxDuration": 60
+    },
+    "api/discogs-search.js": {
+      "maxDuration": 15
+    },
+    "api/import-worker.js": {
+      "maxDuration": 300
+    },
+    "api/spotify-features.js": {
+      "maxDuration": 30
+    },
+    "api/stripe-checkout.js": {
+      "maxDuration": 15
+    },
+    "api/stripe-portal.js": {
+      "maxDuration": 15
+    },
+    "api/stripe-webhook.js": {
+      "maxDuration": 15
+    },
+    "api/trace.js": {
+      "maxDuration": 30
+    }
   }
 }

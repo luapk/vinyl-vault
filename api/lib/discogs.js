@@ -306,6 +306,11 @@ export async function fetchDiscogsRelease(id) {
     year: r.year || null,
     country: r.country || null,
     format: (r.formats || []).map(f => f.name).join(', ') || null,
+    // Kept separate from `format` because the descriptions are what carry the
+    // shape ("LP", "7\"", "2 x Vinyl"), and Trace prices shipping off the
+    // packed weight that shape implies. recordFromRelease whitelists track and
+    // record fields, so this is additive and never reaches a saved record.
+    formatDescriptions: (r.formats || []).flatMap(f => f.descriptions || []),
     genres: [...(r.genres || []), ...(r.styles || [])],
     topGenres: r.genres || [],
     tracklist,
@@ -326,6 +331,46 @@ const SUGGESTION_GRADES = [
   ['Fair (F)', 'F'],
   ['Poor (P)', 'P'],
 ];
+
+// How many pressings of this record exist, and in which countries.
+//
+// Answers the question the handoff doc calls "which press is which" with the
+// only data Discogs permits us to hold: the versions list off the master. A
+// release with no master has exactly one known pressing, which is itself, and
+// that is a useful answer rather than a missing one.
+export async function fetchMasterVersions(masterId) {
+  if (!masterId) return null;
+  const headers = authHeaders();
+  const res = await fetchWithRetry(
+    `${BASE}/masters/${masterId}/versions?per_page=100&sort=released&sort_order=asc`,
+    { headers }, 1, 6000,
+  );
+  if (!res || !res.ok) return null;
+  const data = await res.json().catch(() => null);
+  if (!data) return null;
+
+  const versions = (data.versions || []).map(v => ({
+    id: String(v.id),
+    year: v.released || null,
+    country: v.country || null,
+    label: v.label || null,
+    catNo: v.catno || null,
+    format: v.format || null,
+  }));
+
+  const byCountry = {};
+  for (const v of versions) {
+    const c = v.country || 'Unknown';
+    byCountry[c] = (byCountry[c] || 0) + 1;
+  }
+
+  return {
+    total: data.pagination?.items ?? versions.length,
+    listed: versions.length,
+    versions,
+    byCountry: Object.entries(byCountry).sort((a, b) => b[1] - a[1]).map(([country, n]) => ({ country, n })),
+  };
+}
 
 export async function fetchDiscogsPrice(releaseId) {
   const headers = authHeaders();

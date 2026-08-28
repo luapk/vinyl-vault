@@ -73,6 +73,25 @@ export function flagFor(country) {
   return flags.join('');
 }
 
+// The ISO code behind a Discogs country string, for anything that needs to key
+// off the country rather than print it -- the shipping corridor, chiefly.
+// Exported from here rather than copied, because two vocabularies for the same
+// field drift, and the failure is quiet: a pressing whose flag renders but
+// whose shipping falls back to rest-of-world.
+//
+// A combined territory ("UK, Europe & US") resolves to its first recognised
+// member. That is a guess about where a copy is likely to be, not a fact about
+// where this one is, and the caller is expected to label it as such.
+export function isoFor(country) {
+  const key = String(country || '').trim().toLowerCase();
+  if (!key || NO_FLAG.has(key)) return null;
+  if (ISO[key]) return ISO[key];
+  for (const part of key.split(TERRITORY_SEPARATOR).map(p => p.trim())) {
+    if (part && !NO_FLAG.has(part) && ISO[part]) return ISO[part];
+  }
+  return null;
+}
+
 // Country with its flag, for a one-line meta row. Falls back to the bare name.
 export function countryLabel(country) {
   const name = String(country || '').trim();

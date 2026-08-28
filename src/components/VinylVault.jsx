@@ -5,7 +5,7 @@ import {
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Crown, SignOut, ChartBar, Users,
   ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
-  MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple,
+  MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple, Binoculars,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
 import { useAuth } from "../hooks/useAuth.js";
@@ -16,8 +16,10 @@ import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
 import ChatPanel from "./ChatPanel.jsx";
 import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
+import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { freshAccessToken } from '../lib/authToken.js';
 import { camelotColor } from '../lib/camelot.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
 import { legibleAccentRGB } from '../lib/accentContrast.js';
@@ -31,24 +33,6 @@ import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
 import { supabase } from '../lib/supabase.js';
-
-// A Supabase access token expires ~hourly. The cached token from useAuth stays
-// fresh only while background auto-refresh fires; if the app sat idle the
-// cached token can be expired, so authed API calls (/api/scan) 401. getSession()
-// returns the current token and transparently refreshes an expired one -- we
-// race it against a timeout so a stalled refresh can never hang the call, and
-// fall back to the cached token if it does.
-async function freshAccessToken(fallback) {
-  try {
-    const { data } = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 8000)),
-    ]);
-    return data?.session?.access_token || fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -713,7 +697,7 @@ function getGreeting(name) {
 export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
-  const { tier, isPaid, startCheckout, openPortal } = useSubscription(user, profile);
+  const { tier, isPaid, isActive, startCheckout, openPortal } = useSubscription(user, profile);
 
   // Splash stays up for one full loop of the chosen WebP clip (its duration),
   // and for as long as auth is genuinely still loading. WebP <img> has no
@@ -1445,6 +1429,11 @@ export default function VinylVault() {
   const navItems = [
     { id: "scan", label: "Scan", icon: Scan },
     { id: "collection", label: collection.length ? `Collection (${collection.length})` : "Collection", icon: VinylRecord},
+    // Wishlist sits beside Collection because it is the same idea one step
+    // earlier: records you have, records you are after. Trace inside it is
+    // Resident-only, but the tab itself is not -- a locked tab teaches nobody
+    // what they would be paying for.
+    { id: "wishlist", label: "Wishlist", icon: Binoculars },
     // Tracks is a Selector feature. Free users still see the tab, with a lock:
     // hiding it means nobody ever discovers what they would be paying for.
     ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes, locked: !isPaid }] : []),
@@ -1486,6 +1475,10 @@ export default function VinylVault() {
                 // reached from the tile on that screen, or from NEW SCAN.
                 if (id === "scan" && appView !== "scan") reset();
               }}
+              // The label is hidden below sm, which left these buttons with no
+              // accessible name on exactly the screens most people use.
+              aria-label={label}
+              aria-current={appView === id ? 'page' : undefined}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${navAccentRGB},0.15)`, border: `1px solid rgba(${navAccentRGB},0.35)`, color: `rgb(${navAccentRGB})`, boxShadow: `0 0 12px -4px rgba(${navAccentRGB},0.3)` }
@@ -1571,6 +1564,15 @@ export default function VinylVault() {
         )}
         {appView === "collection" && (
           <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} userId={userId} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
+        )}
+        {appView === "wishlist" && (
+          <WishlistView
+            userId={userId}
+            accessToken={accessToken}
+            isLight={!isDark}
+            canTrace={tier === 'resident' && isActive}
+            onUpsell={() => setShowPricingModal(true)}
+          />
         )}
         {appView === "tracks" && isPaid && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
