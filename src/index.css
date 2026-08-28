@@ -529,3 +529,11 @@ body {
   .vv-radar-sweep, .vv-radar-ping { animation: none; }
   .vv-radar-ping:first-of-type { opacity: 0.4; transform: scale(0.7); }
 }
+
+/* The header tab row scrolls sideways rather than wrapping. Five tabs plus the
+   round buttons folded onto a second line on a 390px screen, which pushed the
+   whole page down and made the header look broken. Hide the scrollbar: the row
+   is short enough that a visible bar is noise, and the tabs fade off the edge
+   clearly enough to read as scrollable. */
+.vv-nav-row { scrollbar-width: none; -ms-overflow-style: none; }
+.vv-nav-row::-webkit-scrollbar { display: none; }

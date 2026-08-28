@@ -16,10 +16,13 @@ import { signIn, stubApi, resetMock, control, JON } from './helpers.mjs';
 //   - A stored result is still there when you come back, and clearing it is
 //     the user's decision.
 
+// Shaped exactly as searchDiscogs returns a row: `recordTitle` and `coverUrl`,
+// not `title` and `thumb`. Reading the wrong two left every result card with a
+// blank name and an empty artwork square in production while the tests passed.
 const MATCH = {
-  id: 249504, artist: 'Gat Decor', title: 'Passion', year: 1992,
+  id: 249504, masterId: '9911', artist: 'Gat Decor', recordTitle: 'Passion', year: 1992,
   label: 'Effective Records', catalogNumber: '12 EFFS 1', country: 'UK',
-  format: 'Vinyl, 12"', thumb: null,
+  format: 'Vinyl, 12"', coverUrl: null,
 };
 
 const TRACE_PAYLOAD = {
@@ -133,6 +136,17 @@ test('a resident traces a record, sees the sweep, and the result is still there 
   // Never asserted as fact: the estimate has to say what it is.
   await expect(page.getByText(/An estimate/)).toBeVisible();
 
+  // The name of the record has to survive the round trip from search to card.
+  await expect(page.getByText('Passion').first()).toBeVisible();
+
+  // Buy goes to the marketplace page for THIS release, not to the master,
+  // which is where a plain Discogs search would drop the user instead.
+  const buy = page.getByRole('link', { name: /buy now on discogs/i });
+  await expect(buy).toBeVisible();
+  await expect(buy).toHaveAttribute('href', 'https://www.discogs.com/sell/release/249504');
+  await expect(buy).toHaveAttribute('target', '_blank');
+  await expect(buy).toHaveAttribute('rel', /noopener/);
+
   await page.reload();
   await openWishlist(page);
   await expect(page.getByText('£49.51').first()).toBeVisible({ timeout: 15_000 });
@@ -155,4 +169,26 @@ test('clearing a stored result is the users decision, and leaves the record pinn
   await expect(page.getByText('£49.51')).toHaveCount(0);
   // The want survives the answer being thrown away.
   await expect(page.getByText('1 on the hunt')).toBeVisible();
+});
+
+test('the header tab row never wraps, and messages are reachable inside community', async ({ page, context }) => {
+  await resetMock();
+  await stubApi(context, { discogsMatches: [MATCH] });
+  await page.setViewportSize({ width: 360, height: 740 });
+  await signIn(page);
+
+  // Every tab button sits on the same line as the first one. Wrapping folded
+  // the icons onto a second row and pushed the whole page down.
+  const tabs = page.locator('nav.vv-nav-row button');
+  const count = await tabs.count();
+  expect(count).toBeGreaterThan(1);
+  const firstTop = (await tabs.first().boundingBox()).y;
+  for (let i = 1; i < count; i++) {
+    const box = await tabs.nth(i).boundingBox();
+    expect(Math.abs(box.y - firstTop)).toBeLessThan(4);
+  }
+
+  // Chat left the header, so Community has to carry it.
+  await page.getByRole('button', { name: /Community/ }).first().click();
+  await expect(page.getByRole('button', { name: /Messages/ })).toBeVisible({ timeout: 10_000 });
 });

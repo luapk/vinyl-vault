@@ -4,7 +4,7 @@ import {
   Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
   DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
   Scan, Crown, SignOut, ChartBar, Users,
-  ChatCircle, ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
+  ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
   MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple, Binoculars,
 } from "@phosphor-icons/react";
 import { useCollection, exportCSV } from "../hooks/useCollection.js";
@@ -1437,7 +1437,6 @@ export default function VinylVault() {
     // Tracks is a Selector feature. Free users still see the tab, with a lock:
     // hiding it means nobody ever discovers what they would be paying for.
     ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes, locked: !isPaid }] : []),
-    ...(isSupabaseEnabled && user ? [{ id: "community", label: "Community", icon: Users, badge: notifCount }] : []),
   ];
 
   return (
@@ -1461,7 +1460,7 @@ export default function VinylVault() {
           <img src="/logo-white.png" alt="Vinyl Vault" style={{ height: 56, opacity: 0.92 }} />
         </button>
 
-        <nav className="flex items-center gap-1.5 flex-wrap">
+        <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
           {navItems.map(({ id, label, icon: Icon, badge, locked }) => (
             <button
               key={id}
@@ -1479,7 +1478,7 @@ export default function VinylVault() {
               // accessible name on exactly the screens most people use.
               aria-label={label}
               aria-current={appView === id ? 'page' : undefined}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${navAccentRGB},0.15)`, border: `1px solid rgba(${navAccentRGB},0.35)`, color: `rgb(${navAccentRGB})`, boxShadow: `0 0 12px -4px rgba(${navAccentRGB},0.3)` }
                 : { background: "transparent", border: `1px solid rgba(var(--fg),${isDark ? 0.07 : 0.15})`, color: `rgba(var(--fg),${isDark ? 0.4 : 0.6})` }
@@ -1503,16 +1502,23 @@ export default function VinylVault() {
           ))}
         </nav>
 
-        {/* Chat + Account pair */}
+        {/* Community + Account pair */}
         {isSupabaseEnabled && user && (
           <div className="flex items-center gap-1.5 shrink-0">
-            <button onClick={() => { setChatRecipient(null); setChatOpen(p => !p); }} title="Messages"
+            {/* Community is chrome, not a tab: it is about people rather than
+                records, and moving it here is what gives the tab row the space
+                to stop wrapping. Its badge carries messages as well as
+                notifications, because messages now live inside it. */}
+            <button onClick={openCommunityHome} title="Community" aria-label="Community"
+              aria-current={appView === 'community' ? 'page' : undefined}
               className="relative w-8 h-8 rounded-full flex items-center justify-center transition-opacity hover:opacity-70"
-              style={{ border: chatOpen ? `1px solid rgba(${accentRGB},0.45)` : '1px solid rgba(var(--fg),0.18)', background: chatOpen ? `rgba(${accentRGB},0.12)` : 'rgba(var(--fg),0.06)', color: chatOpen ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.55)' }}>
-              <ChatCircle size={16} weight={chatOpen ? 'fill' : 'regular'} />
-              {msgUnread > 0 && (
-                <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: `rgb(${accentRGB})`, fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
-                  {msgUnread > 9 ? '9+' : msgUnread}
+              style={appView === 'community'
+                ? { border: `1px solid rgba(${navAccentRGB},0.45)`, background: `rgba(${navAccentRGB},0.12)`, color: `rgb(${navAccentRGB})` }
+                : { border: '1px solid rgba(var(--fg),0.18)', background: 'rgba(var(--fg),0.06)', color: 'rgba(var(--fg),0.55)' }}>
+              <Users size={16} weight={appView === 'community' ? 'fill' : 'regular'} />
+              {(notifCount + msgUnread) > 0 && (
+                <span style={{ position: 'absolute', top: -3, right: -3, minWidth: 14, height: 14, borderRadius: 7, background: '#22c55e', fontSize: 13, fontWeight: 700, color: '#000', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                  {(notifCount + msgUnread) > 9 ? '9+' : (notifCount + msgUnread)}
                 </span>
               )}
             </button>
@@ -1589,6 +1595,8 @@ export default function VinylVault() {
             onOpenProfile={openProfile}
             onOpenHome={openCommunityHome}
             onOpenAccount={() => setShowAccount(true)}
+            onOpenMessages={() => { setChatRecipient(null); setChatOpen(true); }}
+            messageUnread={msgUnread}
             collection={collection}
             onOpenChat={(recipient) => { setChatRecipient(recipient); setChatOpen(true); }}
             onlineUsers={onlineUsers}

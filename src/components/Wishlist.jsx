@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  MagnifyingGlass, Crosshair, Trash, CaretDown, CaretRight, Plus, LockSimple, X,
+  MagnifyingGlass, Crosshair, Trash, CaretDown, CaretRight, Plus, LockSimple, X, ArrowUpRight,
 } from '@phosphor-icons/react';
 import { useWishlist } from '../hooks/useWishlist.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
@@ -53,7 +53,8 @@ function timeAgo(iso) {
 // and it is also the only thing that makes a number about somebody's money
 // worth showing: the user can check it rather than trust it.
 function TracePanel({ payload, isLight, onClear }) {
-  const { cost, market, pressings, verdict, recourse, sources, checkedAt } = payload;
+  const { cost, market, pressings, verdict, recourse, sources, checkedAt, releaseId } = payload;
+  const forSale = market.totalListings > 0;
   const accent = isLight ? ACID_ON_PAPER : ACID;
   const line = 'rgba(var(--fg),0.10)';
 
@@ -75,6 +76,28 @@ function TracePanel({ payload, isLight, onClear }) {
             </div>
           )}
         </div>
+
+        {/* Straight to the copies of THIS pressing, not to the master, which
+            is where a Discogs search would otherwise dump you. The label tells
+            the truth about what is on the other side: with nothing listed
+            there is nothing to buy, and calling it "Buy now" would be a lie
+            the next tap exposes. */}
+        {releaseId && (
+          <a
+            href={`https://www.discogs.com/sell/release/${releaseId}`}
+            target="_blank" rel="noopener noreferrer"
+            className="mt-3.5 w-full flex items-center justify-center gap-2 rounded-full transition-all hover:brightness-110"
+            style={{
+              padding: '11px 0', fontSize: 13, fontWeight: 600, letterSpacing: '0.1em',
+              textTransform: 'uppercase', fontFamily: 'monospace', textDecoration: 'none',
+              background: forSale ? (isLight ? '#08080c' : accent) : 'transparent',
+              color: forSale ? (isLight ? '#ffffff' : '#08080c') : 'rgba(var(--fg),0.55)',
+              border: forSale ? 'none' : '1px solid rgba(var(--fg),0.16)',
+            }}>
+            {forSale ? 'Buy now on Discogs' : 'See it on Discogs'}
+            <ArrowUpRight size={14} weight="bold" />
+          </a>
+        )}
         {verdict.notes.length > 0 && (
           <ul className="mt-3 flex flex-col gap-1.5">
             {verdict.notes.map((n, i) => (
@@ -382,10 +405,13 @@ export default function WishlistView({ userId, accessToken, isLight, canTrace, o
                   className="flex items-center gap-3 p-3 rounded-2xl text-left transition-all hover:brightness-110"
                   style={{ background: 'rgba(var(--fg),0.045)', border: '1px solid rgba(var(--fg),0.09)', cursor: 'pointer' }}>
                   <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0" style={{ background: 'rgba(var(--fg),0.07)' }}>
-                    {c.thumb && <img src={c.thumb} alt="" className="w-full h-full object-cover" loading="lazy" />}
+                    {(c.coverUrl || c.thumb) && <img src={c.coverUrl || c.thumb} alt="" className="w-full h-full object-cover" loading="lazy" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14px] font-display truncate">{c.title}</div>
+                    {/* searchDiscogs splits "Artist - Title" into `artist` and
+                        `recordTitle`. Reading `title` here left the name of the
+                        record blank on every card. */}
+                    <div className="text-[14px] font-display truncate">{c.recordTitle || c.title}</div>
                     <div className="text-[12px] text-white/45 truncate">{c.artist}</div>
                     <div className="text-[11px] font-mono text-white/28 truncate">
                       {[c.year, c.label, c.catalogNumber].filter(Boolean).join(' · ')}

@@ -129,13 +129,15 @@ export function useWishlist(userId) {
       releaseId: candidate.id ? String(candidate.id) : null,
       rawQuery,
       artist: candidate.artist || '',
-      title: candidate.title || '',
+      // searchDiscogs returns `recordTitle`; a scan result returns `title`.
+      // Accept both, or the pinned card carries an empty name.
+      title: candidate.recordTitle || candidate.title || '',
       label: candidate.label || null,
       catNo: candidate.catalogNumber || candidate.catNo || null,
       year: candidate.year || null,
       country: candidate.country || null,
       format: candidate.format || null,
-      coverUrl: candidate.thumb || candidate.coverUrl || null,
+      coverUrl: candidate.coverUrl || candidate.thumb || null,
       note: null,
       category: 'want',
       createdAt: new Date().toISOString(),

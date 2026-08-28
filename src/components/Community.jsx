@@ -633,7 +633,7 @@ function ProfileMessage({ title, body, onBack, profile }) {
 
 // ─── Community home (feed + search + your profile) ────────────────────────────
 
-function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection, onOpenChat, onlineUsers }) {
+function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, onShare, onOpenAccount, collection, onOpenChat, onOpenMessages, messageUnread = 0, onlineUsers }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -701,6 +701,31 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
       <h1 className="text-[31px] md:text-[41px] leading-[0.95] mb-8 font-display tracking-tight">
         Connect with <span className="italic" style={{ color: 'rgba(var(--fg),0.45)' }}>likeminded collectors.</span>
       </h1>
+
+      {/* Messages. This used to be a third round button in the header, which is
+          what made the top row wrap on a phone. It belongs here anyway: the
+          messages are with the people this screen is about. */}
+      {onOpenMessages && (
+        <button onClick={onOpenMessages}
+          className="w-full rounded-2xl p-4 mb-4 flex items-center gap-3 text-left transition-all hover:brightness-110"
+          style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)', cursor: 'pointer' }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: `rgba(${accentRGB},0.12)`, border: `1px solid rgba(${accentRGB},0.35)`, color: `rgb(${accentRGB})` }}>
+            <ChatCircle size={18} weight={messageUnread > 0 ? 'fill' : 'regular'} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-medium" style={{ color: 'rgba(var(--fg),0.85)' }}>Messages</div>
+            <div className="text-[12px] font-mono text-white/40">
+              {messageUnread > 0 ? `${messageUnread} unread` : 'Your conversations'}
+            </div>
+          </div>
+          {messageUnread > 0 && (
+            <span className="shrink-0" style={{ minWidth: 20, height: 20, borderRadius: 10, background: '#22c55e', fontSize: 12, fontWeight: 700, color: '#000', fontFamily: 'monospace', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>
+              {messageUnread > 9 ? '9+' : messageUnread}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Your profile card */}
       <div className="rounded-2xl p-4 mb-4 flex items-center gap-3" style={{ background: 'rgba(var(--fg),0.04)', border: '1px solid rgba(var(--fg),0.08)' }}>
@@ -940,7 +965,7 @@ function CommunityHome({ currentUser, currentProfile, accentRGB, onOpenProfile, 
 
 // ─── Top-level Community view ─────────────────────────────────────────────────
 
-export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection, onOpenChat, onlineUsers }) {
+export default function CommunityView({ currentUser, currentProfile, accentRGB, profileUsername, onOpenProfile, onOpenHome, onOpenAccount, collection, onOpenChat, onOpenMessages, messageUnread = 0, onlineUsers }) {
   const [toast, setToast] = useState('');
 
   const share = useCallback((username) => {
@@ -978,6 +1003,8 @@ export default function CommunityView({ currentUser, currentProfile, accentRGB, 
           onOpenAccount={onOpenAccount}
           collection={collection}
           onOpenChat={onOpenChat}
+          onOpenMessages={onOpenMessages}
+          messageUnread={messageUnread}
           onlineUsers={onlineUsers}
         />
       )}
