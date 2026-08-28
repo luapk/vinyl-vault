@@ -1201,6 +1201,15 @@ export default function VinylVault() {
     reset();
   };
 
+  // Home, unconditionally. The SCAN nav button only resets when it is coming
+  // from another view, so that pressing it twice does not wipe a result you
+  // are still looking at; the wordmark makes no such bargain -- it is the one
+  // control that always means "take me back to the start".
+  const goHome = () => {
+    cancelScan();
+    setAppView("scan");
+  };
+
   const stopBatch = () => {
     scanAbortRef.current?.abort();
     scanAbortRef.current = null;
@@ -1453,9 +1462,15 @@ export default function VinylVault() {
 
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
       <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)", paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
-        <div className="flex items-center shrink-0">
+        {/* The wordmark is the way home, from anywhere and in any state --
+            mid-scan, on a result, deep in the community. It aborts an
+            in-flight scan the same way Cancel does rather than leaving a
+            request running against a screen nobody is looking at. */}
+        <button type="button" onClick={goHome} aria-label="Vinyl Vault home"
+          className="flex items-center shrink-0 transition-opacity hover:opacity-80"
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
           <img src="/logo-white.png" alt="Vinyl Vault" style={{ height: 56, opacity: 0.92 }} />
-        </div>
+        </button>
 
         <nav className="flex items-center gap-1.5 flex-wrap">
           {navItems.map(({ id, label, icon: Icon, badge, locked }) => (
@@ -1836,6 +1851,11 @@ function SaveConfirmation({ release, accentRGB }) {
 // three of them. On mobile the card is a row (icon beside the words) so all
 // three fit the screen without scrolling; from sm up it is the original
 // centred column.
+// The brand acid, as used by the splash and the walkthrough. Named once so the
+// tiles and the viewfinder brackets cannot drift apart.
+const ACID = '#CAFE04';
+const ACID_ON_PAPER = '#6E8A00';
+
 const VIEWFINDER_CORNERS = [
   ['tl', { top: 10, left: 10, borderRight: 'none', borderBottom: 'none', borderRadius: '5px 0 0 0' }],
   ['tr', { top: 10, right: 10, borderLeft: 'none', borderBottom: 'none', borderRadius: '0 5px 0 0' }],
@@ -1877,19 +1897,20 @@ function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Ta
       {hero && VIEWFINDER_CORNERS.map(([corner, pos]) => (
         <span key={corner} aria-hidden="true" style={{
           position: 'absolute', width: 17, height: 17,
-          border: `1.5px solid ${isLight ? '#6E8A00' : '#CAFE04'}`,
+          border: `1.5px solid ${isLight ? ACID_ON_PAPER : ACID}`,
           ...pos,
         }} />
       ))}
       <div className={hero
         ? 'relative flex flex-col items-center gap-3 text-center'
         : 'relative flex flex-col gap-3 text-left'}>
-        {/* Light mode only: a black tile with a white icon, which the pale
-            card needs to give the icon any weight. Dark mode keeps the glass
-            tile, where a black square would sink into a near-black card. */}
-        <div className={`${hero ? 'w-14 h-14' : 'w-10 h-10'} rounded-2xl flex items-center justify-center shrink-0${isLight ? '' : ' vv-glass-tile'}`}
-          style={isLight ? { background: '#08080c' } : undefined}>
-          <Icon size={hero ? 24 : 18} weight="light" style={{ color: isLight ? '#ffffff' : 'rgba(var(--fg),0.72)' }} />
+        {/* A solid tile either way, and the only filled colour on the screen.
+            Light mode is black on paper; dark mode is the brand acid, which
+            the near-black card needs to give the icon any presence at all --
+            the glass tile it used to use was a grey square on a grey card. */}
+        <div className={`${hero ? 'w-14 h-14' : 'w-10 h-10'} rounded-2xl flex items-center justify-center shrink-0`}
+          style={{ background: isLight ? '#08080c' : ACID }}>
+          <Icon size={hero ? 24 : 18} weight="regular" style={{ color: isLight ? '#ffffff' : '#08080c' }} />
         </div>
         <div className="min-w-0">
           {kicker && (
