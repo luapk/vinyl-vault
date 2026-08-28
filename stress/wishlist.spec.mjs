@@ -207,3 +207,38 @@ test('the header tab row never wraps, and messages are reachable inside communit
   await page.getByRole('button', { name: /Community/ }).first().click();
   await expect(page.getByRole('button', { name: /Messages/ })).toBeVisible({ timeout: 10_000 });
 });
+
+test('a result stored before the card was redesigned still renders', async ({ page, context }) => {
+  // The payload shape changed when the fee table became a bar: `cost.split` is
+  // computed server-side now, and every trace run before that deploy is sitting
+  // in trace_results without it. Reading it unguarded took the whole tab down
+  // with "Cannot read properties of undefined (reading 'item')" the moment one
+  // of those rendered, which is a crash a user hits by doing nothing at all.
+  const legacy = JSON.parse(JSON.stringify(TRACE_PAYLOAD));
+  delete legacy.cost.split;
+  delete legacy.floorCost;
+  delete legacy.cost.grade;
+  delete legacy.cost.gradeNote;
+
+  await resetMock();
+  await control('/__test/set-tier', { email: JON.email, tier: 'resident' });
+  await stubApi(context, { discogsMatches: [MATCH] });
+  await context.route('**/api/trace', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(legacy),
+  }));
+
+  const crashes = [];
+  page.on('pageerror', e => crashes.push(e.message));
+
+  await signIn(page);
+  await pinPassion(page);
+  await page.getByRole('button', { name: /trace this record/i }).click();
+
+  // The bar is drawn from `lines`, so an old result renders properly rather
+  // than merely failing to explode.
+  await expect(page.getByText('£49.51')).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.getByText('The record', { exact: true })).toBeVisible();
+  await expect(page.getByText('Getting it here', { exact: true })).toBeVisible();
+  await expect(page.getByText('Something went wrong')).toHaveCount(0);
+  expect(crashes).toEqual([]);
+});

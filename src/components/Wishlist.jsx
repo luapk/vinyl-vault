@@ -48,6 +48,21 @@ function timeAgo(iso) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+// The record-versus-freight split, recovered from an itemised cost when the
+// payload predates `split` being computed server-side. Returns null when the
+// lines are missing too, and the caller then draws no bar at all.
+function splitFromLines(cost) {
+  const lines = Array.isArray(cost?.lines) ? cost.lines : null;
+  if (!lines || !lines.length) return null;
+  const item = lines.find(l => l.label === 'Item')?.value;
+  if (typeof item !== 'number') return null;
+  return {
+    item,
+    friction: Math.round((cost.total - item) * 100) / 100,
+    parts: lines.filter(l => l.label !== 'Item' && l.value > 0).map(l => ({ label: l.label, value: l.value })),
+  };
+}
+
 // ----- The stored answer ----------------------------------------------------
 // Every figure on this panel names where it came from. That is the house rule,
 // and it is also the only thing that makes a number about somebody's money
@@ -63,7 +78,14 @@ function TracePanel({ payload, isLight, onClear }) {
   // the record and the freight rather than a league table of fees.
   const neutral = isLight ? 'rgba(10,10,13,0.45)' : 'rgba(255,255,255,0.45)';
   const line = 'rgba(var(--fg),0.10)';
-  const pct = cost?.split ? Math.max(4, Math.min(96, (cost.split.item / cost.total) * 100)) : 0;
+  // A stored result is a saved payload, and the payload shape changed when the
+  // fee table became a bar. Every trace run before that deploy is sitting in
+  // trace_results without `split`, so reading it directly crashed the whole tab
+  // the moment one of those rendered. Derive it from `lines` instead, which
+  // both shapes carry: old results then draw correctly rather than merely not
+  // exploding, and no migration is needed.
+  const split = cost ? (cost.split || splitFromLines(cost)) : null;
+  const pct = split ? Math.max(4, Math.min(96, (split.item / cost.total) * 100)) : 0;
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden" style={{ border: `1px solid ${line}`, background: 'rgba(var(--fg),0.03)' }}>
@@ -99,8 +121,8 @@ function TracePanel({ payload, isLight, onClear }) {
 
             {/* Part to whole: what is the record, and what is getting it here.
                 2px surface gap between the segments rather than a stroke. */}
-            <div className="mt-4" role="img"
-              aria-label={`Of ${money(cost.total)} landed, ${money(cost.split.item)} is the record and ${money(cost.split.friction)} is getting it here`}>
+            {split && <div className="mt-4" role="img"
+              aria-label={`Of ${money(cost.total)} landed, ${money(split.item)} is the record and ${money(split.friction)} is getting it here`}>
               <div className="flex h-2.5 w-full rounded-full overflow-hidden" style={{ gap: 2 }}>
                 <div style={{ width: `${pct}%`, background: accent, borderRadius: '999px 0 0 999px' }} />
                 <div style={{ flex: 1, background: neutral, borderRadius: '0 999px 999px 0' }} />
@@ -112,21 +134,21 @@ function TracePanel({ payload, isLight, onClear }) {
                   <span className="w-2 h-2 rounded-full shrink-0 self-center" style={{ background: accent }} />
                   <span className="text-white/55">The record</span>
                   <span className="flex-1 border-b border-dashed self-end mb-1" style={{ borderColor: 'rgba(var(--fg),0.10)' }} />
-                  <span className="font-mono tabular-nums text-white/80">{money(cost.split.item)}</span>
+                  <span className="font-mono tabular-nums text-white/80">{money(split.item)}</span>
                 </div>
                 <div className="flex items-baseline gap-2 text-[12.5px]">
                   <span className="w-2 h-2 rounded-full shrink-0 self-center" style={{ background: neutral }} />
                   <span className="text-white/55">Getting it here</span>
                   <span className="flex-1 border-b border-dashed self-end mb-1" style={{ borderColor: 'rgba(var(--fg),0.10)' }} />
-                  <span className="font-mono tabular-nums text-white/80">{money(cost.split.friction)}</span>
+                  <span className="font-mono tabular-nums text-white/80">{money(split.friction)}</span>
                 </div>
-                {cost.split.parts.length > 0 && (
+                {split.parts.length > 0 && (
                   <div className="text-[10.5px] font-mono text-white/28 pl-4 leading-relaxed">
-                    {cost.split.parts.map(x => `${x.label} ${money(x.value)}`).join('  ·  ')}
+                    {split.parts.map(x => `${x.label} ${money(x.value)}`).join('  ·  ')}
                   </div>
                 )}
               </div>
-            </div>
+            </div>}
           </>
         ) : (
           <div className="text-[19px] font-display">{verdict.headline}</div>
