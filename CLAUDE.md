@@ -95,6 +95,20 @@ rather than paying for it again.
   `api/lib/trace.js` so they can be argued with, they cost nothing per hunt, and
   they cannot invent a sentence nobody can check. It never asserts authenticity
   and never tells the user to buy.
+- **The card says each thing once.** It first shipped printing the landed total
+  twice, the cheapest copy twice, the transit window twice and the origin twice,
+  which made the panel about twice as long as the information in it. A verdict
+  note now earns its place only by saying something no figure on the card says,
+  so `buildVerdict` emits supply judgement and the pressing warning and nothing
+  that is already a number on screen. `stress/wishlist.spec.mjs` asserts the
+  total appears exactly once.
+- **The cost breakdown is a two-tone bar, not a table.** The split that matters
+  is the record against the freight, not a league table of fees, and one accent
+  plus one neutral is what the dataviz palette checks actually clear at that
+  size: three or more greys fall under the normal-vision separation floor. Both
+  segments are direct-labelled with name and value, which is what makes the
+  two-tone encoding legal and keeps identity off colour alone. Named fees sit in
+  one mono line beneath, so nothing is hidden.
 - **Load merges, it does not replace.** Both items and stored results keep
   anything local the cloud does not have. An empty cloud result would otherwise
   wipe a card added while the insert was failing -- offline, or before

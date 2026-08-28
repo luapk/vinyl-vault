@@ -28,12 +28,14 @@ const MATCH = {
 const TRACE_PAYLOAD = {
   releaseId: '249504',
   release: { artist: 'Gat Decor', title: 'Passion', label: 'Effective Records', catalogNumber: '12 EFFS 1', year: 1992, country: 'Japan', format: 'Vinyl, 12"', coverUrl: null, masterId: '9911' },
-  market: { totalListings: 9, floor: { value: 4200, currency: 'JPY' }, conditions: [{ grade: 'NM', value: 78.2 }, { grade: 'VG+', value: 55.4 }], suggestionsStatus: 'ok' },
+  market: { totalListings: 9, floor: { value: 4200, currency: 'JPY' }, conditions: [{ grade: 'M', value: 92.0 }, { grade: 'NM', value: 78.2 }, { grade: 'VG+', value: 55.4 }], suggestionsStatus: 'ok' },
   pressings: { total: 6, byCountry: [{ country: 'UK', n: 4 }, { country: 'Japan', n: 1 }] },
   cost: {
     total: 49.51, currency: 'GBP', askingPrice: 4200, askingCurrency: 'JPY', rate: 0.0051,
     domestic: false, vatAtBorder: false, grams: 420, corridor: 'Japan', corridorCode: 'Japan',
     daysMin: 8, daysMax: 18, fxLive: false, fxDate: '2026-08-01',
+    grade: 'M', gradeNote: 'estimated for a Mint copy',
+    split: { item: 21.42, friction: 28.09, parts: [{ label: 'Shipping', value: 19 }, { label: 'FX spread', value: 1.01 }, { label: 'Import VAT', value: 8.08 }] },
     lines: [
       { label: 'Item', value: 21.42, note: '4200 JPY' },
       { label: 'Shipping', value: 19, note: 'Japan, 420g' },
@@ -43,8 +45,9 @@ const TRACE_PAYLOAD = {
       { label: 'Handling fee', value: 0, note: 'none, under the £135 threshold' },
     ],
   },
+  floorCost: { total: 27.4, currency: 'GBP', askingPrice: 4200, askingCurrency: 'JPY', corridor: 'Japan', lines: [] },
   recourse: { level: 'weak', note: 'returning it costs more than most records' },
-  verdict: { stance: 'steady', headline: '9 copies listed', notes: ['Getting it here adds £28.09 to the asking price, and 8 to 18 days.'] },
+  verdict: { stance: 'steady', headline: '9 listed', notes: ['6 pressings exist. Check the one you are buying is the one you want.'] },
   sources: ['Discogs release', 'Discogs master versions', 'Discogs marketplace stats', 'Built-in FX table'],
   grams: 420, tookMs: 1840, checkedAt: new Date().toISOString(),
 };
@@ -128,13 +131,25 @@ test('a resident traces a record, sees the sweep, and the result is still there 
 
   // The landed total, and the itemisation that makes it checkable.
   await expect(page.getByText('£49.51').first()).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('What it costs to your door')).toBeVisible();
-  await expect(page.getByText('4200 JPY').first()).toBeVisible();
-  // The asking price and the landed price must be visibly different numbers,
-  // which is the entire argument for the feature.
-  await expect(page.getByText('Import VAT')).toBeVisible();
+  // The part-to-whole split, which replaced the six-row fee table.
+  await expect(page.getByText('The record', { exact: true })).toBeVisible();
+  await expect(page.getByText('Getting it here', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: /is the record and .* getting it here/ })).toBeVisible();
   // Never asserted as fact: the estimate has to say what it is.
-  await expect(page.getByText(/An estimate/)).toBeVisible();
+  await expect(page.getByText(/Estimate, not a quote/)).toBeVisible();
+
+  // The landed total is stated ONCE. It used to appear as the headline and
+  // again as a Total row under the table, which is half of why the panel was
+  // twice as long as the information in it.
+  await expect(page.getByText('£49.51')).toHaveCount(1);
+
+  // A price with no condition beside it is how somebody pays clean-copy money
+  // for a crackly record, so the grade sits next to the number.
+  await expect(page.getByText('M', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/estimated for a Mint copy/)).toBeVisible();
+  // And it must not be passed off as a listing: the cheapest actual copy is
+  // named separately, with its condition explicitly unknown.
+  await expect(page.getByText(/grade not stated/)).toBeVisible();
 
   // The name of the record has to survive the round trip from search to card.
   await expect(page.getByText('Passion').first()).toBeVisible();
@@ -165,7 +180,7 @@ test('clearing a stored result is the users decision, and leaves the record pinn
   await page.getByRole('button', { name: /trace this record/i }).click();
   await expect(page.getByText('£49.51').first()).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: /clear result/i }).click();
+  await page.getByRole('button', { name: /^clear$/i }).click();
   await expect(page.getByText('£49.51')).toHaveCount(0);
   // The want survives the answer being thrown away.
   await expect(page.getByText('1 on the hunt')).toBeVisible();

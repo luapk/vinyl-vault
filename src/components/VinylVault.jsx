@@ -1857,26 +1857,15 @@ function SaveConfirmation({ release, accentRGB }) {
 
 // One of the three "add records" panels on the home screen.
 //
-// Extracted because the glass chrome is a long style object and there are now
-// three of them. On mobile the card is a row (icon beside the words) so all
-// three fit the screen without scrolling; from sm up it is the original
-// centred column.
 // The brand acid, as used by the splash and the walkthrough. Named once so the
-// tiles and the viewfinder brackets cannot drift apart.
+// icon tiles cannot drift away from it.
 const ACID = '#CAFE04';
-const ACID_ON_PAPER = '#6E8A00';
-
-const VIEWFINDER_CORNERS = [
-  ['tl', { top: 10, left: 10, borderRight: 'none', borderBottom: 'none', borderRadius: '5px 0 0 0' }],
-  ['tr', { top: 10, right: 10, borderLeft: 'none', borderBottom: 'none', borderRadius: '0 5px 0 0' }],
-  ['bl', { bottom: 10, left: 10, borderRight: 'none', borderTop: 'none', borderRadius: '0 0 0 5px' }],
-  ['br', { bottom: 10, right: 10, borderLeft: 'none', borderTop: 'none', borderRadius: '0 0 5px 0' }],
-];
 
 // The four ways into the app are not equals: scanning a sleeve is what Vinyl
 // Vault is for, and the other two are how you get a backlog in. `variant`
-// carries that ranking. "hero" is the wide viewfinder panel, "compact" the
-// half-height pair beneath it.
+// carries that ranking. "hero" is the full-width panel, "compact" the
+// half-height pair beneath it. Both centre their contents so the three read as
+// one set.
 function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, title, subtitle, onClick, children, ...rest }) {
   const hero = variant === 'hero';
   const style = isLight ? {
@@ -1899,21 +1888,11 @@ function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Ta
       className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] ${hero ? 'px-5 py-7 sm:py-9' : 'p-4'} ${className}`}
       style={{ ...style, border: 'none', cursor: 'pointer', animationDelay: `${index * 90}ms` }}
       {...rest}>
-      {/* Viewfinder brackets, hero only. They say "camera" before a word of
-          the label is read, which is the whole job of this card. The brand
-          acid rather than the artwork accent: on the idle screen no cover has
-          been read yet, so `accent` is still the pale grey default and the
-          brackets would be invisible. */}
-      {hero && VIEWFINDER_CORNERS.map(([corner, pos]) => (
-        <span key={corner} aria-hidden="true" style={{
-          position: 'absolute', width: 17, height: 17,
-          border: `1.5px solid ${isLight ? ACID_ON_PAPER : ACID}`,
-          ...pos,
-        }} />
-      ))}
-      <div className={hero
-        ? 'relative flex flex-col items-center gap-3 text-center'
-        : 'relative flex flex-col gap-3 text-left'}>
+      {/* Both variants centre their contents. The hero is already the primary
+          action by size, tile and glow, so it needs no second marker, and the
+          pair beneath it read as a matched set only when they line up with it
+          rather than hanging off the left edge. */}
+      <div className="relative flex flex-col items-center gap-3 text-center">
         {/* A solid tile either way, and the only filled colour on the screen.
             Light mode is black on paper; dark mode is the brand acid, which
             the near-black card needs to give the icon any presence at all --

@@ -58,6 +58,13 @@ async function liveRates() {
   }
 }
 
+// Discogs' grade codes, spelled out. "NM" means nothing to somebody buying
+// their fortieth record, let alone their fourth.
+const GRADE_NAMES = {
+  M: 'Mint', NM: 'Near Mint', 'VG+': 'Very Good Plus', VG: 'Very Good',
+  'G+': 'Good Plus', G: 'Good', F: 'Fair', P: 'Poor',
+};
+
 // ---------------------------------------------------------------------------
 // Verdict
 // ---------------------------------------------------------------------------
@@ -68,71 +75,53 @@ async function liveRates() {
 //
 // Never asserts authenticity, never says "this is an original", never tells
 // the user to buy. It reports what the market looks like and what it will cost.
-function buildVerdict({ price, versions, cost, condition }) {
+function buildVerdict({ price, versions, cost, condition, floorCost }) {
   const notes = [];
-  let stance = 'watch';
-  let headline = 'Not enough to go on yet';
 
   if (!cost) {
-    notes.push('No live listing to price. The condition ladder below is what Discogs has sold this for.');
-    return { stance: 'cold', headline: 'Nothing for sale right now', notes };
+    return {
+      stance: 'cold',
+      headline: 'Nothing for sale right now',
+      notes: ['No live listing to price. The ladder below is what Discogs has sold this for.'],
+    };
   }
 
   const listings = price?.totalListings || 0;
-  // The suggestion ladder is what Discogs has actually SOLD copies for, so the
-  // gap between it and the cheapest live listing is the only "is this a deal"
-  // signal available without scraping.
-  const vgPlus = condition.find(c => c.grade === 'VG+') || condition.find(c => c.grade === 'NM');
-  const benchmark = vgPlus?.value ?? null;
+  let stance = 'steady';
+  let headline = `${listings} listed`;
 
+  // Supply judgement. This is the one thing on the card that is an opinion
+  // rather than a number, so it is the one thing worth spending a line on.
   if (listings === 0) {
     stance = 'cold';
-    headline = 'No copies listed today';
-    notes.push('Nothing is for sale on Discogs at the moment. Worth watching rather than chasing.');
+    headline = 'None listed';
+    notes.push('Nothing for sale today. Worth watching rather than chasing.');
   } else if (listings <= 3) {
     stance = 'scarce';
-    headline = `Only ${listings} cop${listings === 1 ? 'y' : 'ies'} listed`;
-    notes.push('Thin supply. The price is whatever the few sellers say it is, and it moves when one sells.');
+    notes.push('Thin supply. The price is whatever these few sellers say, and it moves when one sells.');
   } else if (listings >= 40) {
     stance = 'common';
-    headline = `${listings} copies listed`;
-    notes.push('Common enough that waiting costs you nothing. There is no rush on this one.');
-  } else {
-    stance = 'steady';
-    headline = `${listings} copies listed`;
+    notes.push('Common enough that waiting costs you nothing.');
   }
 
-  if (benchmark != null && cost.total > 0) {
-    const delta = Math.round((cost.total - benchmark) * 100) / 100;
-    if (delta > benchmark * 0.25) {
-      notes.push(`Landed, the cheapest copy works out ${fmt(delta)} above what a VG+ usually sells for.`);
-    } else if (delta < -benchmark * 0.15) {
-      notes.push(`Landed, the cheapest copy is ${fmt(-delta)} under the usual VG+ price.`);
-    }
-  }
-
-  if (!cost.domestic) {
-    const added = Math.round((cost.total - cost.lines[0].value) * 100) / 100;
-    notes.push(`Getting it here adds ${fmt(added)} to the asking price, and ${cost.daysMin} to ${cost.daysMax} days.`);
-    if (cost.vatAtBorder) {
-      notes.push('Over the £135 threshold, so VAT is collected at the border and a courier handling fee lands with it.');
-    }
-  }
-
-  const recourse = recourseScore(cost.corridorCode);
-  if (recourse.level === 'weak') {
-    notes.push('If it turns up wrong, returning it costs more than most records are worth.');
-  }
-
+  // Everything else the card already SHOWS: the landed total, the cheapest
+  // listed copy, the transit window, the recourse, the split between the record
+  // and the freight. Restating any of it in prose was making the panel twice as
+  // long as the information in it. A note earns its place only by saying
+  // something no figure on the card says.
   if (versions?.total > 1) {
     notes.push(`${versions.total} pressings exist. Check the one you are buying is the one you want.`);
   }
+  if (cost.vatAtBorder) {
+    notes.push('Over the £135 threshold, so VAT is collected at the border and the courier adds its fee.');
+  }
 
-  return { stance, headline, notes };
-}
+  const benchmark = (condition.find(c => c.grade === 'VG+') || condition.find(c => c.grade === 'NM'))?.value ?? null;
+  if (benchmark != null && floorCost?.total > 0 && floorCost.total > benchmark * 1.25) {
+    notes.push(`Even the cheapest copy lands above what a VG+ usually sells for.`);
+  }
 
-function fmt(n) {
-  return `£${Math.abs(n).toFixed(2)}`;
+  return { stance, headline, notes: notes.slice(0, 2) };
 }
 
 // ---------------------------------------------------------------------------
@@ -158,26 +147,66 @@ export async function runTrace(releaseId) {
   const grams = packedWeight(release.format, release.formatDescriptions);
   const condition = price?.conditions || [];
 
-  // The floor is the cheapest ACTIVE listing. It is the only number here that
-  // describes a copy somebody can actually buy today, so it is what gets
-  // landed. Everything else on the card is context around it.
-  const cost = price?.floor
-    ? landedCost({
-        price: price.floor.value,
-        currency: price.floor.currency,
-        country: release.country,
-        grams,
-        rates: fx.rates,
-      })
-    : null;
+  // WHICH PRICE GETS LANDED, AND WHY IT CARRIES A GRADE
+  //
+  // Two numbers are available and they answer different questions.
+  //
+  //   `floor` is the cheapest ACTIVE listing. It is a copy somebody can buy
+  //   today, but Discogs' stats endpoint reports no condition with it, so
+  //   nobody can say what state that copy is in. A price with no grade beside
+  //   it is how you end up paying 40 quid for a record that crackles.
+  //
+  //   The suggestion ladder is per-grade and comes from real sales history, so
+  //   a figure on it can be labelled honestly. The headline number is the best
+  //   grade the ladder actually carries, Mint first, and it is shown WITH that
+  //   grade. It is what a clean copy costs, not what the cheapest copy costs.
+  //
+  // Both are landed and both are returned. The card leads with the graded one
+  // and keeps the floor beside it, because the gap between them is the thing a
+  // buyer is actually deciding about.
+  const land = (value, currency) => {
+    if (typeof value !== 'number' || !(value > 0)) return null;
+    const out = landedCost({ price: value, currency, country: release.country, grams, rates: fx.rates });
+    if (out) {
+      out.corridorCode = release.country || null;
+      out.fxLive = fx.live;
+      out.fxDate = fx.live ? fx.date : out.ratesDate;
+    }
+    return out;
+  };
 
+  // Best grade first. The ladder from fetchDiscogsPrice is already ordered that
+  // way, so the first entry is the cleanest copy it has a figure for.
+  const best = condition[0] || null;
+  const cost = best ? land(best.value, price.currency) : null;
   if (cost) {
-    cost.corridorCode = release.country || null;
-    cost.fxLive = fx.live;
-    cost.fxDate = fx.live ? fx.date : cost.ratesDate;
+    cost.grade = best.grade;
+    // Never let the card imply this is a listing. It is what copies in this
+    // grade have sold for, which is a different claim.
+    cost.gradeNote = `estimated for a ${GRADE_NAMES[best.grade] || best.grade} copy`;
   }
 
-  const verdict = buildVerdict({ price, versions, cost, condition });
+  const floorCost = price?.floor ? land(price.floor.value, price.floor.currency) : null;
+
+  if (cost) {
+    // The split the card visualises: what you pay for the record, and what you
+    // pay to have it. Everything that is not the record is friction, and seeing
+    // the ratio is the point -- a 20 quid record with 30 quid of freight on it
+    // is a different proposition from the same total the other way round.
+    const item = cost.lines.find(l => l.label === 'Item')?.value || 0;
+    const friction = Math.round((cost.total - item) * 100) / 100;
+    cost.split = {
+      item,
+      friction,
+      // Named parts of the friction, for the one line under the legend. Zero
+      // rows are dropped: a fee that was not charged is not information.
+      parts: cost.lines
+        .filter(l => l.label !== 'Item' && l.value > 0)
+        .map(l => ({ label: l.label, value: l.value })),
+    };
+  }
+
+  const verdict = buildVerdict({ price, versions, cost: cost || floorCost, condition, floorCost });
 
   return {
     releaseId: String(releaseId),
@@ -202,6 +231,7 @@ export async function runTrace(releaseId) {
       ? { total: versions.total, byCountry: versions.byCountry.slice(0, 6) }
       : { total: 1, byCountry: release.country ? [{ country: release.country, n: 1 }] : [] },
     cost,
+    floorCost,
     recourse: recourseScore(release.country),
     verdict,
     // Sources, named, so the card can attribute every figure on it. The house

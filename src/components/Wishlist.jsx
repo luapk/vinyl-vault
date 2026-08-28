@@ -53,40 +53,144 @@ function timeAgo(iso) {
 // and it is also the only thing that makes a number about somebody's money
 // worth showing: the user can check it rather than trust it.
 function TracePanel({ payload, isLight, onClear }) {
-  const { cost, market, pressings, verdict, recourse, sources, checkedAt, releaseId } = payload;
+  const { cost, floorCost, market, pressings, verdict, recourse, sources, checkedAt, releaseId } = payload;
   const forSale = market.totalListings > 0;
   const accent = isLight ? ACID_ON_PAPER : ACID;
+  // The bar is two-tone, not a five-hue breakdown. Validated against the
+  // dataviz palette checks: one accent plus one neutral clears the CVD and
+  // normal-vision separation floors with room, where three or more greys at
+  // this size do not. It also tells the truer story, which is the ratio between
+  // the record and the freight rather than a league table of fees.
+  const neutral = isLight ? 'rgba(10,10,13,0.45)' : 'rgba(255,255,255,0.45)';
   const line = 'rgba(var(--fg),0.10)';
+  const pct = cost?.split ? Math.max(4, Math.min(96, (cost.split.item / cost.total) * 100)) : 0;
 
   return (
     <div className="mt-3 rounded-2xl overflow-hidden" style={{ border: `1px solid ${line}`, background: 'rgba(var(--fg),0.03)' }}>
-      {/* Verdict */}
-      <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${line}` }}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-[11px] tracking-[0.22em] uppercase font-mono mb-1" style={{ color: accent }}>
-              {verdict.stance}
-            </div>
-            <div className="text-[19px] leading-snug font-display">{verdict.headline}</div>
-          </div>
-          {cost && (
-            <div className="text-right shrink-0">
-              <div className="text-[24px] leading-none font-display">{money(cost.total)}</div>
-              <div className="text-[11px] font-mono mt-1 text-white/40">landed</div>
-            </div>
-          )}
+      <div className="px-4 pt-3.5 pb-4">
+        {/* One meta row carries supply and stance. It used to be a headline, a
+            separate two-column stat block, and a bullet, all saying the same
+            two numbers. */}
+        <div className="flex items-center gap-2 flex-wrap text-[10px] tracking-[0.2em] uppercase font-mono mb-3">
+          <span style={{ color: accent }}>{verdict.stance}</span>
+          <span className="text-white/20">/</span>
+          <span className="text-white/40">{market.totalListings} listed</span>
+          <span className="text-white/20">/</span>
+          <span className="text-white/40">{pressings.total} pressing{pressings.total === 1 ? '' : 's'}</span>
         </div>
 
-        {/* Straight to the copies of THIS pressing, not to the master, which
-            is where a Discogs search would otherwise dump you. The label tells
-            the truth about what is on the other side: with nothing listed
-            there is nothing to buy, and calling it "Buy now" would be a lie
-            the next tap exposes. */}
+        {/* The hero number. It appears exactly once now: the old panel printed
+            it in the header and again as a Total under the table. */}
+        {cost ? (
+          <>
+            <div className="flex items-baseline gap-2.5">
+              {cost.grade && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono shrink-0 self-center"
+                  style={{ background: `${accent}22`, border: `1px solid ${accent}66`, color: accent }}>
+                  {cost.grade}
+                </span>
+              )}
+              <span className="text-[34px] leading-none font-display tabular-nums">{money(cost.total)}</span>
+              <span className="text-[11px] font-mono text-white/35">landed</span>
+            </div>
+            <div className="text-[11.5px] text-white/35 mt-1.5">
+              {cost.gradeNote}{cost.domestic ? '' : ` · ${cost.corridor} origin`}
+            </div>
+
+            {/* Part to whole: what is the record, and what is getting it here.
+                2px surface gap between the segments rather than a stroke. */}
+            <div className="mt-4" role="img"
+              aria-label={`Of ${money(cost.total)} landed, ${money(cost.split.item)} is the record and ${money(cost.split.friction)} is getting it here`}>
+              <div className="flex h-2.5 w-full rounded-full overflow-hidden" style={{ gap: 2 }}>
+                <div style={{ width: `${pct}%`, background: accent, borderRadius: '999px 0 0 999px' }} />
+                <div style={{ flex: 1, background: neutral, borderRadius: '0 999px 999px 0' }} />
+              </div>
+              {/* Legend, direct-labelled. Identity is never colour alone, which
+                  is also what makes the two-tone bar legal at this size. */}
+              <div className="mt-2.5 flex flex-col gap-1.5">
+                <div className="flex items-baseline gap-2 text-[12.5px]">
+                  <span className="w-2 h-2 rounded-full shrink-0 self-center" style={{ background: accent }} />
+                  <span className="text-white/55">The record</span>
+                  <span className="flex-1 border-b border-dashed self-end mb-1" style={{ borderColor: 'rgba(var(--fg),0.10)' }} />
+                  <span className="font-mono tabular-nums text-white/80">{money(cost.split.item)}</span>
+                </div>
+                <div className="flex items-baseline gap-2 text-[12.5px]">
+                  <span className="w-2 h-2 rounded-full shrink-0 self-center" style={{ background: neutral }} />
+                  <span className="text-white/55">Getting it here</span>
+                  <span className="flex-1 border-b border-dashed self-end mb-1" style={{ borderColor: 'rgba(var(--fg),0.10)' }} />
+                  <span className="font-mono tabular-nums text-white/80">{money(cost.split.friction)}</span>
+                </div>
+                {cost.split.parts.length > 0 && (
+                  <div className="text-[10.5px] font-mono text-white/28 pl-4 leading-relaxed">
+                    {cost.split.parts.map(x => `${x.label} ${money(x.value)}`).join('  ·  ')}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-[19px] font-display">{verdict.headline}</div>
+        )}
+      </div>
+
+      {/* Three things an asking price hides, each said once. */}
+      <div className="grid grid-cols-3" style={{ borderTop: `1px solid ${line}` }}>
+        {[
+          floorCost
+            ? { k: 'Cheapest', v: money(floorCost.total), sub: 'grade not stated' }
+            : { k: 'Cheapest', v: '--', sub: 'none listed' },
+          cost
+            ? { k: 'To hand', v: `${cost.daysMin}-${cost.daysMax}`, sub: 'days' }
+            : { k: 'To hand', v: '--', sub: '' },
+          {
+            k: 'Returns',
+            v: { strong: 'Easy', fair: 'Fair', weak: 'Hard' }[recourse.level],
+            sub: { strong: 'UK rights', fair: 'postage on you', weak: 'costly to send back' }[recourse.level],
+          },
+        ].map((t, i) => (
+          <div key={t.k} className="px-3 py-3" style={i < 2 ? { borderRight: `1px solid ${line}` } : undefined}>
+            <div className="text-[9.5px] tracking-[0.18em] uppercase font-mono text-white/28 mb-1.5">{t.k}</div>
+            <div className="text-[16px] font-display leading-none tabular-nums">{t.v}</div>
+            <div className="text-[10px] font-mono text-white/28 mt-1 leading-tight">{t.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* The ladder Discogs has actually sold copies at. Ordered best first, so
+          it doubles as the scale the headline grade sits on. */}
+      {market.conditions.length > 0 && (
+        <div className="px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
+          <div className="text-[9.5px] tracking-[0.18em] uppercase font-mono text-white/28 mb-2">
+            Sells for, in {market.currency || 'USD'}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {market.conditions.map(c => (
+              <span key={c.grade} className="px-2 py-0.5 rounded-full text-[11.5px] font-mono"
+                style={c.grade === cost?.grade
+                  ? { background: `${accent}1f`, border: `1px solid ${accent}55`, color: accent }
+                  : { background: 'rgba(var(--fg),0.05)', border: `1px solid ${line}`, color: 'rgba(var(--fg),0.5)' }}>
+                {c.grade} {c.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Judgement only. Anything the figures above already state has been cut. */}
+      {verdict.notes.length > 0 && (
+        <div className="px-4 py-3 flex flex-col gap-1.5" style={{ borderTop: `1px solid ${line}` }}>
+          {verdict.notes.map((n, i) => (
+            <div key={i} className="text-[12.5px] leading-relaxed text-white/45">{n}</div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-4 pt-3 pb-4" style={{ borderTop: `1px solid ${line}` }}>
         {releaseId && (
           <a
             href={`https://www.discogs.com/sell/release/${releaseId}`}
             target="_blank" rel="noopener noreferrer"
-            className="mt-3.5 w-full flex items-center justify-center gap-2 rounded-full transition-all hover:brightness-110"
+            className="w-full flex items-center justify-center gap-2 rounded-full transition-all hover:brightness-110"
             style={{
               padding: '11px 0', fontSize: 13, fontWeight: 600, letterSpacing: '0.1em',
               textTransform: 'uppercase', fontFamily: 'monospace', textDecoration: 'none',
@@ -98,87 +202,20 @@ function TracePanel({ payload, isLight, onClear }) {
             <ArrowUpRight size={14} weight="bold" />
           </a>
         )}
-        {verdict.notes.length > 0 && (
-          <ul className="mt-3 flex flex-col gap-1.5">
-            {verdict.notes.map((n, i) => (
-              <li key={i} className="text-[13px] leading-relaxed text-white/50 flex gap-2">
-                <span style={{ color: accent }}>·</span>{n}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* The arithmetic, in full. A total nobody can check is a claim. */}
-      {cost && (
-        <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${line}` }}>
-          <div className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/30 mb-2.5">What it costs to your door</div>
-          <div className="flex flex-col gap-1.5">
-            {cost.lines.map(l => (
-              <div key={l.label} className="flex items-baseline justify-between gap-3 text-[13px]">
-                <span className="text-white/55 shrink-0">{l.label}</span>
-                {l.note && <span className="text-[11px] font-mono text-white/25 truncate flex-1 text-right">{l.note}</span>}
-                <span className="font-mono tabular-nums shrink-0" style={{ minWidth: 62, textAlign: 'right', color: l.value ? 'rgba(var(--fg),0.8)' : 'rgba(var(--fg),0.3)' }}>
-                  {money(l.value)}
-                </span>
-              </div>
-            ))}
-            <div className="flex items-baseline justify-between gap-3 mt-1.5 pt-2.5" style={{ borderTop: `1px solid ${line}` }}>
-              <span className="text-[13px]">Total</span>
-              <span className="font-mono tabular-nums text-[15px]" style={{ color: accent }}>{money(cost.total)}</span>
-            </div>
+        {/* Provenance, one line. The long disclaimer paragraph said the origin,
+            the transit window and the recourse a second time; all three are
+            figures on the card now, so only the caveat itself is left. */}
+        <div className="mt-3 flex items-baseline justify-between gap-3 flex-wrap">
+          <div className="text-[10px] font-mono text-white/25 min-w-0 leading-relaxed">
+            Estimate, not a quote. Discogs reports where a pressing was made, not where this copy is.
+            <br />{sources.join(' · ')} · {timeAgo(checkedAt)}
           </div>
-          <p className="text-[11px] leading-relaxed text-white/30 mt-3">
-            An estimate. Discogs reports where a pressing was made, not where this copy sits, so
-            shipping is priced from a {cost.corridor} origin. {cost.daysMin} to {cost.daysMax} days
-            typical. Recourse: {recourse.note}.
-          </p>
+          <button onClick={onClear}
+            className="text-[10px] font-mono text-white/25 hover:text-white/60 transition-colors shrink-0"
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+            Clear
+          </button>
         </div>
-      )}
-
-      {/* Market and pressings */}
-      <div className="px-4 py-3.5 grid grid-cols-2 gap-4" style={{ borderBottom: `1px solid ${line}` }}>
-        <div>
-          <div className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/30 mb-2">For sale</div>
-          <div className="text-[19px] font-display leading-none">{market.totalListings}</div>
-          <div className="text-[12px] text-white/40 mt-1">
-            {market.floor ? `from ${market.floor.value} ${market.floor.currency}` : 'no live listings'}
-          </div>
-        </div>
-        <div>
-          <div className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/30 mb-2">Pressings</div>
-          <div className="text-[19px] font-display leading-none">{pressings.total}</div>
-          <div className="text-[12px] text-white/40 mt-1 truncate">
-            {pressings.byCountry.slice(0, 3).map(c => `${c.country} ${c.n}`).join(', ') || 'one known'}
-          </div>
-        </div>
-      </div>
-
-      {/* What it sells for by condition. Discogs' own sales history, which is
-          the only benchmark available without scraping anybody. */}
-      {market.conditions.length > 0 && (
-        <div className="px-4 py-3.5" style={{ borderBottom: `1px solid ${line}` }}>
-          <div className="text-[11px] tracking-[0.22em] uppercase font-mono text-white/30 mb-2.5">Sells for, by condition</div>
-          <div className="flex flex-wrap gap-1.5">
-            {market.conditions.map(c => (
-              <span key={c.grade} className="px-2.5 py-1 rounded-full text-[12px] font-mono"
-                style={{ background: 'rgba(var(--fg),0.06)', border: `1px solid ${line}` }}>
-                {c.grade} <span className="text-white/45">{c.value}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Provenance */}
-      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-[11px] font-mono text-white/25 min-w-0">
-          Checked {timeAgo(checkedAt)} · {sources.join(' · ')}
-        </div>
-        <button onClick={onClear}
-          className="text-[11px] font-mono text-white/30 hover:text-white/60 transition-colors shrink-0">
-          Clear result
-        </button>
       </div>
     </div>
   );
@@ -346,7 +383,7 @@ export default function WishlistView({ userId, accessToken, isLight, canTrace, o
       <div className="mb-7 md:mb-9">
         <div className="text-[13px] tracking-[0.35em] uppercase mb-4 text-white/30 font-mono">Wishlist</div>
         <h1 className="text-[34px] md:text-[46px] leading-[0.98] mb-3 font-display tracking-tight">
-          Records you are after.<br /><span className="text-white/35">And what they really cost.</span>
+          Track down<br /><span className="text-white/35">the records you need.</span>
         </h1>
         <p className="text-white/45 text-sm max-w-lg leading-relaxed">
           Add what you are hunting, then trace it. You get the pressings that exist, what is for sale,
