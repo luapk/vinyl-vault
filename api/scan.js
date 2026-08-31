@@ -9,8 +9,12 @@ import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
+import { FREE_SCANS } from '../src/lib/pricing.js';
 
-const SCAN_LIMITS = { digger: 30, selector: Infinity, resident: Infinity };
+// The free allowance is defined once, in the same file the pricing screen
+// reads. Two copies of the number is how a card ends up advertising 30 while
+// the server enforces something else.
+const SCAN_LIMITS = { digger: FREE_SCANS, selector: Infinity, resident: Infinity };
 
 async function _doCheckAndIncrementScanLimit(userId) {
   if (!userId) return null; // unauthenticated: allow (will be rate-limited separately)

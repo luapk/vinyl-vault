@@ -6,7 +6,6 @@ import {
   PRICE_FOUNDING,
   FOUNDING_SEATS,
   FREE_SCANS,
-  FREE_LABELS,
 } from '../lib/pricing.js';
 
 // Brand acid + ink. This screen is deliberately theme-independent: acid page,
@@ -26,11 +25,11 @@ const TIERS = [
     accentRGB: '91,33,212',
     comingSoon: false,
     features: [
-      `${FREE_SCANS} AI photo scans`,
-      `${FREE_LABELS} BPM label prints`,
-      'Discogs bulk import',
-      'Smart sort into crates',
-      'Browse and search',
+      `${FREE_SCANS} AI photo scans a month`,
+      'Barcode and sleeve scanning',
+      'Discogs, CSV and text import',
+      'BPM label printing',
+      'Community, profiles and messages',
     ],
   },
   {
@@ -45,9 +44,8 @@ const TIERS = [
     founding:  `or £${PRICE_FOUNDING} lifetime -- first ${FOUNDING_SEATS}`,
     features: [
       'Unlimited AI scans',
-      'Tracks view: BPM and key for every track',
-      'BPM label printing',
-      'CSV export and multi-device sync',
+      'Wishlist: keep what you are hunting in one place',
+      'Smart crates: sorted by sound, era and scene',
       'All Digger features',
     ],
   },
@@ -60,9 +58,9 @@ const TIERS = [
     comingSoon: false,
     priceEnvKey: 'VITE_STRIPE_PRICE_RESIDENT_YEAR',
     features: [
-      'Wishlist: keep what you are hunting in one place',
-      'Trace: every pressing, every copy for sale',
+      'Trace: every pressing, every copy on Discogs',
       'True landed price, with shipping, VAT and fees',
+      'Tracks: sort and filter your collection by BPM',
       'Priority support and early access',
       'All Selector features',
     ],
@@ -89,7 +87,7 @@ const ROUNDEL_INSIDE = ROUNDEL - OVERLAP;
 // the right says "there is more", this says what the more actually is.
 const UPSELL = {
   Digger:   'Selector adds unlimited scans and Tracks',
-  Selector: 'Resident adds the wishlist and Trace',
+  Selector: 'Resident adds Trace and the BPM sorter',
 };
 
 function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {

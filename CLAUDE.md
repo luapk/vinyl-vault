@@ -64,6 +64,40 @@ dropped rather than looked up. The decoded number goes to `/api/scan` as
 search. `npm run bench:barcode` renders 100 barcodes under camera-like
 degradation and reports read rate and decode time.
 
+### Tiers, and where they are enforced
+`FEATURE_TIER` in `src/lib/pricing.js` is the single map of what each tier buys,
+read by the client gates, the server gates and the pricing screen alike. A
+feature absent from the map is free to everyone, on purpose: a gate should have
+to be written down.
+
+| Feature | Tier | Enforced |
+| --- | --- | --- |
+| Unlimited scans | Selector | `api/scan.js`, server |
+| Wishlist tab | Selector | client only |
+| Smart crates | Selector | `api/smart-crates.js`, server |
+| BPM sorter (Tracks) | Resident | client only |
+| Trace | Resident | `api/trace.js`, server |
+
+- **Anything that spends money or third-party quota is gated on the server**,
+  via `requireTier` (`api/lib/tier.js`). Hiding a button is not a gate: smart
+  crates sends up to 2MB to Claude and asks for 8192 tokens back, and Trace
+  spends three or four Discogs requests a hunt. The two client-only gates guard
+  views over data the user already owns, so there is nothing to abuse.
+- **`requireTier` fails CLOSED.** A profile it cannot read answers 503, not
+  access. Failing open would make an unreachable database the cheapest way to
+  use a paid feature.
+- **A lapsed subscriber is a free user, not an exempt one.** `tierAllows` takes
+  `isActive` for that reason. The scan limit was once skipped unless the
+  subscription was active, so cancelling granted unlimited scans: the one status
+  that should have restricted a person was the one that let them through.
+- **Do not put a claim on the pricing card that nothing checks.** Label
+  printing, CSV export and multi-device sync were all sold on Selector and none
+  was ever enforced, which made two thirds of that tier things the free tier
+  already had. `FREE_LABELS` is still exported and still unenforced; it is
+  annotated as such and no copy claims it.
+- Camelot key notation was removed from the product entirely. Track `key` may
+  still arrive in scan data, but nothing displays it.
+
 ### Wishlist and Trace
 The Wishlist tab (`src/components/Wishlist.jsx`, `src/hooks/useWishlist.js`) is
 one screen doing two jobs: what you are hunting, and what each one costs. Search

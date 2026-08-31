@@ -1,4 +1,5 @@
 import { requireAuth } from './lib/auth.js';
+import { requireTier } from './lib/tier.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -8,6 +9,11 @@ export default async function handler(req, res) {
   // URL could spend the project's Anthropic budget at will.
   const authUser = await requireAuth(req, res);
   if (!authUser) return;
+
+  // Selector and up. This is the only gate on the spending: hiding the button
+  // would leave the endpoint open to anyone holding a token, and one call is
+  // up to 2MB in and 8192 tokens out.
+  if (!await requireTier('smartCrates', authUser.id, res)) return;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });

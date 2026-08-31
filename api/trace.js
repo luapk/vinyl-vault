@@ -10,13 +10,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
+import { requireTier } from './lib/tier.js';
 import { runTrace } from './lib/trace.js';
-
-// Resident only. Trace is the feature the tier exists for, and every hunt
-// costs real upstream quota, so the gate is enforced on the server rather than
-// by hiding a button. A lapsed subscription falls back to no access, the same
-// rule api/scan.js applies to scan limits.
-const TRACE_TIERS = new Set(['resident']);
 
 let cachedAdmin = null;
 function admin() {
@@ -44,17 +39,9 @@ export default async function handler(req, res) {
 
   const db = admin();
 
-  const { data: profile } = await db
-    .from('profiles')
-    .select('subscription_tier, subscription_status')
-    .eq('id', authUser.id)
-    .single();
-
-  const tier = profile?.subscription_tier || 'digger';
-  const active = !profile?.subscription_status || ['active', 'trialing'].includes(profile.subscription_status);
-  if (!active || !TRACE_TIERS.has(tier)) {
-    return res.status(402).json({ error: 'trace_requires_resident', tier });
-  }
+  // Resident only, checked before any Discogs quota is spent. The tier map is
+  // shared with the client so the button and the endpoint agree.
+  if (!await requireTier('trace', authUser.id, res)) return;
 
   // If an itemId is given it must belong to the caller. Without this check any
   // signed-in user could write a trace result onto somebody else's wishlist row.

@@ -19,8 +19,8 @@ import PricingScreen, { TierCarousel } from "./PricingScreen.jsx";
 import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
+import { tierAllows } from '../lib/pricing.js';
 import { freshAccessToken } from '../lib/authToken.js';
-import { camelotColor } from '../lib/camelot.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
 import { legibleAccentRGB } from '../lib/accentContrast.js';
 import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
@@ -698,6 +698,9 @@ export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, isPaid, isActive, startCheckout, openPortal } = useSubscription(user, profile);
+  // Every gate in this file goes through the shared tier map, so what the
+  // pricing screen sells and what the app enforces cannot drift apart.
+  const can = useCallback((feature) => tierAllows(feature, tier, isActive), [tier, isActive]);
 
   // Splash stays up for one full loop of the chosen WebP clip (its duration),
   // and for as long as auth is genuinely still loading. WebP <img> has no
@@ -1433,10 +1436,13 @@ export default function VinylVault() {
     // earlier: records you have, records you are after. Trace inside it is
     // Resident-only, but the tab itself is not -- a locked tab teaches nobody
     // what they would be paying for.
-    { id: "wishlist", label: "Wishlist", icon: Binoculars },
+    { id: "wishlist", label: "Wishlist", icon: Binoculars, locked: !can('wishlist') },
     // Tracks is a Selector feature. Free users still see the tab, with a lock:
     // hiding it means nobody ever discovers what they would be paying for.
-    ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes, locked: !isPaid }] : []),
+    // The BPM sorter is what Resident buys, alongside Trace. Free and Selector
+    // users still see the tab with a lock: hiding it means nobody discovers
+    // what they would be paying for.
+    ...(collection.length ? [{ id: "tracks", label: "Tracks", icon: MusicNotes, locked: !can('bpmSorter') }] : []),
   ];
 
   return (
@@ -1569,18 +1575,18 @@ export default function VinylVault() {
           </>
         )}
         {appView === "collection" && (
-          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} userId={userId} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} />
+          <CollectionView collection={collection} syncedIds={syncedIds} accentRGB={accentRGB} accessToken={accessToken} userId={userId} onRemove={removeRecord} onUpdate={updateRecord} onRenameCrate={renameCrate} onDeleteCrate={deleteCrate} onDownloadCSV={() => downloadCSV(collection)} labelSelectMode={labelSelectMode} selectedForLabels={selectedForLabels} showBatchLabelModal={showBatchLabelModal} onToggleLabelSelect={toggleLabelSelect} onEnterLabelMode={enterLabelMode} onExitLabelMode={exitLabelMode} onShowBatchLabelModal={setShowBatchLabelModal} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onSmartCratesApplied={applySmartCrates} profile={profile} onUpdatePreferences={updatePreferences} canSmartCrates={can('smartCrates')} onUpsell={() => setShowPricingModal(true)} />
         )}
-        {appView === "wishlist" && (
+        {appView === "wishlist" && can('wishlist') && (
           <WishlistView
             userId={userId}
             accessToken={accessToken}
             isLight={!isDark}
-            canTrace={tier === 'resident' && isActive}
+            canTrace={can('trace')}
             onUpsell={() => setShowPricingModal(true)}
           />
         )}
-        {appView === "tracks" && isPaid && (
+        {appView === "tracks" && can('bpmSorter') && (
           <TracksView collection={collection} accentRGB={accentRGB} onUpdate={updateRecord} accessToken={accessToken} />
         )}
         {appView === "batch" && (
@@ -2649,7 +2655,7 @@ function RotatingCube({ color, size = 9 }) {
 // names, so The Beatles files under B and The Cure under C.
 const artistSortKey = (v) => String(v || '').replace(/^the\s+/i, '');
 
-function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], smartCrateMeta = [], onSmartCratesApplied, profile, onUpdatePreferences }) {
+function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId, onRemove, onUpdate, onRenameCrate, onDeleteCrate, onDownloadCSV, labelSelectMode, selectedForLabels, showBatchLabelModal, onToggleLabelSelect, onEnterLabelMode, onExitLabelMode, onShowBatchLabelModal, smartCrateNames = [], smartCrateMeta = [], onSmartCratesApplied, profile, onUpdatePreferences, canSmartCrates = true, onUpsell }) {
   const [collectionMode, setCollectionMode] = useState("stacks"); // stacks | explore
   // Carousel vs grid is a personal preference: remember the last choice so
   // the collection reopens the way the user left it.
@@ -2832,7 +2838,7 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
 
       {/* CRATES MODE */}
       {collectionMode === "crates" && (
-        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onOpenCrate={(crate) => { setFilterCrate(crate); setCrateMenuOpen(false); setCollectionMode("stacks"); }} />
+        <CratesTabView collection={collection} allCrates={allCrates} onUpdate={onUpdate} onRename={onRenameCrate} onDelete={onDeleteCrate} crateColors={crateColors} onSetColor={setCrateColor} onSmartCratesApplied={onSmartCratesApplied} smartCrateNames={smartCrateNames} smartCrateMeta={smartCrateMeta} onOpenCrate={(crate) => { setFilterCrate(crate); setCrateMenuOpen(false); setCollectionMode("stacks"); }} canSmartCrates={canSmartCrates} onUpsell={onUpsell} />
       )}
 
       {/* STATS MODE */}
@@ -4887,7 +4893,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
               {[
                 { Icon: Camera,      title: 'Photograph', desc: 'Camera or photo library' },
                 { Icon: Scan,        title: 'Identify',   desc: 'Matched against Discogs' },
-                { Icon: Sparkle,     title: 'Enrich',     desc: 'Tracklist, BPM, Camelot key' },
+                { Icon: Sparkle,     title: 'Enrich',     desc: 'Tracklist and BPM' },
                 { Icon: VinylRecord, title: 'File',       desc: 'Assign to crates, sort later' },
               ].map(({ Icon, title, desc }) => (
                 <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -5205,7 +5211,7 @@ function SmartCratesModal({ collection, onUpdate, onClose, crateColors = {}, onS
 
 // ----- CratesTabView ---------------------------------------------------------
 
-function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], smartCrateMeta = [], onOpenCrate }) {
+function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, crateColors, onSetColor, onSmartCratesApplied, smartCrateNames = [], smartCrateMeta = [], onOpenCrate, canSmartCrates = true, onUpsell }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const [smartMode, setSmartMode] = useState(null); // null = closed, 'full' | 'unfiled'
   const [editingName, setEditingName] = useState(null);
@@ -5216,6 +5222,11 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
     setEditingName(null);
   };
 
+  // Two separate reasons the button can be unavailable, and they need
+  // different words: a collection too small to sort, and a tier that does not
+  // include sorting. Collapsing them into one disabled state tells a Selector
+  // prospect nothing about why.
+  const gated = !canSmartCrates;
   const canScan = collection.length >= 2;
   // Once a collection has been sorted once, the usual job is a handful of new
   // scans, not a re-think of the whole shelf. Filing those becomes the default
@@ -5243,21 +5254,22 @@ function CratesTabView({ collection, allCrates, onUpdate, onRename, onDelete, cr
         </p>
         {!sorted ? (
           <button
-            onClick={() => canScan && setSmartMode('full')}
-            disabled={!canScan}
-            className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
-            style={btnStyle(canScan)}
-            onMouseEnter={e => { if (canScan) e.currentTarget.style.background = '#d8ff33'; }}
-            onMouseLeave={e => { if (canScan) e.currentTarget.style.background = '#C9FF00'; }}
+            onClick={() => { if (gated) { onUpsell?.(); return; } if (canScan) setSmartMode('full'); }}
+            disabled={!gated && !canScan}
+            className="inline-flex items-center gap-2 text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
+            style={btnStyle(gated || canScan)}
+            onMouseEnter={e => { if (gated || canScan) e.currentTarget.style.background = '#d8ff33'; }}
+            onMouseLeave={e => { if (gated || canScan) e.currentTarget.style.background = '#C9FF00'; }}
           >
-            Sort my collection
+            {gated && <LockSimple size={12} weight="fill" />}
+            {gated ? 'Sorting is a Selector feature' : 'Sort my collection'}
           </button>
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => unfiledCount > 0 && setSmartMode('unfiled')}
-                disabled={unfiledCount === 0}
+                onClick={() => { if (gated) { onUpsell?.(); return; } if (unfiledCount > 0) setSmartMode('unfiled'); }}
+                disabled={!gated && unfiledCount === 0}
                 className="text-[13px] font-mono transition-all px-4 py-2.5 rounded-2xl"
                 style={btnStyle(unfiledCount > 0)}
                 onMouseEnter={e => { if (unfiledCount > 0) e.currentTarget.style.background = '#d8ff33'; }}
@@ -5652,7 +5664,7 @@ function StatsView({ collection, accentRGB, onExplore, onOpenCrate }) {
 const HOW_STEPS = [
   { num: 1, title: 'Photograph', Icon: Camera,      video: null, poster: null, desc: 'Point your camera at the sleeve or label. A single photo is all it takes.' },
   { num: 2, title: 'Identify',   Icon: Scan,        video: null, poster: null, desc: 'The exact pressing is matched against the global record database: label, catalogue number, year, country.' },
-  { num: 3, title: 'Enrich',     Icon: Sparkle,     video: null, poster: null, desc: 'Tracklist, BPM, and Camelot key notation are pulled automatically where available.' },
+  { num: 3, title: 'Enrich',     Icon: Sparkle,     video: null, poster: null, desc: 'The tracklist and BPM for every track are pulled automatically where available.' },
   { num: 4, title: 'File',       Icon: VinylRecord, video: null, poster: null, desc: 'Assign the record to one or more crates, or save it unassigned and sort later.' },
 ];
 
@@ -6453,7 +6465,6 @@ function TracksView({ collection, accentRGB, onUpdate, accessToken }) {
 
 function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
   const isPlaying = t.previewUrl && playing === t.previewUrl;
-  const keyColor = t.key ? camelotColor(t.key) : null;
   return (
     <div className="flex items-center gap-3 px-2 py-2 rounded-xl transition-all hover:bg-white/[0.03]" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}>
       {/* Cover */}
@@ -6468,13 +6479,6 @@ function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
         <div className="text-[15px] truncate font-display text-white/85">{t.title}</div>
         <div className="text-[12px] truncate font-mono text-white/45">{t.artist}{t.recordTitle ? ` · ${t.recordTitle}` : ''}</div>
       </div>
-
-      {/* Key chip (camelotColor returns hsl/rgb, so colour the text/border, neutral bg) */}
-      {t.key && (
-        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono shrink-0" style={{ background: 'rgba(var(--fg),0.05)', color: keyColor || 'rgba(var(--fg),0.5)', border: '1px solid rgba(var(--fg),0.10)' }}>
-          {t.key}
-        </span>
-      )}
 
       {/* BPM */}
       <div className="text-right shrink-0 w-[52px]">
@@ -7465,7 +7469,7 @@ function RoadmapFooter({ accentRGB }) {
     { label: "Phase 1", title: "Scan and Identify", desc: "Vision · Discogs · Spotify · Done", done: true },
     { label: "Phase 2", title: "Collection", desc: "Save · crates · carousel · export · Done", done: true },
     { label: "Phase 3", title: "Record Boxes", desc: "Virtual crates · drag · multi-box assignment" },
-    { label: "Phase 4", title: "DJ Mode", desc: "Camelot wheel · BPM filter · set builder" },
+    { label: "Phase 4", title: "DJ Mode", desc: "BPM filter · set builder" },
     { label: "Phase 5", title: "Archetype Engine", desc: "Clustering · pinnable lenses" },
   ];
   return (

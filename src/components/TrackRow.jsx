@@ -6,10 +6,8 @@
 // community view. Importing it from VinylVault would have made Community and
 // VinylVault import each other.
 import { Play, Pause, Clock } from "@phosphor-icons/react";
-import { camelotColor } from "../lib/camelot.js";
 
 export default function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading, onHotToggle }) {
-  const keyColor = track.key ? camelotColor(track.key) : null;
   const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
 
   const PlayBtn = ({ size = 9 }) => track.previewUrl ? (
@@ -26,7 +24,7 @@ export default function TrackRow({ track, index, accentRGB, playingPreview, onPl
   ) : null;
 
   return (
-    <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
+    <div className="grid grid-cols-[36px_1fr_auto] md:grid-cols-[44px_1fr_auto_auto_28px] items-center gap-2.5 md:gap-4 px-3 md:px-4 py-2.5 rounded-xl transition-all group hover:bg-white/[0.025]" style={{ animation: `fadeUp 0.3s ease-out ${index * 0.04}s both` }}>
       <div className="text-[13px] tracking-[0.12em] text-white/50 font-mono">{track.position}</div>
       <div className="min-w-0 flex items-start gap-1.5">
         {/* Hot toggle: clickable when onHotToggle provided, display-only when track.hot */}
@@ -60,7 +58,6 @@ export default function TrackRow({ track, index, accentRGB, playingPreview, onPl
               if (track.duration) parts.push(<span key="d">{track.duration}</span>);
               if (bpmLoading) parts.push(<span key="b" style={{ animation: "pulse 1.2s ease-in-out infinite" }}>··· BPM</span>);
               else if (track.bpm != null) parts.push(<span key="b">{track.bpm} BPM</span>);
-              if (track.key) parts.push(<span key="k" style={{ color: keyColor || "rgba(var(--fg),0.38)" }}>{track.key}</span>);
               return parts.flatMap((el, i) => i === 0 ? [el] : [<span key={`s${i}`}>·</span>, el]);
             })()}
           </div>
@@ -78,12 +75,6 @@ export default function TrackRow({ track, index, accentRGB, playingPreview, onPl
           ? <span className="text-white/40" style={{ animation: "pulse 1.2s ease-in-out infinite", letterSpacing: "0.05em" }}>···</span>
           : <span style={{ color: track.bpm != null ? "rgba(var(--fg),0.65)" : "rgba(var(--fg),0.40)" }}>{track.bpm != null ? track.bpm : "—"}</span>
         }
-      </div>
-      {/* Key badge: hidden on mobile (already shown inline above) */}
-      <div className="hidden md:flex items-center justify-center md:w-12 h-7">
-        {keyColor ? (
-          <div className="w-full h-full rounded-full flex items-center justify-center text-[14px] font-semibold tabular-nums font-mono" style={{ background: keyColor.replace("hsl", "hsla").replace(")", ", 0.10)"), border: `1px solid ${keyColor.replace("hsl", "hsla").replace(")", ", 0.30)")}`, color: keyColor }}>{track.key}</div>
-        ) : <span className="text-white/35 text-[13px] font-mono">—</span>}
       </div>
       <div className="hidden md:flex items-center justify-center">
         <PlayBtn size={9} />
