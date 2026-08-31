@@ -43,18 +43,23 @@ export function useWishlist(userId) {
   const [loading, setLoading] = useState(true);
   const [tracing, setTracing] = useState({}); // itemId -> true while a hunt runs
   const [syncOff, setSyncOff] = useState(false);
+  const [cacheFull, setCacheFull] = useState(false);
   const userRef = useRef(userId);
   userRef.current = userId;
 
   // ---- local cache ---------------------------------------------------------
   const cacheItems = useCallback((next) => {
     if (!userRef.current) return;
-    safeSetItem(localStorage, key(userRef.current), JSON.stringify(next));
+    const ok = safeSetItem(localStorage, key(userRef.current), JSON.stringify(next));
+    // A full quota used to be swallowed here. The card stayed on screen, never
+    // reached storage, and disappeared on the next reload with nothing said,
+    // which reads as the app losing your work at random.
+    if (!ok) setCacheFull(true);
   }, []);
 
   const cacheTraces = useCallback((next) => {
     if (!userRef.current) return;
-    safeSetItem(localStorage, traceKey(userRef.current), JSON.stringify(next));
+    if (!safeSetItem(localStorage, traceKey(userRef.current), JSON.stringify(next))) setCacheFull(true);
   }, []);
 
   // ---- load ----------------------------------------------------------------
@@ -96,6 +101,24 @@ export function useWishlist(userId) {
       const mapped = [...cloud, ...localOnly];
       setItems(mapped);
       cacheItems(mapped);
+
+      // Back-fill. Anything local the cloud has never seen gets inserted now
+      // that the table is answering. Without this, every card added before
+      // supabase/wishlist.sql was run would stay on the one device for ever:
+      // the merge above keeps showing them, so the loss is invisible until the
+      // user opens the app somewhere else and finds half a wishlist.
+      if (localOnly.length) {
+        const { error: pushErr } = await supabase
+          .from('wishlist_items')
+          .upsert(localOnly.map(i => toRow(i, userId)), { onConflict: 'id' });
+        if (pushErr) {
+          console.log('[wishlist] back-fill failed:', pushErr.message);
+        } else if (!cancelled) {
+          const synced = mapped.map(i => ({ ...i, pending: false }));
+          setItems(synced);
+          cacheItems(synced);
+        }
+      }
 
       // Results merge on the same rule as the items above, and for the same
       // reason: a result the server never stored (the migration is not run, or
@@ -214,7 +237,7 @@ export function useWishlist(userId) {
     if (error && !isMissingTable(error)) console.log('[wishlist] clear trace failed:', error.message);
   }, [cacheTraces, syncOff]);
 
-  return { items, traces, tracing, loading, syncOff, addItem, removeItem, updateItem, runTrace, clearTrace };
+  return { items, traces, tracing, loading, syncOff, cacheFull, addItem, removeItem, updateItem, runTrace, clearTrace };
 }
 
 // ---- row mapping -----------------------------------------------------------

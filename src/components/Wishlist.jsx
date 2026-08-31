@@ -183,7 +183,7 @@ function TracePanel({ payload, isLight, onClear }) {
       {market.conditions.length > 0 && (
         <div className="px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
           <div className="text-[9.5px] tracking-[0.18em] uppercase font-mono text-white/28 mb-2">
-            Sells for, in {market.currency || 'USD'}
+            Sells for{market.currency ? `, in ${market.currency}` : ''}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {market.conditions.map(c => (
@@ -335,7 +335,7 @@ function WishlistRow({ item, trace, tracing, isLight, canTrace, onTrace, onRemov
 
 // ----- The tab --------------------------------------------------------------
 export default function WishlistView({ userId, accessToken, isLight, canTrace, onUpsell }) {
-  const { items, traces, tracing, loading, syncOff, addItem, removeItem, runTrace, clearTrace } = useWishlist(userId);
+  const { items, traces, tracing, loading, syncOff, cacheFull, addItem, removeItem, runTrace, clearTrace } = useWishlist(userId);
 
   const [artist, setArtist] = useState('');
   const [title, setTitle] = useState('');
@@ -499,6 +499,13 @@ export default function WishlistView({ userId, accessToken, isLight, canTrace, o
       {syncOff && (
         <p className="text-[12px] font-mono text-white/30 mb-5">
           Saving on this device only. The wishlist tables have not been created on the database yet.
+        </p>
+      )}
+
+      {cacheFull && (
+        <p className="text-[12px] font-mono mb-5" style={{ color: isLight ? '#b3261e' : '#fca5a5' }}>
+          This device is out of storage, so the newest additions may not survive a reload.
+          Clearing some traced results will free space.
         </p>
       )}
 

@@ -44,8 +44,17 @@ function parseDiscogsTitle(combined) {
 // Vinyl Vault is a vinyl-only app: every Discogs search is constrained to
 // format=Vinyl so CD / cassette / file pressings are never returned (and never
 // crowd real vinyl pressings out of the small per_page window).
-function buildSearchUrl(params) {
-  return `${BASE}/database/search?${new URLSearchParams({ type: 'release', format: 'Vinyl', per_page: '5', ...params })}`;
+// per_page is 5 for a SCAN, which fires many narrow interpretations of what the
+// vision model read and merges them: a wide window there just lets one loose
+// query crowd out the others. A MANUAL search is the opposite shape, one or two
+// deliberate queries typed by a person, and 5 rows made an artist search look
+// like the app only knew five records by them. Page size costs no extra request
+// either way, so the only thing a bigger window spends is response size.
+const SCAN_PER_PAGE = 5;
+const MANUAL_PER_PAGE = 25;
+
+function buildSearchUrl(params, perPage = SCAN_PER_PAGE) {
+  return `${BASE}/database/search?${new URLSearchParams({ type: 'release', format: 'Vinyl', per_page: String(perPage), ...params })}`;
 }
 
 // The same product carries different barcode strings depending on where it was
@@ -64,6 +73,7 @@ export function barcodeVariants(barcode) {
 
 export async function searchDiscogs({ catalogNumber, barcode, artist, title, label, country, rawText, manual = false, meta = null }) {
   const headers = authHeaders();
+  const perPage = manual ? MANUAL_PER_PAGE : SCAN_PER_PAGE;
 
   // Run search strategies in parallel. Vision sometimes misassigns fields
   // (e.g. track title read as label name), so image scans try multiple interpretations.
@@ -76,25 +86,25 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   // long enough to be a real UPC/EAN, so a stray number never fires a search.
   const barcodeUrls = new Set();
   for (const variant of barcodeVariants(barcode)) {
-    const u = buildSearchUrl({ barcode: variant });
+    const u = buildSearchUrl({ barcode: variant }, perPage);
     urls.add(u);
     barcodeUrls.add(u);
   }
 
   if (catalogNumber) {
     // Broad catno-only search (may return false collisions from other labels)
-    urls.add(buildSearchUrl({ catno: catalogNumber }));
+    urls.add(buildSearchUrl({ catno: catalogNumber }, perPage));
     // Normalised variants: strip/replace separators so "PM012" finds "PM-012"
     const stripped = catalogNumber.replace(/[\s\-\.]/g, '');
     const dashed = catalogNumber.replace(/[\s\.]/g, '-');
     for (const variant of new Set([stripped, dashed])) {
       if (variant !== catalogNumber) {
-        urls.add(buildSearchUrl({ catno: variant }));
+        urls.add(buildSearchUrl({ catno: variant }, perPage));
       }
     }
     // Combined catno + artist: much more targeted, avoids cross-label collisions
     if (artist) {
-      urls.add(buildSearchUrl({ catno: catalogNumber, artist }));
+      urls.add(buildSearchUrl({ catno: catalogNumber, artist }, perPage));
     }
   }
   if (artist && title) {
@@ -103,21 +113,30 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
     // often every field except this one. It is never added to the fuzzy
     // fallback below, which exists precisely for when the targeted search is
     // too narrow to match anything.
-    urls.add(buildSearchUrl({ artist, release_title: title, ...(country ? { country } : {}) }));
+    urls.add(buildSearchUrl({ artist, release_title: title, ...(country ? { country } : {}) }, perPage));
   }
   // Loose fallbacks: only needed for image scans where Vision may misidentify fields.
   // Skip for manual searches -- the user typed explicit values, so field confusion
   // doesn't apply, and the extra requests needlessly eat rate-limit quota.
   if (!manual) {
     if (title) {
-      urls.add(buildSearchUrl({ release_title: title }));
+      urls.add(buildSearchUrl({ release_title: title }, perPage));
+    }
+    // One field is a legitimate search. Somebody with a sleeve in their hand
+    // often has the artist and nothing else, and a targeted artist query is a
+    // far better answer than the fuzzy fallback that was carrying it alone.
+    if (artist && !title) {
+      urls.add(buildSearchUrl({ artist, ...(country ? { country } : {}) }, perPage));
+    }
+    if (label && !title) {
+      urls.add(buildSearchUrl({ label }, perPage));
     }
     if (label && title) {
-      urls.add(buildSearchUrl({ label, release_title: title }));
+      urls.add(buildSearchUrl({ label, release_title: title }, perPage));
     }
     if (artist && title && artist !== label) {
       // Treat Vision's "artist" as a label — catches label/artist/title confusion
-      urls.add(buildSearchUrl({ label: artist, release_title: title }));
+      urls.add(buildSearchUrl({ label: artist, release_title: title }, perPage));
     }
     // Mine rawText for catno-like patterns as independent catno searches, but only
     // when no structured catalogue number was read -- a confident structured catno
@@ -129,10 +148,10 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
       const catnoPattern = /\b([A-Z]{1,5}[\s\-]?\d{2,4}[A-Z]?)\b/g;
       const rawCatnos = [...new Set([...rawText.matchAll(catnoPattern)].map(m => m[1]))].slice(0, 3);
       for (const c of rawCatnos) {
-        urls.add(buildSearchUrl({ catno: c }));
+        urls.add(buildSearchUrl({ catno: c }, perPage));
         const stripped = c.replace(/[\s\-]/g, '');
         if (stripped !== c) {
-          urls.add(buildSearchUrl({ catno: stripped }));
+          urls.add(buildSearchUrl({ catno: stripped }, perPage));
         }
       }
     }
@@ -145,13 +164,13 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
   const fuzzyQ = (rawText ? rawText.slice(0, 80).trim() : '') || [artist, title, label].filter(Boolean).join(' ');
   let fuzzyUrl = null;
   if (fuzzyQ && (!manual || !catalogNumber)) {
-    fuzzyUrl = buildSearchUrl({ q: fuzzyQ });
+    fuzzyUrl = buildSearchUrl({ q: fuzzyQ }, perPage);
     urls.add(fuzzyUrl);
   }
 
   // Title-keyword fallback: only for image scans where artist field may be unreliable.
   if (!manual && title && (!artist || artist === label)) {
-    urls.add(buildSearchUrl({ q: title }));
+    urls.add(buildSearchUrl({ q: title }, perPage));
   }
 
   // 5s timeout + 1 retry for search: Discogs responses regularly arrive in the
@@ -235,7 +254,7 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
 
   // Slice to 15: broad catno searches can return up to 5 wrong-label collisions,
   // which would crowd out correct releases from targeted searches if we sliced to 5.
-  return merged.slice(0, 15).map(r => {
+  return merged.slice(0, manual ? 40 : 15).map(r => {
     const { artist: a, recordTitle } = parseDiscogsTitle(r.title || '');
     return {
       id: String(r.id),

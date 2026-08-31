@@ -222,6 +222,10 @@ export async function runTrace(releaseId) {
       masterId: release.masterId,
     },
     market: {
+      // fetchDiscogsPrice reports the currency the ladder is quoted in and the
+      // card prints it. Omitting it here made every ladder read as USD, which
+      // is wrong for most European pressings and is a number about money.
+      currency: price?.currency || null,
       totalListings: price?.totalListings ?? 0,
       floor: price?.floor || null,
       conditions: condition,
