@@ -9,12 +9,20 @@ import { analyzeImage } from './lib/google-vision.js';
 import { scoreCandidate, rankCandidates } from './lib/scoring.js';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
-import { FREE_SCANS } from '../src/lib/pricing.js';
+import { FREE_SCANS, tierAllows } from '../src/lib/pricing.js';
+import { refreshFeatureOverrides } from './lib/tier.js';
+import { aiUsageHandler, setAiUser } from './lib/aiUsage.js';
 
 // The free allowance is defined once, in the same file the pricing screen
 // reads. Two copies of the number is how a card ends up advertising 30 while
 // the server enforces something else.
-const SCAN_LIMITS = { digger: FREE_SCANS, selector: Infinity, resident: Infinity };
+//
+// Which tier buys the unlimited allowance is the shared gate rather than a
+// table of its own, so moving `scanUnlimited` in the admin panel moves the
+// limit here too. A hard-coded table beside a gate the admin can edit is the
+// same drift the tier map exists to prevent.
+const scanLimitFor = (tier, isActive) =>
+  (tierAllows('scanUnlimited', tier, isActive) ? Infinity : FREE_SCANS);
 
 async function _doCheckAndIncrementScanLimit(userId) {
   if (!userId) return null; // unauthenticated: allow (will be rate-limited separately)
@@ -23,6 +31,7 @@ async function _doCheckAndIncrementScanLimit(userId) {
   if (!url || !key) return null; // payments not configured: don't block scans
 
   const supabase = createClient(url, key);
+  await refreshFeatureOverrides();
   const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_tier, subscription_status, scans_this_period, scans_period_end')
@@ -42,7 +51,7 @@ async function _doCheckAndIncrementScanLimit(userId) {
   // granted unlimited scans: the one status that should restrict a person was
   // the one that let them through.
   const effectiveTier = hasAccess ? tier : 'digger';
-  const limit = SCAN_LIMITS[effectiveTier] ?? SCAN_LIMITS.digger;
+  const limit = scanLimitFor(effectiveTier, true);
 
   // Auto-reset if period has rolled over
   const now = new Date();
@@ -190,11 +199,12 @@ function toCandidate(r) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const authUser = await requireAuth(req, res);
   if (!authUser) return;
+  setAiUser(authUser.id);
 
   const { image, mediaType, discogsId, barcode, vision: clientVision } = req.body || {};
 
@@ -492,3 +502,7 @@ export default async function handler(req, res) {
 export const config = {
   api: { bodyParser: { sizeLimit: '5mb' } },
 };
+
+// Every Claude call inside the handler is booked against this endpoint, and
+// against the caller once requireAuth has identified them.
+export default aiUsageHandler('scan', handler);

@@ -20,6 +20,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
+import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { freshAccessToken } from '../lib/authToken.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
 import { legibleAccentRGB } from '../lib/accentContrast.js';
@@ -698,9 +699,16 @@ export default function VinylVault() {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, loading: authLoading, isAdmin, accessToken, signIn, signUp, signOut, signInWithGoogle, isSupabaseEnabled, updateDisplayName, updateProfile, updateAvatar, updatePreferences, refreshProfile } = useAuth();
   const { tier, isPaid, isActive, startCheckout, openPortal } = useSubscription(user, profile);
+  // Which tier each feature needs, as the database currently says. The shipped
+  // map is the default and an override moves one feature; the version bumps
+  // when a load lands so the memo below recomputes.
+  const { featureTierVersion, reloadFeatureTiers } = useFeatureTiers();
   // Every gate in this file goes through the shared tier map, so what the
   // pricing screen sells and what the app enforces cannot drift apart.
-  const can = useCallback((feature) => tierAllows(feature, tier, isActive), [tier, isActive]);
+  // featureTierVersion is not read in the body. It is in the dependency list
+  // because it is the signal that the shared map behind tierAllows changed.
+  const can = useCallback((feature) => tierAllows(feature, tier, isActive),
+    [tier, isActive, featureTierVersion]);
 
   // Splash stays up for one full loop of the chosen WebP clip (its duration),
   // and for as long as auth is genuinely still loading. WebP <img> has no
@@ -1545,7 +1553,7 @@ export default function VinylVault() {
       {/* Main */}
       <main className="relative px-5 md:px-10 pb-20 max-w-7xl mx-auto">
         {appView === "admin" && (
-          <AdminPanel onBack={() => setAppView("collection")} />
+          <AdminPanel onBack={() => setAppView("collection")} onFeatureTiersChanged={reloadFeatureTiers} />
         )}
         {appView === "scan" && (
           <>

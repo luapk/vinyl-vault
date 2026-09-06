@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { tierAllows, FEATURE_TIER, TIERS } from '../pricing.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { tierAllows, FEATURE_TIER, TIERS, setFeatureTierOverrides, effectiveFeatureTier } from '../pricing.js';
 
 describe('tierAllows', () => {
   it('lets a higher tier reach everything a lower one can', () => {
@@ -41,5 +41,44 @@ describe('tierAllows', () => {
   it('treats an unknown or missing tier as free', () => {
     expect(tierAllows('wishlist', undefined)).toBe(false);
     expect(tierAllows('wishlist', 'nonsense')).toBe(false);
+  });
+});
+
+describe('feature tier overrides', () => {
+  // public.feature_tiers can move one gate without a deploy. The rules that
+  // matter are that it layers over the shipped map rather than replacing it,
+  // and that an empty table is not a licence to open everything.
+  afterEach(() => setFeatureTierOverrides({}));
+
+  it('moves a single feature and leaves the rest alone', () => {
+    setFeatureTierOverrides({ trace: TIERS.SELECTOR });
+    expect(tierAllows('trace', TIERS.SELECTOR)).toBe(true);
+    expect(tierAllows('bpmSorter', TIERS.SELECTOR)).toBe(false);
+    expect(tierAllows('wishlist', TIERS.DIGGER)).toBe(false);
+  });
+
+  it('opens a feature to everyone with "free"', () => {
+    setFeatureTierOverrides({ wishlist: 'free' });
+    expect(tierAllows('wishlist', TIERS.DIGGER)).toBe(true);
+    expect(effectiveFeatureTier('wishlist')).toBe(null);
+  });
+
+  it('can tighten a gate as well as loosen it', () => {
+    setFeatureTierOverrides({ wishlist: TIERS.RESIDENT });
+    expect(tierAllows('wishlist', TIERS.SELECTOR)).toBe(false);
+    expect(tierAllows('wishlist', TIERS.RESIDENT)).toBe(true);
+  });
+
+  it('falls back to the shipped map when the table is empty', () => {
+    // The failure this guards is the important one: a load that returns
+    // nothing (offline, or the migration not run) must not read as "no gates".
+    setFeatureTierOverrides({});
+    expect(tierAllows('trace', TIERS.SELECTOR)).toBe(false);
+    expect(effectiveFeatureTier('trace')).toBe(TIERS.RESIDENT);
+  });
+
+  it('still treats a lapsed subscriber as free under an override', () => {
+    setFeatureTierOverrides({ trace: TIERS.SELECTOR });
+    expect(tierAllows('trace', TIERS.SELECTOR, false)).toBe(false);
   });
 });

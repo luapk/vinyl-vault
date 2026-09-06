@@ -1,5 +1,6 @@
 import { requireAuth } from './lib/auth.js';
 import { callClaude } from './lib/vision.js';
+import { aiUsageHandler, setAiUser } from './lib/aiUsage.js';
 
 // Octave arbiter: the client waveform analyser sometimes cannot tell a tempo
 // from its half/double (87 vs 174 -- the classic autocorrelation ambiguity).
@@ -8,11 +9,12 @@ import { callClaude } from './lib/vision.js';
 // request keeps this at fractions of a cent per record.
 const MAX_ITEMS = 24;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const authUser = await requireAuth(req, res);
   if (!authUser) return;
+  setAiUser(authUser.id);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'Arbiter not configured' });
@@ -84,3 +86,7 @@ Return ONLY a JSON array of the chosen numbers, one per track, in order. Example
 export const config = {
   api: { bodyParser: { sizeLimit: '256kb' } },
 };
+
+// Every Claude call inside the handler is booked against this endpoint, and
+// against the caller once requireAuth has identified them.
+export default aiUsageHandler('bpm-arbiter', handler);

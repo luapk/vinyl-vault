@@ -29,6 +29,77 @@ async function grantTier(supabase, userId, tier) {
     .eq('id', userId);
 }
 
+// ─── Billing detail ──────────────────────────────────────────────────────────
+//
+// Stripe is the source of truth for money; these writes are a local copy so the
+// admin panel can answer "when does this renew, and for how much" without a
+// Stripe call per row. Everything here is best effort: a failed copy costs the
+// dashboard a field, and must never cost the customer their access, so the
+// tier and status write stays the one that has to succeed.
+
+// Stripe moved the period fields from the subscription onto its items. Read
+// both, newest shape first, or a renewal date silently stops updating the day
+// the account's API version rolls forward.
+function periodEnd(sub) {
+  const secs = sub?.items?.data?.[0]?.current_period_end || sub?.current_period_end;
+  return secs ? new Date(secs * 1000).toISOString() : null;
+}
+
+function priceOf(sub) {
+  const price = sub?.items?.data?.[0]?.price;
+  return {
+    amount:   typeof price?.unit_amount === 'number' ? price.unit_amount : null,
+    currency: price?.currency || null,
+    interval: price?.recurring?.interval || null,
+  };
+}
+
+async function writeBillingDetail(supabase, sub) {
+  const { amount, currency, interval } = priceOf(sub);
+  const patch = {
+    current_period_end:        periodEnd(sub),
+    cancel_at_period_end:      !!sub.cancel_at_period_end,
+    subscription_amount_pence: amount,
+    subscription_currency:     currency,
+    subscription_interval:     interval,
+  };
+  const { error } = await supabase
+    .from('profiles').update(patch).eq('stripe_customer_id', sub.customer);
+  // 42703 is an undefined column: supabase/admin-analytics.sql has not been run
+  // on this database yet. That is a normal state, not an incident.
+  if (error && error.code !== '42703') {
+    console.error('[stripe-webhook] billing detail:', error.message);
+  }
+
+  // First payment sets the start date, and only the first: a renewal must not
+  // move it, or every subscriber looks like they signed up this month.
+  if (sub.start_date) {
+    await supabase
+      .from('profiles')
+      .update({ subscription_started_at: new Date(sub.start_date * 1000).toISOString() })
+      .eq('stripe_customer_id', sub.customer)
+      .is('subscription_started_at', null);
+  }
+}
+
+// One row per payment, keyed on Stripe's own id so a webhook redelivery
+// updates the row it already wrote instead of counting the money twice.
+async function recordPayment(supabase, row) {
+  if (!row.id || typeof row.amount_pence !== 'number') return;
+  let userId = row.user_id || null;
+  if (!userId && row.stripe_customer_id) {
+    const { data } = await supabase
+      .from('profiles').select('id').eq('stripe_customer_id', row.stripe_customer_id).maybeSingle();
+    userId = data?.id || null;
+  }
+  const { error } = await supabase
+    .from('payments')
+    .upsert({ ...row, user_id: userId }, { onConflict: 'id' });
+  if (error && error.code !== '42P01') {
+    console.error('[stripe-webhook] payment ledger:', error.message);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -71,6 +142,18 @@ export default async function handler(req, res) {
         if (session.mode === 'payment') {
           // One-time founding purchase -- grant permanently, no subscription ID
           await grantTier(supabase, userId, tier);
+          await recordPayment(supabase, {
+            id: session.id,
+            user_id: userId,
+            stripe_customer_id: session.customer || null,
+            amount_pence: session.amount_total ?? 0,
+            currency: session.currency || 'gbp',
+            status: 'paid',
+            kind: 'one_time',
+            tier,
+            description: 'Founding lifetime',
+            paid_at: new Date((session.created || Date.now() / 1000) * 1000).toISOString(),
+          });
         }
         // Subscription mode: wait for invoice.payment_succeeded / subscription.updated
         break;
@@ -89,6 +172,7 @@ export default async function handler(req, res) {
           p_tier:                   tier,
           p_status:                 sub.status === 'active' || sub.status === 'trialing' ? sub.status : 'past_due',
         });
+        await writeBillingDetail(supabase, sub);
         break;
       }
 
@@ -101,6 +185,44 @@ export default async function handler(req, res) {
           p_tier:                   'digger',
           p_status:                 'cancelled',
         });
+        // A cancelled subscription has no next renewal. Leaving the old date in
+        // place would have the panel counting down to a charge nobody is making.
+        await supabase.from('profiles').update({
+          current_period_end: null, cancel_at_period_end: false,
+          subscription_amount_pence: null, subscription_interval: null,
+        }).eq('stripe_customer_id', sub.customer);
+        break;
+      }
+
+      // ── Payment taken (first bill and every renewal) ──────────────────────
+      //
+      // This is the only event that reports money actually collected, so it is
+      // the one the revenue total is built from. The subscription events above
+      // report intent and access; an invoice reports a charge that cleared.
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        const subId = invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
+        await recordPayment(supabase, {
+          id: invoice.id,
+          stripe_customer_id: invoice.customer || null,
+          amount_pence: invoice.amount_paid ?? 0,
+          currency: invoice.currency || 'gbp',
+          status: 'paid',
+          kind: 'subscription',
+          tier: invoice.lines?.data?.[0]?.price?.id ? tierForPrice(invoice.lines.data[0].price.id) : null,
+          description: invoice.lines?.data?.[0]?.description || 'Subscription',
+          paid_at: new Date((invoice.status_transitions?.paid_at || invoice.created || Date.now() / 1000) * 1000).toISOString(),
+        });
+        // The renewal date moves on every successful bill, and the invoice does
+        // not carry it, so it is read back off the subscription.
+        if (subId) {
+          try {
+            const sub = await stripe.subscriptions.retrieve(subId);
+            await writeBillingDetail(supabase, sub);
+          } catch (err) {
+            console.error('[stripe-webhook] period refresh:', err.message);
+          }
+        }
         break;
       }
 

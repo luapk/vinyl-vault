@@ -98,6 +98,48 @@ to be written down.
 - Camelot key notation was removed from the product entirely. Track `key` may
   still arrive in scan data, but nothing displays it.
 
+### The admin panel, and where its numbers come from
+`src/components/AdminPanel.jsx` is three screens: Money, People, Features.
+
+- **The feature matrix edits the gate, not a copy of it.** `public.feature_tiers`
+  holds one row per overridden feature and both the client gates
+  (`useFeatureTiers` -> `setFeatureTierOverrides`) and the server gates
+  (`requireTier` -> `refreshFeatureOverrides`, cached 60s) read it. It **layers
+  over** `FEATURE_TIER` rather than replacing it, which is the direction that
+  fails safe: a table that is empty, missing or unreachable leaves the product
+  exactly as shipped, where replace-on-load would turn every paid feature free
+  the first time the query fell over. `scanUnlimited` moves the scan cap in
+  `api/scan.js` too, because the limit is derived from the same gate rather than
+  a second table beside it. What it does NOT move is the pricing page's written
+  copy, and the panel says so on screen.
+- **Money is a ledger, not a projection.** `public.payments` takes one row per
+  payment Stripe reports as collected, keyed on Stripe's own invoice or session
+  id so a webhook redelivery updates the row instead of counting the money
+  twice. "Committed / year" is a separate figure from "Taken", and is labelled
+  as such: one is what live subscriptions are set to bill, the other is money
+  that actually arrived. Both are integers in minor units all the way to the
+  formatter.
+- **AI spend is measured, not estimated.** `api/lib/aiUsage.js` books every
+  Anthropic response with the token counts the API itself reported, prices it at
+  the published rate and stores the cost as well as the tokens (rates change,
+  and what a call cost on the day is not recoverable from a later rate card).
+  The request context rides on an `AsyncLocalStorage` so `vision.js` does not
+  need to know who is scanning, and rows are flushed once, awaited, at the end
+  of the handler: an unawaited insert on a serverless function is a row that
+  arrives only if the instance outlives the response. An **unknown model prices
+  at the dearest rate in the table**, never zero, for the same reason an unknown
+  origin gets the expensive shipping corridor.
+- **Both ledgers are unreadable from the browser**: RLS on, no policy at all, so
+  every anon and authenticated select returns nothing whatever PostgREST is
+  asked for. The panel reads them through `admin_metrics()` and the extended
+  `admin_list_users()`, definer functions that check `is_admin()` first. The
+  record count comes from there too now, instead of the client selecting every
+  row of `records` to count them.
+- **The panel must not break on a database where the migration has not been
+  run**, the same rule `admin_list_users` already followed: `admin_metrics()`
+  answering nothing shows a banner naming the file to run, and the users list
+  falls back to the old shape.
+
 ### Wishlist and Trace
 The Wishlist tab (`src/components/Wishlist.jsx`, `src/hooks/useWishlist.js`) is
 one screen doing two jobs: what you are hunting, and what each one costs. Search
@@ -181,6 +223,7 @@ src/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
     useWishlist.js     # wishlist items + stored trace results
+    useFeatureTiers.js # tier overrides from the database, layered over the shipped map
   lib/
     supabase.js        # Supabase client (handles both legacy JWT and publishable keys)
     badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
@@ -199,6 +242,7 @@ api/                   # Vercel serverless functions (all secret keys live here)
   image-proxy.js       # cover art proxy (CORS) for caching covers into storage
   price.js             # Discogs price history
   trace.js             # one hunt: pressings, live listings, landed cost, verdict
+  lib/aiUsage.js       # books every Claude call to the ai_usage ledger
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
 
@@ -216,6 +260,7 @@ supabase/
   profile-privacy.sql  # column grants that keep email + Stripe ids off public profiles
   bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
   wishlist.sql         # wishlist_items + trace_results (Wishlist tab)
+  admin-analytics.sql  # feature_tiers overrides, billing columns, payments + ai_usage ledgers
 ```
 
 ## Security rules
@@ -289,6 +334,7 @@ Also run when updating an existing database:
 - `supabase/import-jobs.sql` (background file imports; until it is run, imports keep running in the browser and stop when the tab does)
 - `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
 - `supabase/wishlist.sql` (the Wishlist tab; until it is run the tab works but saves to this device only)
+- `supabase/admin-analytics.sql` (the advanced admin panel: editable feature gates, billing detail on the profile, and the payments + AI spend ledgers. Until it is run the panel shows accounts and tiers only and says so, and nothing is recorded)
 
 ## Data model
 

@@ -1,3 +1,5 @@
+import { recordAiUsage } from './aiUsage.js';
+
 const PROMPT = `Analyse this photo of a vinyl record sleeve or label. Return ONLY valid JSON (no markdown fences, no preamble) in this exact shape:
 
 {
@@ -67,7 +69,13 @@ export async function callClaude(body, apiKey, maxRetries = 1) {
       throw err;
     }
 
-    if (response.ok) return response.json();
+    if (response.ok) {
+      const data = await response.json();
+      // Booked here rather than at each call site: every Claude call in the
+      // scan pipeline comes through this function, so one line covers them all.
+      recordAiUsage(body?.model, data?.usage);
+      return data;
+    }
 
     const errText = await response.text();
     const status = response.status;
@@ -206,6 +214,7 @@ Return ONLY a JSON array of strings. Example: ["Name One", "Name Two"]`;
 
     if (!response.ok) return [];
     const data = await response.json();
+    recordAiUsage('claude-haiku-4-5-20251001', data?.usage);
     const text = data.content?.[0]?.text?.trim() || '[]';
     const raw = text
       .replace(/^```json\s*/i, '')

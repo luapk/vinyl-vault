@@ -1,7 +1,8 @@
 import { requireAuth } from './lib/auth.js';
 import { requireTier } from './lib/tier.js';
+import { aiUsageHandler, setAiUser, recordAiUsage } from './lib/aiUsage.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // Signed-in callers only. This endpoint sends up to 2MB of text to Claude and
@@ -9,6 +10,7 @@ export default async function handler(req, res) {
   // URL could spend the project's Anthropic budget at will.
   const authUser = await requireAuth(req, res);
   if (!authUser) return;
+  setAiUser(authUser.id);
 
   // Selector and up. This is the only gate on the spending: hiding the button
   // would leave the endpoint open to anyone holding a token, and one call is
@@ -117,6 +119,7 @@ ${inventory}`;
     }
 
     const data = await response.json();
+    recordAiUsage('claude-sonnet-4-6', data?.usage);
 
     // A response cut off at max_tokens leaves the JSON unterminated, and the
     // greedy brace match below then hands JSON.parse something invalid. That
@@ -158,3 +161,7 @@ ${inventory}`;
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
 };
+
+// Every Claude call inside the handler is booked against this endpoint, and
+// against the caller once requireAuth has identified them.
+export default aiUsageHandler('smart-crates', handler);

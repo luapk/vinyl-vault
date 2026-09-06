@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { tierAllows } from '../../src/lib/pricing.js';
+import { tierAllows, setFeatureTierOverrides } from '../../src/lib/pricing.js';
 
 // Server-side tier gating.
 //
@@ -25,11 +25,42 @@ function admin() {
 // state a comped or pre-Stripe account sits in.
 const ACTIVE = new Set(['active', 'trialing', 'past_due']);
 
+// ---------------------------------------------------------------------------
+// Overrides
+// ---------------------------------------------------------------------------
+// public.feature_tiers can move a feature between tiers without a deploy (the
+// admin panel writes it). Read here, cached per warm instance for a minute, so
+// a gate check does not cost two round trips.
+//
+// Failure leaves the shipped map in place rather than clearing it. That is the
+// safe direction: a table we cannot read must not quietly turn every paid
+// feature free, which is exactly what replacing-on-load would do the first
+// time this query timed out.
+const OVERRIDE_TTL_MS = 60 * 1000;
+let overridesAt = 0;
+
+export async function refreshFeatureOverrides() {
+  if (Date.now() - overridesAt < OVERRIDE_TTL_MS) return;
+  try {
+    const { data, error } = await admin().from('feature_tiers').select('feature, tier');
+    if (error) throw new Error(error.message);
+    const map = {};
+    for (const row of data || []) map[row.feature] = row.tier;
+    setFeatureTierOverrides(map);
+    overridesAt = Date.now();
+  } catch {
+    // Keep whatever is loaded (the shipped map, or the last good read) and try
+    // again on the next call rather than pinning the failure for a minute.
+  }
+}
+
 /**
  * Answers 402 and returns null when the caller's tier does not reach `feature`.
  * Returns { tier, isActive } when it does.
  */
 export async function requireTier(feature, userId, res) {
+  await refreshFeatureOverrides();
+
   const { data: profile, error } = await admin()
     .from('profiles')
     .select('subscription_tier, subscription_status')
