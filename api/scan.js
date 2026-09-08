@@ -208,9 +208,20 @@ async function handler(req, res) {
 
   const { image, mediaType, discogsId, barcode, vision: clientVision } = req.body || {};
 
-  // Enforce scan limits on image scans only -- disambiguation resolutions are
-  // part of the same scan the user already paid for, so don't count them twice.
-  if (!discogsId) {
+  // Enforce scan limits on image scans only.
+  //
+  // Two things are exempt and both for the same reason: they are not an AI
+  // photo scan, which is the thing the allowance is sold in units of.
+  //
+  //   `discogsId` is a disambiguation resolution, part of a scan already counted.
+  //
+  //   `barcode` was decoded on the device. It makes no model call at all, just
+  //   one Discogs lookup, and the pricing card sells barcode scanning to the
+  //   free tier with no cap beside it. Metering it against the photo allowance
+  //   meant a free user who scanned thirty barcodes was told to upgrade to keep
+  //   using a feature the card says is theirs, and an account whose count had
+  //   run up could not scan a barcode at all.
+  if (!discogsId && !barcode) {
     const limitResult = await checkAndIncrementScanLimit(authUser.id).catch(() => null);
     if (limitResult?.blocked) {
       return res.status(402).json({
