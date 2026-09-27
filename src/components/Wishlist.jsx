@@ -4,6 +4,7 @@ import {
 } from '@phosphor-icons/react';
 import { useWishlist } from '../hooks/useWishlist.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
+import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 
 // The Wishlist tab: records you want, and what each one actually costs.
 //
@@ -426,7 +427,7 @@ export default function WishlistView({ userId, accessToken, isLight, canTrace, o
             aria-label="Release or track title"
             className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
           <input value={catno} onChange={e => setCatno(e.target.value)} placeholder="Catalogue number"
-            aria-label="Catalogue number"
+            aria-label="Catalogue number" {...CODE_INPUT_PROPS}
             className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
           <input value={country} onChange={e => setCountry(e.target.value)} placeholder="Country"
             aria-label="Country" list="vv-wishlist-countries" autoComplete="off"

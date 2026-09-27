@@ -20,6 +20,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
+import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { freshAccessToken } from '../lib/authToken.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
@@ -5889,6 +5890,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
         <div className="flex flex-col gap-1.5">
           <label className="text-[12px] tracking-[0.2em] uppercase text-white/35 font-mono">Catalogue number <span className="text-white/20">(optional)</span></label>
           <input value={catno} onChange={(e) => setCatno(e.target.value)} placeholder="e.g. RACCIDENT 004"
+            {...CODE_INPUT_PROPS}
             className="w-full rounded-full px-4 py-2.5 text-[15px] font-mono text-white/75 placeholder-white/25 outline-none transition-all" style={fieldStyle} />
         </div>
         {/* Country separates a UK pressing from a German one. The suggestions
