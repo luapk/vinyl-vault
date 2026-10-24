@@ -22,6 +22,7 @@ import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
+import { useAuthProviders } from '../hooks/useAuthProviders.js';
 import { freshAccessToken } from '../lib/authToken.js';
 import { countryLabel, DISCOGS_COUNTRIES } from '../lib/countryFlag.js';
 import { legibleAccentRGB } from '../lib/accentContrast.js';
@@ -704,6 +705,9 @@ export default function VinylVault() {
   // map is the default and an override moves one feature; the version bumps
   // when a load lands so the memo below recomputes.
   const { featureTierVersion, reloadFeatureTiers } = useFeatureTiers();
+  // Which sign-in providers the project has switched on. A button that leads
+  // to Supabase's "provider is not enabled" JSON page is worse than no button.
+  const authProviders = useAuthProviders();
   // Every gate in this file goes through the shared tier map, so what the
   // pricing screen sells and what the app enforces cannot drift apart.
   // featureTierVersion is not read in the body. It is in the dependency list
@@ -1044,7 +1048,12 @@ export default function VinylVault() {
         />
       );
     }
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onGoogle={signInWithGoogle} loading={authLoading} initialMode={authInitialMode} />;
+    // Google is offered only when the project actually has it enabled. Until
+    // the answer lands it is offered, so a slow check never costs a Google
+    // user their way in; only a definitive "off" takes the button away.
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp}
+      onGoogle={authProviders.google === false ? undefined : signInWithGoogle}
+      loading={authLoading} initialMode={authInitialMode} />;
   }
 
   // POST to /api/scan with a guaranteed-fresh access token. If the token is
