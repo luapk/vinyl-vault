@@ -11,7 +11,7 @@
 // been run) the same work runs here in the browser, as it always did.
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Check } from '@phosphor-icons/react';
-import { parseImportRows, IMPORT_ROW_CAP } from '../lib/importParse.js';
+import { parseImportRows, IMPORT_ROW_CAP, rowCanIdentify } from '../lib/importParse.js';
 import { gapFor, createRateWindow, LIMIT_BACKOFF_MS, unmatchedImports } from '../lib/importBudget.js';
 import { planDraftDedupe } from '../lib/draftDuplicates.js';
 import { inspectImportShape } from '../lib/importShape.js';
@@ -30,6 +30,10 @@ async function sleep(ms, isCancelled) {
 // versus 'nomatch': they arrive as the same empty list, and treating the first
 // as the second is what filed a whole collection as unidentifiable drafts.
 async function lookupRelease({ artist, title }) {
+  // An artist with no title identifies nothing, so there is nothing to ask
+  // Discogs and no request worth spending. Drafted instead of guessed.
+  if (!rowCanIdentify({ artist, title })) return { outcome: 'nomatch', remaining: null, requests: 0 };
+
   let res, data;
   try {
     res = await fetch('/api/discogs-search', {

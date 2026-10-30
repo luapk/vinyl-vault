@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseImportRows, IMPORT_ROW_CAP } from '../importParse.js';
+import { parseImportRows, IMPORT_ROW_CAP, rowCanIdentify } from '../importParse.js';
 
 describe('parseImportRows -- forgiving record-list parsing', () => {
   it('parses plain "Artist - Title" lines (hyphen, en dash, em dash)', () => {
@@ -75,5 +75,48 @@ describe('parseImportRows -- forgiving record-list parsing', () => {
   it('empty input returns empty', () => {
     expect(parseImportRows('')).toEqual([]);
     expect(parseImportRows('\n\n')).toEqual([]);
+  });
+});
+
+describe('rowCanIdentify', () => {
+  // The import takes the top Discogs result and files it. That is only safe
+  // when the row actually names a record: an artist on its own returns that
+  // artist's discography, and the first sleeve back is somebody else's record
+  // filed into your collection under a green tick.
+  it('rejects a row with an artist and no title', () => {
+    expect(rowCanIdentify({ artist: 'willie hutch', title: '' })).toBe(false);
+    expect(rowCanIdentify({ artist: 'willie hutch', title: '   ' })).toBe(false);
+    expect(rowCanIdentify({ artist: 'willie hutch' })).toBe(false);
+  });
+
+  it('accepts a title on its own, which is a real search', () => {
+    // A line with no dash parses as title-only, and those must keep working.
+    expect(rowCanIdentify({ artist: '', title: 'Dead Cities' })).toBe(true);
+  });
+
+  it('accepts an ordinary row', () => {
+    expect(rowCanIdentify({ artist: 'Massive Attack', title: 'Mezzanine' })).toBe(true);
+  });
+
+  it('survives junk without throwing', () => {
+    expect(rowCanIdentify(null)).toBe(false);
+    expect(rowCanIdentify({})).toBe(false);
+  });
+
+  it('is what a spreadsheet row with a blank title cell parses into', () => {
+    // End to end, and this is the route that actually produces the shape: a
+    // header row naming the columns, and a record whose title cell is empty.
+    const rows = parseImportRows('artist,title\nwillie hutch,\nmassive attack,mezzanine');
+    expect(rows[0]).toEqual({ artist: 'willie hutch', title: '' });
+    expect(rowCanIdentify(rows[0])).toBe(false);
+    expect(rowCanIdentify(rows[1])).toBe(true);
+  });
+
+  it('still searches a trailing-dash text line, which parses as title-only', () => {
+    // Worth pinning: "willie hutch -" keeps the dash and becomes a title, not
+    // an artist, so it stays searchable. Only the empty-title shape is drafted.
+    const [row] = parseImportRows('willie hutch - ');
+    expect(row).toEqual({ artist: '', title: 'willie hutch -' });
+    expect(rowCanIdentify(row)).toBe(true);
   });
 });

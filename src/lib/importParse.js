@@ -10,6 +10,25 @@
 // themselves.
 export const IMPORT_ROW_CAP = 1000;
 
+// Can this row identify a release on its own?
+//
+// The title is what identifies a record. An artist with no title cannot: ask
+// Discogs for "willie hutch" and it answers with that artist's whole
+// discography, and whichever sleeve happens to come back first is not the
+// record anybody listed.
+//
+// That mattered because the import takes the top result and files it. A row
+// reading "willie hutch -" with nothing after the dash was being saved as a
+// confidently identified Willie Hutch record the user had never owned, with a
+// green tick beside it and a place in the "matched" count. A draft the user
+// can repair is the honest answer, and it costs no Discogs request to give.
+//
+// A row the other way round is fine and still searched: a line with no dash
+// becomes title-only, and a title alone is a real search.
+export function rowCanIdentify(row) {
+  return !!(row?.title || '').trim();
+}
+
 export const IMPORT_ARTIST_KEYS = ['artist', 'artists', 'artist name', 'performer', 'band'];
 export const IMPORT_TITLE_KEYS = ['title', 'album', 'album title', 'release', 'release title', 'record', 'name'];
 

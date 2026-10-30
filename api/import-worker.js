@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { searchDiscogs } from './lib/discogs.js';
 import { requireAuth } from './lib/auth.js';
 import { recordFromMatch, draftFromRow, patchFromMatch } from './lib/importRecord.js';
+import { rowCanIdentify } from '../src/lib/importParse.js';
 
 // Leave headroom under the function's maxDuration so the last flush and the
 // unlock always get to run. An invocation that dies mid-row is recoverable
@@ -74,6 +75,11 @@ async function resolveRow(row) {
   let requests = 0;
   for (let attempt = 0; ; attempt++) {
     const meta = { rateLimited: false, remaining: null, requests: 0 };
+    // Same rule the browser applies, for the same reason: an artist with no
+    // title cannot identify a release, so it is drafted rather than guessed.
+    // These two paths have to produce the same records.
+    if (!rowCanIdentify(row)) return { outcome: 'nomatch', remaining: null, requests };
+
     let matches = [];
     try {
       matches = await searchDiscogs({ artist: row.artist, title: row.title, manual: true, meta });
