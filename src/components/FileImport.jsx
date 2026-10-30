@@ -236,6 +236,11 @@ export { ImportShapeWarning };
 // ---- The server-side queue ---------------------------------------------------
 
 const JOB_POLL_MS = 1500;
+// How long a job may sit at the same row before the watching tab assumes
+// nothing is working it and kicks the worker itself. Comfortably longer than
+// one invocation's own pause between rows, so a working import is never
+// interrupted by a second claim it does not need.
+const STALL_KICK_MS = 45_000;
 const UNFINISHED = ['queued', 'running'];
 
 async function accessToken() {
@@ -359,11 +364,31 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     jobIdRef.current = jobId;
     setFileImporting(true);
     let stop = false;
+    // Re-kick state: the cursor last seen, and when it last moved.
+    let lastCursor = -1;
+    let movedAt = Date.now();
     const tick = async () => {
       if (stop || jobIdRef.current !== jobId) return;
       const { data: job, error } = await supabase.from('import_jobs').select('*').eq('id', jobId).single();
       if (error || !job) { setFileImporting(false); return; }
       const rows = Array.isArray(job.rows) ? job.rows : [];
+
+      // One worker invocation does a few minutes of rows and then hands the
+      // job back, expecting the cron to pick it up. When the cron is not
+      // running, nothing does: the import simply stops, and the only way it
+      // ever moved again was the user reopening the app, which reads as an
+      // import that stalls every few hundred rows.
+      //
+      // So the watcher drives it. A cursor that has not moved for a while on a
+      // job that is not finished means nobody is working it, and a kick costs
+      // one request. The cron stays the backstop for a closed tab rather than
+      // being the only thing that works.
+      const cursor = job.cursor || 0;
+      if (cursor !== lastCursor) { lastCursor = cursor; movedAt = Date.now(); }
+      else if (UNFINISHED.includes(job.status) && Date.now() - movedAt > STALL_KICK_MS) {
+        movedAt = Date.now();
+        kickWorker();
+      }
       setFileItems(rows.map((r, i) => ({
         artist: r.artist, title: r.title,
         status: r.status && r.status !== 'pending' ? r.status : (i === job.cursor && job.status === 'running' ? 'searching' : 'pending'),

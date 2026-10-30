@@ -61,10 +61,19 @@ function admin() {
 async function authorize(req, res) {
   const secret = process.env.CRON_SECRET;
   const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-  if (secret && bearer === secret) return { cron: true };
-  if (req.headers['x-vercel-cron']) return { cron: true };
+  if (secret && bearer === secret) return { cron: true, via: 'cron-secret' };
+  if (req.headers['x-vercel-cron']) return { cron: true, via: 'cron-header' };
   const user = await requireAuth(req, res);
-  return user ? { cron: false, user } : null;
+  if (user) return { cron: false, via: 'user', user };
+
+  // A cron tick that cannot authenticate is the failure that hides itself: the
+  // schedule fires, the function answers 401, nothing is written, and the only
+  // visible symptom is an import that stops moving hours later. It has to say
+  // so. Which credential was missing is the whole diagnosis, so name it.
+  console.error('[import-worker] rejected: ' +
+    `cronSecretSet=${!!secret} bearerSent=${!!bearer} ` +
+    `vercelCronHeader=${!!req.headers['x-vercel-cron']}`);
+  return null;
 }
 
 // One Discogs lookup for one row, with the rate limit treated as what it is:
@@ -226,6 +235,10 @@ export default async function handler(req, res) {
   const db = admin();
   const deadline = Date.now() + INVOCATION_BUDGET_MS;
   const handled = [];
+  // Proof of life for the schedule itself, cheap enough to keep: without it a
+  // cron that never fires and a cron that fires over an empty queue look
+  // identical from the logs.
+  console.log(`[import-worker] tick via=${auth.via}`);
 
   try {
     while (Date.now() < deadline) {
@@ -237,8 +250,14 @@ export default async function handler(req, res) {
       }
       // A claim that found nothing comes back as null, or as an all-null row.
       if (!job || !job.id) break;
+      const before = job.cursor || 0;
       const outcome = await processJob(db, job, deadline);
       handled.push({ id: job.id, outcome });
+      // Every claim leaves a trace. A worker that only logs on exceptions is a
+      // worker nobody can tell apart from one that is never being called, which
+      // is exactly the hole this investigation fell into.
+      console.log(`[import-worker] via=${auth.via} job=${job.id} ` +
+        `rows=${before}->${job.total ?? '?'} outcome=${outcome}`);
       if (outcome === 'paused') break;
     }
   } catch (err) {
