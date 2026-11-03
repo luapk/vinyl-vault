@@ -19,13 +19,31 @@ export const WORDMARK = {
   black: '/wordmark-black.svg',
 };
 
-// The same mark set on ONE line, for places too short to take two: the header
-// pill, where a square two-line block sat badly beside a row of round buttons.
-// Traced from the same artwork, the two words split at the gap between them
-// and set on a shared baseline, so it is the identical lettering rather than a
-// second drawing that could drift.
+// The same mark set on ONE line, for places too short to take two.
 export const WORDMARK_LINE = {
   acid:  '/wordmark-line-acid.svg',
   white: '/wordmark-line-white.svg',
   black: '/wordmark-line-black.svg',
+};
+
+// THE LOGO. A keyline lozenge holding the wordmark, with the subline justified
+// to the same measure as the lozenge so the two parts read as one block rather
+// than a shape with a caption under it.
+//
+// Every part is outlines, the subline included: it was converted from Hanken
+// Grotesk rather than set as live text, so the logo never waits on a webfont
+// and cannot reflow if one fails to load.
+export const STAMP = {
+  acid:  '/logo-stamp-acid.svg',
+  white: '/logo-stamp-white.svg',
+  black: '/logo-stamp-black.svg',
+};
+
+// The same stamp without the subline, for anywhere too small to read it. Below
+// about 96px the subline turns to mush, so it is dropped rather than shipped
+// illegible.
+export const STAMP_MARK = {
+  acid:  '/logo-mark-acid.svg',
+  white: '/logo-mark-white.svg',
+  black: '/logo-mark-black.svg',
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { APP_NAME, WORDMARK } from '../lib/brand.js';
+import { APP_NAME, STAMP } from '../lib/brand.js';
 
 // Google's own mark, inlined: an external asset would be one more thing that
 // can fail to load on the very first screen a new user sees.
@@ -92,9 +92,9 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
             down the screen. */}
         <div className="flex justify-center mb-10">
           <img
-            src={isLight ? WORDMARK.black : WORDMARK.white}
+            src={isLight ? STAMP.black : STAMP.white}
             alt={APP_NAME}
-            style={{ width: 200, height: 'auto', opacity: 0.92 }}
+            style={{ width: 260, height: 'auto', opacity: 0.92 }}
           />
         </div>
 

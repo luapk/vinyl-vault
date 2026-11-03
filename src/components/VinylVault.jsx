@@ -20,7 +20,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, WORDMARK, WORDMARK_LINE } from '../lib/brand.js';
+import { APP_NAME, STAMP, STAMP_MARK } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1479,23 +1479,16 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The wordmark rides in a floating pill, set on one line because a
-            two-line block sat square and heavy beside a row of round buttons.
-            Same two-colour logic as the AddCards: acid ground in the dark, ink
-            ground in the light, so it reads as the app's own colour either
-            way. The pill's height is matched to the nav buttons beside it, so
-            the row reads as one band rather than a logo and some controls. */}
+        {/* The logo itself, minus the subline, which is unreadable at this
+            size. The lozenge is drawn into the artwork, so there is no painted
+            background here: acid keyline in the dark, ink keyline in the
+            light. Height matched to the nav buttons beside it so the row reads
+            as one band rather than a logo and some controls. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
-          style={{
-            background: isDark ? ACID : '#08080c',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '9px 16px',
-            borderRadius: 999,
-          }}>
-          <img src={isDark ? WORDMARK_LINE.black : WORDMARK_LINE.white} alt={APP_NAME}
-            style={{ height: 18, display: 'block' }} />
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+          <img src={isDark ? STAMP_MARK.acid : STAMP_MARK.black} alt={APP_NAME}
+            style={{ height: 34, display: 'block' }} />
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
@@ -5998,7 +5991,7 @@ function SplashScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
-        src={WORDMARK.black}
+        src={STAMP.black}
         alt={APP_NAME}
         className="w-[54vw] max-w-[300px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
