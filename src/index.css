@@ -90,21 +90,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Logo: white-on-dark in dark mode.
-   In light mode: full invert → black illustration on white, then multiply
-   blends the white away against the background, leaving just the artwork. */
-[data-theme="light"] img[src="/logo.png"] {
-  mix-blend-mode: multiply !important;
-  filter: invert(1) !important;
-  opacity: 0.88 !important;
-}
-
-/* Header logo (white letters, transparent bg): invert to black in light mode */
-[data-theme="light"] img[src="/logo-white.png"] {
-  filter: invert(1) !important;
-  opacity: 0.85 !important;
-}
-
 /* Splash screen: logo and mascot animation fade up while the app boots */
 @keyframes splashFadeUp {
   from { opacity: 0; transform: translateY(18px); }

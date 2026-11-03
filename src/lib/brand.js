@@ -11,21 +11,6 @@
 // a storage key orphans the cache on every device that already has one.
 export const APP_NAME = 'Found Sound';
 
-// The wordmark, as three flat-colour SVGs in public/. An <img> cannot inherit
-// currentColor, so the colour is picked per context rather than themed in CSS.
-export const WORDMARK = {
-  acid:  '/wordmark-acid.svg',
-  white: '/wordmark-white.svg',
-  black: '/wordmark-black.svg',
-};
-
-// The same mark set on ONE line, for places too short to take two.
-export const WORDMARK_LINE = {
-  acid:  '/wordmark-line-acid.svg',
-  white: '/wordmark-line-white.svg',
-  black: '/wordmark-line-black.svg',
-};
-
 // THE LOGO. A keyline lozenge holding the wordmark, with the subline justified
 // to the same measure as the lozenge so the two parts read as one block rather
 // than a shape with a caption under it.

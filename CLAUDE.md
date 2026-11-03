@@ -11,12 +11,21 @@ worker cache names, and the `vinylvault_*` localStorage keys. Renaming a
 storage key orphans the cache on every device that already holds one, and
 nobody sees any of these. Do not "finish the rename" by touching them.
 
-The wordmark is `public/wordmark-{acid,white,black}.svg`, traced from the brand
-artwork. An `<img>` cannot inherit `currentColor`, so there are three flat
-files and the call site picks one; `WORDMARK` in `src/lib/brand.js` holds the
-paths. The old `logo*.png` files stay in `public/` unreferenced, because
-confirmation emails already delivered point at `logo.png` and deleting it would
-break the image in somebody's inbox.
+The logo is a keyline lozenge holding the wordmark, with the subline justified
+to the lozenge's own measure. `public/logo-stamp-{acid,white,black}.svg` is the
+full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
+for anywhere under about 96px where that line stops being readable. `STAMP` and
+`STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>` cannot
+inherit `currentColor`, so the call site picks a colour rather than theming it.
+
+Every part is outlines, the subline included: it was converted from Hanken
+Grotesk rather than set as live text, so the logo never waits on a webfont and
+carries no font licence into a trademark filing.
+
+The Vinyl Vault era `logo*.png` files and the interim `wordmark-*` files have
+been deleted. One known cost: confirmation emails already delivered pointed at
+`logo.png` (and later `wordmark-white.png`), so the image in that old mail is
+now broken. Restoring either file from git history would fix it.
 
 A vinyl record collection manager. Scan a record sleeve photo, identify it via AI + Discogs, and file it into crates. Syncs across devices via Supabase.
 
