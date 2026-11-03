@@ -1479,10 +1479,27 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
+        {/* The wordmark rides in a tab pinned to the very top of the screen.
+            The negative top margin cancels the header's own top padding AND
+            the safe-area inset, so the acid bleeds all the way to the edge
+            (and up behind a notch) while the mark itself stays below it. Same
+            two-colour logic as the AddCards: acid ground in the dark, ink
+            ground in the light, so the tab reads as the app's own colour
+            either way. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-          <img src={WORDMARK.white} alt={APP_NAME} style={{ height: 56, opacity: 0.92 }} />
+          style={{
+            alignSelf: 'flex-start',
+            background: isDark ? ACID : '#08080c',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '10px 16px 12px',
+            paddingTop: 'calc(10px + env(safe-area-inset-top))',
+            marginTop: 'calc(-0.75rem - env(safe-area-inset-top))',
+            borderRadius: '0 0 18px 18px',
+          }}>
+          <img src={isDark ? WORDMARK.black : WORDMARK.white} alt={APP_NAME}
+            style={{ height: 40, display: 'block' }} />
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
