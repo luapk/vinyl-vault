@@ -1,4 +1,22 @@
-# Vinyl Vault
+# Found Sound (repo: vinyl-vault)
+
+**The product is called Found Sound.** It was renamed from Vinyl Vault, and the
+rename is deliberately skin-deep: every user-facing mention reads `APP_NAME`
+from `src/lib/brand.js`, while everything behind the scenes keeps its original
+name on purpose.
+
+Still called vinyl-vault, and staying that way: the repo, the Vercel project,
+the `vinyl-vault-teal.vercel.app` domain, the Supabase tables, the service
+worker cache names, and the `vinylvault_*` localStorage keys. Renaming a
+storage key orphans the cache on every device that already holds one, and
+nobody sees any of these. Do not "finish the rename" by touching them.
+
+The wordmark is `public/wordmark-{acid,white,black}.svg`, traced from the brand
+artwork. An `<img>` cannot inherit `currentColor`, so there are three flat
+files and the call site picks one; `WORDMARK` in `src/lib/brand.js` holds the
+paths. The old `logo*.png` files stay in `public/` unreferenced, because
+confirmation emails already delivered point at `logo.png` and deleting it would
+break the image in somebody's inbox.
 
 A vinyl record collection manager. Scan a record sleeve photo, identify it via AI + Discogs, and file it into crates. Syncs across devices via Supabase.
 

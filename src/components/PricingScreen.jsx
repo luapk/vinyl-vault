@@ -7,6 +7,7 @@ import {
   FOUNDING_SEATS,
   FREE_SCANS,
 } from '../lib/pricing.js';
+import { APP_NAME, WORDMARK } from '../lib/brand.js';
 
 // Brand acid + ink. This screen is deliberately theme-independent: acid page,
 // black chrome, dark cards with white interiors -- matching the splash and app
@@ -310,7 +311,7 @@ export default function PricingScreen({ onGetStarted, onSignIn }) {
 
         {/* Logo -- black logotype on acid */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, ...anim(0) }}>
-          <img src="/logo-black.png" alt="Vinyl Vault"
+          <img src={WORDMARK.black} alt={APP_NAME}
             style={{ width: 'min(58vw, 230px)', height: 'auto' }} />
         </div>
 

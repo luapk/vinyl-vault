@@ -19,7 +19,7 @@
 // Env:
 //   RESEND_API_KEY        required to actually send
 //   UNSUBSCRIBE_SECRET    required, must match the value set on Vercel
-//   CAMPAIGN_FROM         e.g. "Vinyl Vault <hello@yourdomain.com>"
+//   CAMPAIGN_FROM         e.g. "Found Sound <hello@yourdomain.com>"
 //   CAMPAIGN_REPLY_TO     optional, defaults to the from address
 //   SITE_URL              defaults to https://vinyl-vault-teal.vercel.app
 

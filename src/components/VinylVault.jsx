@@ -20,6 +20,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
+import { APP_NAME, WORDMARK } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1478,10 +1479,10 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        <button type="button" onClick={goHome} aria-label="Vinyl Vault home"
+        <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-          <img src="/logo-white.png" alt="Vinyl Vault" style={{ height: 56, opacity: 0.92 }} />
+          <img src={WORDMARK.white} alt={APP_NAME} style={{ height: 56, opacity: 0.92 }} />
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
@@ -1792,7 +1793,7 @@ function PWAInstallBanner({ accentRGB }) {
             <DeviceMobile size={20} style={{ color: `rgb(${accentRGB})` }} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-display text-white/90 mb-0.5">Install Vinyl Vault</div>
+            <div className="text-[15px] font-display text-white/90 mb-0.5">Install {APP_NAME}</div>
             <div className="text-[12.5px] font-mono leading-relaxed text-white/45">
               Add it to your home screen for full-screen scanning and a camera that only asks permission once.
             </div>
@@ -4663,7 +4664,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             {!importing && !importResult && (
               <>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
-                  Import your Discogs collection directly into Vinyl Vault. Your collection must be set to Public in Discogs Settings.
+                  Import your Discogs collection directly into {APP_NAME}. Your collection must be set to Public in Discogs Settings.
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -5734,13 +5735,13 @@ function AboutView({ accentRGB }) {
       <div className="space-y-8">
         <div className="space-y-4 text-white/55 leading-relaxed text-[19px]">
           <p>
-            Vinyl Vault is a personal archive for record collectors who have more wax than memory. Photograph a sleeve, and within seconds you have the pressing confirmed, the tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
+            {APP_NAME} is a personal archive for record collectors who have more wax than memory. Photograph a sleeve, and within seconds you have the pressing confirmed, the tracklist loaded, BPM and key data attached, and the record filed exactly where you want it.
           </p>
           <p>
             No typing, no cross-referencing, no spreadsheet. When the match is unambiguous, it files automatically. When several pressings exist, you pick the right one. That is the only decision required.
           </p>
           <p>
-            The crate system is intentional. Instead of flat tags, Vinyl Vault organises records the way a real DJ would: by feel, era, energy, purpose. Crate names come from the music, not a dropdown. And if the suggestions are not right for how you think, you can name them yourself.
+            The crate system is intentional. Instead of flat tags, {APP_NAME} organises records the way a real DJ would: by feel, era, energy, purpose. Crate names come from the music, not a dropdown. And if the suggestions are not right for how you think, you can name them yourself.
           </p>
         </div>
 
@@ -5984,8 +5985,8 @@ function SplashScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
-        src="/logo-black.png"
-        alt="Vinyl Vault"
+        src={WORDMARK.black}
+        alt={APP_NAME}
         className="w-[54vw] max-w-[300px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
@@ -7185,7 +7186,7 @@ function drawLabel(ctx, record, W, H, accentRGB) {
   ctx.font = '11px monospace';
   ctx.fillStyle = 'rgba(var(--fg),0.10)';
   ctx.textAlign = 'right';
-  ctx.fillText('VINYL VAULT', W - pad, H - 18);
+  ctx.fillText(APP_NAME.toUpperCase(), W - pad, H - 18);
   ctx.textAlign = 'left';
 }
 
@@ -7222,7 +7223,7 @@ function BatchLabelModal({ records, accentRGB, onClose }) {
       const canvas = canvasRefs.current[i];
       return canvas ? `<div style="page-break-inside:avoid;margin-bottom:16px"><img src="${canvas.toDataURL('image/png')}" style="width:100%;max-width:700px;display:block" /><div style="font-family:monospace;font-size:11px;color:#666;margin-top:4px">${record.artist} - ${record.title}</div></div>` : '';
     }).join('');
-    win.document.write(`<html><head><title>Vinyl Vault Labels</title><style>body{margin:24px;background:#fff}@media print{body{margin:0}}</style></head><body>${imgs}<script>window.onload=()=>{window.print();window.close()}<\/script></body></html>`);
+    win.document.write(`<html><head><title>${APP_NAME} Labels</title><style>body{margin:24px;background:#fff}@media print{body{margin:0}}</style></head><body>${imgs}<script>window.onload=()=>{window.print();window.close()}<\/script></body></html>`);
     win.document.close();
   };
 

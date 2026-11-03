@@ -32,7 +32,7 @@ function page(title, body) {
 <div style="max-width:420px;text-align:center;">
 <div style="font-family:Georgia,'Times New Roman',serif;font-size:34px;line-height:38px;margin-bottom:10px;">${title}</div>
 <p style="font-size:16px;line-height:25px;margin:0 0 22px 0;">${body}</p>
-<a href="https://vinyl-vault-teal.vercel.app/" style="display:inline-block;padding:14px 28px;border-radius:100px;background:${INK};color:${ACID};text-decoration:none;font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;">Back to Vinyl Vault</a>
+<a href="https://vinyl-vault-teal.vercel.app/" style="display:inline-block;padding:14px 28px;border-radius:100px;background:${INK};color:${ACID};text-decoration:none;font-size:13px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;">Back to Found Sound</a>
 </div></body></html>`;
 }
 
