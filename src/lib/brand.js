@@ -18,3 +18,14 @@ export const WORDMARK = {
   white: '/wordmark-white.svg',
   black: '/wordmark-black.svg',
 };
+
+// The same mark set on ONE line, for places too short to take two: the header
+// pill, where a square two-line block sat badly beside a row of round buttons.
+// Traced from the same artwork, the two words split at the gap between them
+// and set on a shared baseline, so it is the identical lettering rather than a
+// second drawing that could drift.
+export const WORDMARK_LINE = {
+  acid:  '/wordmark-line-acid.svg',
+  white: '/wordmark-line-white.svg',
+  black: '/wordmark-line-black.svg',
+};

@@ -20,7 +20,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, WORDMARK } from '../lib/brand.js';
+import { APP_NAME, WORDMARK, WORDMARK_LINE } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1479,27 +1479,23 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The wordmark rides in a tab pinned to the very top of the screen.
-            The negative top margin cancels the header's own top padding AND
-            the safe-area inset, so the acid bleeds all the way to the edge
-            (and up behind a notch) while the mark itself stays below it. Same
-            two-colour logic as the AddCards: acid ground in the dark, ink
-            ground in the light, so the tab reads as the app's own colour
-            either way. */}
+        {/* The wordmark rides in a floating pill, set on one line because a
+            two-line block sat square and heavy beside a row of round buttons.
+            Same two-colour logic as the AddCards: acid ground in the dark, ink
+            ground in the light, so it reads as the app's own colour either
+            way. The pill's height is matched to the nav buttons beside it, so
+            the row reads as one band rather than a logo and some controls. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
           style={{
-            alignSelf: 'flex-start',
             background: isDark ? ACID : '#08080c',
             border: 'none',
             cursor: 'pointer',
-            padding: '10px 16px 12px',
-            paddingTop: 'calc(10px + env(safe-area-inset-top))',
-            marginTop: 'calc(-0.75rem - env(safe-area-inset-top))',
-            borderRadius: '0 0 18px 18px',
+            padding: '9px 16px',
+            borderRadius: 999,
           }}>
-          <img src={isDark ? WORDMARK.black : WORDMARK.white} alt={APP_NAME}
-            style={{ height: 40, display: 'block' }} />
+          <img src={isDark ? WORDMARK_LINE.black : WORDMARK_LINE.white} alt={APP_NAME}
+            style={{ height: 18, display: 'block' }} />
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
