@@ -18,28 +18,31 @@ is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
 as a phrase past roughly that, and a short subline justified to this measure
 needs over 1em to reach the edges. `public/logo-stamp-{acid,white,black}.svg` is the
 full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
-for anywhere too small to read it. The app header is exactly that case and
-solves it a third way: the MARK at 34px with the subline set as **live text**
-beneath, not the stamp's outlines. Rendered at each device ratio the stamp's
-subline is mush at 34, soft at 44, and only sharpens from 48 on a 2x screen
-or 56 on a 1x one, where live text at 8px stays crisp at every ratio because
-it gets hinting and subpixel treatment that scaled outlines do not, and the
-wordmark stays the 34px the nav row is built around.
+for anywhere too small to read it. The app header is exactly that case: the
+stamp's subline is mush at 34px and only sharpens from 48 on a 2x screen or
+56 on a 1x one, so the header carries the MARK and no subline at all.
 
-Its tracking is 0.34em, measured rather than picked. The lockup's rule is
-that the subline sits on the lozenge's own measure, and at 8px the mark is
-132.5px wide against 118.1px at 0.26em, 130.2px at 0.34em and 142.4px at
-0.42em. The artwork's 0.42em is a CAP, not a target, so landing under it is
-correct; going to it would hang the line past the lozenge. The tracking also
-adds a trailing space after the last letter, so an equal `text-indent` pulls
-the visible glyphs back to centre.
+**The tagline lives in the home screen's eyebrow slot instead**, where
+"New scan" used to be. That slot was labelling a screen you had already
+navigated to, and the word NEW SCAN still does real work on the two buttons
+that carry it (disambiguation and result). The home screen is the one
+everybody lands on, so the line is read once on arrival at a size that can
+hold it, rather than sitting over every screen in the app forever. It keeps
+the eyebrow's own mono voice rather than the logo's Hanken setting: it is in
+the app's eyebrow position, not under the lozenge, and borrowing the
+lockup's typography outside the lockup is how a wordmark stops being one.
 
-Live text is the right trade HERE and the wrong one in the logo asset: this
-line waits on Hanken Grotesk and reflows a few pixels on a cold cache, which
-is cheap for one small line and not worth a webfont licence inside a
-trademark filing. `STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the
-paths, and an `<img>` cannot inherit `currentColor`, so the call site picks a
-colour rather than theming it.
+A live-text subline under the mark was built and measured before this, and
+it worked (8px at 0.34em tracking, which is what puts it flush with the
+lozenge's 132.5px measure; the artwork's 0.42em is a cap, not a target, and
+overshoots by 10px at that size). It is in the git history if it is ever
+wanted back. Note the trap if so: letter-spacing leaves a trailing space
+after the last letter, so an equal `text-indent` is needed to re-centre the
+glyphs.
+
+`STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>`
+cannot inherit `currentColor`, so the call site picks a colour rather than
+theming it.
 
 Every part is outlines, the subline included: it was converted from Hanken
 Grotesk rather than set as live text, so the logo never waits on a webfont and

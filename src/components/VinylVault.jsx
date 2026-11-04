@@ -1481,55 +1481,25 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The mark, with the subline set as live text beneath it rather
-            than taken from the full stamp.
+        {/* The logo itself, minus the subline. The lozenge is drawn into the
+            artwork, so there is no painted background here: acid keyline in
+            the dark, ink keyline in the light. Height matched to the nav
+            buttons beside it so the row reads as one band rather than a logo
+            and some controls.
 
-            The stamp's own subline is outlines, and at the size this header
-            can afford it goes soft: rendered at each device ratio it is mush
-            at 34, soft at 44, and only sharpens from 48 on a 2x screen or 56
-            on a 1x one. Live text at 8px stays crisp at every ratio, because
-            it gets hinting and subpixel treatment that scaled outlines do
-            not, and it keeps the wordmark at the 34px the nav row is built
-            around.
-
-            Tracking is 0.34em, measured rather than chosen. The lockup's
-            rule is that the subline sits on the lozenge's own measure, so the
-            two read as one block instead of a shape with a caption under it.
-            At 8px the mark is 132.5px wide and the line comes out 118.1px at
-            0.26em, 130.2px at 0.34em and 142.4px at 0.42em: 0.34 is the one
-            that sits flush. 0.42em is the cap the artwork uses, and a cap is
-            a maximum rather than a target, so landing under it is correct
-            here; going to it would hang the line past the lozenge.
-
-            The cost, and it is the reason the logo file uses outlines: this
-            line waits on Hanken Grotesk. The font is the app's body face and
-            loads with display=swap, so a cold cache shows it briefly in the
-            fallback. That is a few pixels of reflow on one small line, which
-            is worth the sharpness here but would NOT be worth it in the logo
-            asset itself, where a trademark filing and a webfront licence are
-            the other side of the trade. */}
+            The subline is NOT under it. It was, briefly, as live text at
+            8px, and it worked: the measured setting is in the git history if
+            it is ever wanted back. It moved to the home screen's eyebrow
+            slot instead, where it is read once on arrival at a size that can
+            carry it, rather than sitting over every screen in the app for
+            the four-hundredth time. The stamp's own outline subline is not
+            an option at this size: it is mush at 34 and only sharpens from
+            48 on a 2x screen. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
-          className="flex flex-col items-center shrink-0 transition-opacity hover:opacity-80"
+          className="flex items-center shrink-0 transition-opacity hover:opacity-80"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
           <img src={isDark ? STAMP_MARK.acid : STAMP_MARK.black} alt={APP_NAME}
             style={{ height: 34, display: 'block' }} />
-          <span aria-hidden="true"
-            style={{
-              marginTop: 5,
-              fontSize: 8,
-              lineHeight: 1,
-              fontWeight: 600,
-              letterSpacing: '0.34em',
-              textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-              // The tracking adds a trailing space after the last letter,
-              // which pushes the line left of centre under the lozenge.
-              // Indenting by the same amount re-centres the visible glyphs.
-              textIndent: '0.34em',
-              color: isDark ? ACID : '#0a0a0d',
-            }}>
-            Your vinyl, sorted
-          </span>
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
@@ -2095,7 +2065,17 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
           mb-14/mb-20, which put ~140px of nothing between the greeting and
           the first tap target and pushed the routes down a phone screen. */}
       <div className="w-full max-w-xl mb-7 md:mb-9">
-        <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">New scan</div>
+        {/* The tagline, in the slot that used to name the screen.
+            "New scan" was a label for somewhere you had already navigated to,
+            and the two real NEW SCAN controls (on the disambiguation and
+            result screens) are where that word actually does work. This is
+            the one screen everybody lands on, so the line is read once on
+            arrival rather than parked over every screen in the app. It keeps
+            the slot's own mono voice rather than the logo's Hanken setting:
+            it is sitting in the app's eyebrow position, not under the
+            lozenge, and borrowing the lockup's typography outside the lockup
+            is how a wordmark stops being a wordmark. */}
+        <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/30 font-mono">Your vinyl, sorted</div>
         <h1 className="text-[38px] md:text-[58px] leading-[0.92] mb-5 font-display tracking-tight text-left" style={{ animation: 'fadeUp 0.4s ease-out' }}>
           {greeting
             ? <>{greeting.split('.')[0]}{/[?!]$/.test(greeting.split('.')[0]) ? '' : '.'}<br /><span className="text-white/35">{greeting.split('.').slice(1).join('.').trim()}</span></>

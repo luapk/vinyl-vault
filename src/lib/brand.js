@@ -30,11 +30,9 @@ export const STAMP = {
 // each device ratio, the stamp's subline is mush at 34, soft at 44, and
 // legible from 48 on a 2x or 3x screen; a 1x display needs about 56.
 //
-// The app header uses these files at 34px and sets the subline as live text
-// underneath instead, which stays crisp at every ratio and keeps the wordmark
-// at the size the nav row is built around. That trade is right for app chrome
-// and wrong for the asset: live text waits on a webfont, which is the whole
-// reason the subline inside the stamp is outlines.
+// The app header uses these files at 34px with no subline under them at all.
+// The tagline sits in the home screen's eyebrow slot instead, which is read
+// once on arrival rather than parked over every screen in the app.
 export const STAMP_MARK = {
   acid:  '/logo-mark-acid.svg',
   white: '/logo-mark-white.svg',
