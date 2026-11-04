@@ -11,8 +11,25 @@ worker cache names, and the `vinylvault_*` localStorage keys. Renaming a
 storage key orphans the cache on every device that already holds one, and
 nobody sees any of these. Do not "finish the rename" by touching them.
 
-The logo is a keyline lozenge holding the wordmark, with the subline ("YOUR
-VINYL, SORTED") set beneath it. The subline justifies to the lozenge's own
+The logo comes in two lockups. The HORIZONTAL one is a keyline lozenge
+holding the wordmark, with the subline ("YOUR VINYL, SORTED") set beneath it.
+The STACKED one (`public/logo-block-*.svg`, `BLOCK` in `src/lib/brand.js`) is
+FOUND over SOUND inside a rounded keyline, and it is what the app header uses.
+
+Stacking works because of a property of the name: FOUND and SOUND are five
+letters each differing only in the first, so at matched cap height they are
+2605.5 and 2644.2 units wide, 2.5% apart. The horizontal mark is 3.90:1 and
+the full stamp 2.77:1; the block is 1.33:1. In the header that turns 132.5px
+of a 360px top bar into 64px, which is what stopped the nav row scrolling
+sideways. The 2.5% is resolved by scaling FOUND up so the edges sit flush,
+costing about 1px of cap height in 40: a flush edge reads as deliberate where
+a 2.5% rag reads as a mistake. Header height is 48px, chosen on cap height
+rather than box height, which puts the words at 14.3px against the horizontal
+mark's 15.8px at 34px: smaller per line, but two lines carry the name.
+
+**Neither logo's generator is in this repo.** Both were built from potrace
+traces of the original artwork by scripts that live outside it, so
+regenerating or recolouring either one means rebuilding that toolchain. The subline justifies to the lozenge's own
 measure where the string is long enough to do that at a readable setting, and
 is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
 as a phrase past roughly that, and a short subline justified to this measure

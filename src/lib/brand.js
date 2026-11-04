@@ -38,3 +38,27 @@ export const STAMP_MARK = {
   white: '/logo-mark-white.svg',
   black: '/logo-mark-black.svg',
 };
+
+// The stacked lockup: FOUND over SOUND inside a rounded keyline.
+//
+// It exists because the name has a property the horizontal setting throws
+// away. FOUND and SOUND are five letters each and differ only in the first,
+// so at matched cap height they measure 2605.5 and 2644.2 units, 2.5% apart.
+// That stacks into very nearly a rectangle. The horizontal mark is 3.90:1 and
+// the full stamp 2.77:1; this is 1.33:1.
+//
+// The 2.5% is resolved by scaling FOUND up so the two edges are flush, which
+// costs about 1px of cap height in 40. A flush edge reads as deliberate where
+// a 2.5% rag reads as a mistake, which is the usual call when words are this
+// close.
+//
+// Generated from the same traced outlines as the stamp, so it is the same
+// drawing rather than a second interpretation of it. NOTE: the generator
+// (stacked.py, on top of letters.py and the w1/w2 traces) is not in this
+// repo, exactly like the stamp's own generator. Regenerating or recolouring
+// either logo means rebuilding that toolchain first.
+export const BLOCK = {
+  acid:  '/logo-block-acid.svg',
+  white: '/logo-block-white.svg',
+  black: '/logo-block-black.svg',
+};

@@ -21,7 +21,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, STAMP, STAMP_MARK } from '../lib/brand.js';
+import { APP_NAME, STAMP, BLOCK } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1481,25 +1481,23 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The logo itself, minus the subline. The lozenge is drawn into the
-            artwork, so there is no painted background here: acid keyline in
-            the dark, ink keyline in the light. Height matched to the nav
-            buttons beside it so the row reads as one band rather than a logo
-            and some controls.
+        {/* The stacked lockup, not the horizontal one.
+            The name stacks almost perfectly (see BLOCK in brand.js), and the
+            header is the place that benefits: the horizontal mark is 3.90:1
+            and ate 132.5px of a 360px phone's top bar, leaving the nav row
+            to scroll sideways. At 1.33:1 this holds the same name in a third
+            of the width.
 
-            The subline is NOT under it. It was, briefly, as live text at
-            8px, and it worked: the measured setting is in the git history if
-            it is ever wanted back. It moved to the home screen's eyebrow
-            slot instead, where it is read once on arrival at a size that can
-            carry it, rather than sitting over every screen in the app for
-            the four-hundredth time. The stamp's own outline subline is not
-            an option at this size: it is mush at 34 and only sharpens from
-            48 on a 2x screen. */}
+            48px is a cap-height decision, not a height one. The lockup's
+            words are 100 of its 335 viewBox units, so 48 sets them at 14.3px
+            against the horizontal mark's 15.8px at 34px. Slightly smaller
+            per line, but there are two lines carrying the name, so the ink
+            on screen is greater, not less. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-          <img src={isDark ? STAMP_MARK.acid : STAMP_MARK.black} alt={APP_NAME}
-            style={{ height: 34, display: 'block' }} />
+          <img src={isDark ? BLOCK.acid : BLOCK.black} alt={APP_NAME}
+            style={{ height: 48, display: 'block' }} />
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
