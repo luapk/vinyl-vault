@@ -268,8 +268,14 @@ rather than paying for it again.
   `stress/wishlist.spec.mjs`.
 - **Trace is gated server-side.** `api/trace.js` checks the tier before spending
   any Discogs quota; hiding the button would leave the endpoint open to anyone
-  holding a token. The tab itself is not gated, because a locked tab teaches
-  nobody what they would be paying for.
+  holding a token. **The tab is gated too**, on Selector, client-side (see the
+  tier table above). This paragraph used to claim the opposite, which left the
+  wishlist specs running as a free account that could not open the tab they
+  were testing: three of them failed for months against code that was doing
+  what the tier table said. The two gates stack on purpose, and the seam
+  between them is the interesting case: a SELECTOR account reaches the
+  wishlist and pins a record, and is still refused Trace by the server. That
+  is what `stress/wishlist.spec.mjs` exercises.
 - **A rate limit is not an answer about a record**, the same rule the file import
   follows: a 429 from the search must never render as "no match", or the user
   pins a cold case that would have resolved a minute later.

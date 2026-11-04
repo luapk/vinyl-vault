@@ -42,6 +42,9 @@ async function openCratesTab(page) {
 
 test('sort unfiled sends only uncrated records, and keeps existing crates', async ({ page, context }) => {
   await resetMock();
+  // Smart Crates is a Selector feature; without one the button reads
+  // "Sorting is a Selector feature" and opens the pricing sheet instead.
+  await control('/__test/set-tier', { email: JON.email, tier: 'selector' });
   await stubApi(context);
   const calls = [];
   await stubSmartCrates(context, calls, (body) => body.mode === 'full'
@@ -106,6 +109,9 @@ test('sort unfiled sends only uncrated records, and keeps existing crates', asyn
 
 test('a run that files nothing leaves every record exactly as it was', async ({ page, context }) => {
   await resetMock();
+  // Smart Crates is a Selector feature; without one the button reads
+  // "Sorting is a Selector feature" and opens the pricing sheet instead.
+  await control('/__test/set-tier', { email: JON.email, tier: 'selector' });
   await stubApi(context);
   const calls = [];
   await stubSmartCrates(context, calls, () => ({ crates: [] }));

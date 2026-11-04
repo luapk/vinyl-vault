@@ -64,6 +64,8 @@ async function pinPassion(page) {
 
 test('a pinned record survives a reload even with no wishlist tables on the database', async ({ page, context }) => {
   await resetMock();
+  // The Wishlist tab is a Selector feature, so reaching it at all needs one.
+  await control('/__test/set-tier', { email: JON.email, tier: 'selector' });
   await stubApi(context, { discogsMatches: [MATCH] });
   await signIn(page);
   await pinPassion(page);
@@ -78,6 +80,8 @@ test('a pinned record survives a reload even with no wishlist tables on the data
 
 test('a rate-limited search is never shown as no match', async ({ page, context }) => {
   await resetMock();
+  // The Wishlist tab is a Selector feature, so reaching it at all needs one.
+  await control('/__test/set-tier', { email: JON.email, tier: 'selector' });
   await stubApi(context, { discogsMatches: [] });
   // stubApi answers 200 with an empty match list; override it with the 429 the
   // real endpoint sends when Discogs is limiting.
@@ -97,13 +101,18 @@ test('a rate-limited search is never shown as no match', async ({ page, context 
 
 test('trace never spends Discogs quota for a user who cannot use it', async ({ page, context }) => {
   await resetMock();
+  // Selector, deliberately. The Wishlist tab is a Selector feature and Trace
+  // is a Resident one, so this is the account that can reach the wishlist,
+  // pin a record and press Trace, and must still be refused. A free account
+  // could not get to the button to prove anything about it.
+  await control('/__test/set-tier', { email: JON.email, tier: 'selector' });
   await stubApi(context, { discogsMatches: [MATCH] });
   let traceCalls = 0;
   await context.route('**/api/trace', (route) => {
     traceCalls += 1;
     route.fulfill({ status: 402, contentType: 'application/json', body: JSON.stringify({ error: 'trace_requires_resident' }) });
   });
-  await signIn(page);           // mock profile is on the free tier
+  await signIn(page);           // on Selector: wishlist yes, Trace no
   await pinPassion(page);
 
   await page.getByRole('button', { name: /trace this record/i }).click();

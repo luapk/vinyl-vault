@@ -215,7 +215,10 @@ test('back to results returns to the pressings already fetched, for free', async
   });
   await signIn(page);
 
-  await page.getByRole('button', { name: /^artist & title$/i }).click();
+  // The way in by name used to be a pill reading "Artist & title" under the
+  // three cards. It is now the third tile in the row, titled "Search", so it
+  // is found by its accessible name rather than the words on its face.
+  await page.getByRole('button', { name: 'Search for a record by artist and title' }).click();
   await page.getByPlaceholder('e.g. Nelly Furtado').fill('Kraftwerk');
   await page.getByRole('button', { name: /Search Discogs/i }).click();
 
