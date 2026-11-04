@@ -38,6 +38,7 @@ import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
 import { unfiledRecords, normalizeCrateMeta, mergeCrateMeta, coverage } from '../lib/smartCrates.js';
 import { supabase } from '../lib/supabase.js';
+import { homeStats } from '../lib/homeStats.js';
 
 // ----- Genre crate list (must match api/lib/vision.js GENRE_CRATES) ---------
 
@@ -1898,12 +1899,21 @@ function SaveConfirmation({ release, accentRGB }) {
 // icon tiles cannot drift away from it.
 const ACID = '#CAFE04';
 
-// The four ways into the app are not equals: scanning a sleeve is what Vinyl
-// Vault is for, and the other two are how you get a backlog in. `variant`
-// carries that ranking. "hero" is the full-width panel, "compact" the
-// half-height pair beneath it. Both centre their contents so the three read as
-// one set.
-function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, title, subtitle, onClick, children, ...rest }) {
+// The four ways into the app are not equals: scanning a sleeve is what the app
+// is for, and the rest are how you get a backlog in. `variant` carries that
+// ranking. "hero" is the full-width panel, "compact" a tile in the row of
+// three beneath it. Both centre their contents so the four read as one set.
+//
+// `tone` carries the ranking in colour as well as in size. Acid is the only
+// filled colour on this screen, so spending it on all four marked nothing:
+// the code here argued the four were not equals while the paint said they
+// were. Only the hero is acid now.
+//
+// A ghost tile is NOT the old glass tile that was removed for being "a grey
+// square on a grey card". That failed because the icon inside it was as dim
+// as the tile; here the tile is a faint ring and the icon sits at 0.8 of the
+// foreground, so what you read is a bright glyph, not the square behind it.
+function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', tone = 'acid', as: Tag = 'button', index = 0, className = '', icon: Icon, kicker, hint, title, subtitle, footer, onClick, children, ...rest }) {
   const hero = variant === 'hero';
   const style = isLight ? {
     background: 'linear-gradient(145deg, rgba(255,254,250,0.92) 0%, rgba(252,249,240,0.88) 100%)',
@@ -1922,30 +1932,45 @@ function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Ta
     // area by construction, and it gets keyboard focus for free.
     <Tag
       onClick={onClick}
-      className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] ${hero ? 'px-5 py-7 sm:py-9' : 'p-4'} ${className}`}
-      style={{ ...style, border: 'none', cursor: 'pointer', animationDelay: `${index * 90}ms` }}
+      className={`vv-add-card relative w-full text-left transition-all hover:brightness-110 active:scale-[0.98] ${className}`}
+      // overflow clips the footer rule to the card's own corners. It does not
+      // clip the glow, which is a box-shadow and paints outside the box.
+      style={{ ...style, overflow: 'hidden', border: 'none', cursor: 'pointer', animationDelay: `${index * 90}ms` }}
       {...rest}>
-      {/* Both variants centre their contents. The hero is already the primary
-          action by size, tile and glow, so it needs no second marker, and the
-          pair beneath it read as a matched set only when they line up with it
-          rather than hanging off the left edge. */}
-      <div className="relative flex flex-col items-center gap-3 text-center">
-        {/* A solid tile either way, and the only filled colour on the screen.
-            Light mode is black on paper; dark mode is the brand acid, which
-            the near-black card needs to give the icon any presence at all --
-            the glass tile it used to use was a grey square on a grey card. */}
-        <div className={`${hero ? 'w-14 h-14' : 'w-10 h-10'} rounded-2xl flex items-center justify-center shrink-0`}
-          style={{ background: isLight ? '#08080c' : ACID }}>
-          <Icon size={hero ? 24 : 18} weight="regular" style={{ color: isLight ? '#ffffff' : '#08080c' }} />
-        </div>
-        <div className="min-w-0">
-          {kicker && (
-            <div className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
-          )}
-          <div className={`${hero ? 'text-[21px] sm:text-[24px]' : 'text-[16px] sm:text-[17px]'} leading-snug font-display`}>{title}</div>
-          {subtitle && <div className="text-[13px] mt-1 text-white/40">{subtitle}</div>}
+      <div className={hero ? 'px-5 py-7 sm:py-9' : 'px-2 py-4'}>
+        {/* Both variants centre their contents. The hero is already the primary
+            action by size, tile and glow, so it needs no second marker, and the
+            row beneath it reads as a matched set only when it lines up with it
+            rather than hanging off the left edge. */}
+        <div className="relative flex flex-col items-center gap-3 text-center">
+          <div className={`${hero ? 'w-14 h-14' : 'w-9 h-9'} rounded-2xl flex items-center justify-center shrink-0`}
+            style={tone === 'acid'
+              ? { background: isLight ? '#08080c' : ACID }
+              : { background: 'rgba(var(--fg),0.07)', boxShadow: 'inset 0 0 0 1px rgba(var(--fg),0.12)' }}>
+            <Icon size={hero ? 24 : 18} weight="regular"
+              style={{ color: tone === 'acid' ? (isLight ? '#ffffff' : '#08080c') : 'rgba(var(--fg),0.8)' }} />
+          </div>
+          <div className="min-w-0">
+            {kicker && (
+              <div className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase text-white/35 mb-0.5 font-mono">{kicker}</div>
+            )}
+            <div className={`${hero ? 'text-[21px] sm:text-[24px]' : 'text-[16px] sm:text-[17px]'} leading-snug font-display`}>{title}</div>
+            {subtitle && <div className="text-[13px] mt-1 text-white/40">{subtitle}</div>}
+            {hint && (
+              <div className="text-[9.5px] sm:text-[10px] tracking-[0.12em] uppercase font-mono mt-1"
+                style={{ color: 'rgba(var(--fg),0.4)' }}>{hint}</div>
+            )}
+          </div>
         </div>
       </div>
+      {/* The rule along the bottom of the hero. It is what buys the hero its
+          size: without it the biggest object on the screen carries six words. */}
+      {footer && (
+        <div className="px-4 py-2.5 flex items-center justify-between gap-3"
+          style={{ borderTop: '1px solid rgba(var(--fg),0.08)' }}>
+          {footer}
+        </div>
+      )}
       {children}
     </Tag>
   );
@@ -1953,6 +1978,10 @@ function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', as: Ta
 
 function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, onRemoveRecord, userId, onReload, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  // What the scan card's bottom rule says. Recomputed only when the
+  // collection changes: the label is a calendar day, so it cannot go stale
+  // inside a session in any way a user would notice.
+  const stats = useMemo(() => homeStats(collection), [collection]);
   // Same hook the account panel uses, so a list imported from here is matched
   // and de-duplicated by exactly the same rules.
   const {
@@ -2060,13 +2089,31 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
             nothing to choose. */}
         <AddCard isLight={isLight} accentRGB={accentRGB} glow variant="hero" index={0} type="button"
           icon={Camera} title="Scan a record" subtitle="Label, barcode or sleeve"
-          onClick={() => setShowCamera(true)} aria-label="Scan a record with the camera" />
+          onClick={() => setShowCamera(true)} aria-label="Scan a record with the camera"
+          footer={stats.count > 0 ? (
+            <>
+              <span className="text-[9px] sm:text-[10px] tracking-[0.1em] sm:tracking-[0.15em] uppercase font-mono truncate"
+                style={{ color: 'rgba(var(--fg),0.45)' }}>
+                {stats.count.toLocaleString()} in the crate
+              </span>
+              {stats.lastAdded && (
+                <span className="text-[9px] sm:text-[10px] tracking-[0.1em] sm:tracking-[0.15em] uppercase font-mono shrink-0"
+                  style={{ color: 'rgba(var(--fg),0.45)' }}>
+                  Last added {stats.lastAdded}
+                </span>
+              )}
+            </>
+          ) : null} />
 
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        {/* Three equal ways to bring in records you are not holding. Search is
+            one of them rather than a footnote under them: for anyone who knows
+            what they own, typing the artist is the fastest route in, and it
+            used to be the faintest thing on the screen. */}
+        <div className="grid grid-cols-3 gap-2.5 mt-3">
         {/* Batch queue card. A label rather than a button: the whole panel
             delegates to the file input inside it, from any child. */}
-        <AddCard isLight={isLight} accentRGB={accentRGB} as="label" index={1} className="block cursor-pointer"
-          icon={GridNine} kicker="Multiple" title="Upload photo/s">
+        <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" as="label" index={1} className="block cursor-pointer"
+          icon={GridNine} title="Photos" hint="50 max">
           <input type="file" accept="image/*" multiple className="hidden"
             onChange={(e) => { if (e.target.files?.length) onBatch(e.target.files); }} />
         </AddCard>
@@ -2075,33 +2122,17 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
             put where records actually get added from. The input is a sibling,
             not a child, since a button may not contain another control. */}
         <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
-        <AddCard isLight={isLight} accentRGB={accentRGB} index={2} type="button"
-          icon={Export} kicker="From a list" title="Import CSV or text"
+        <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" index={2} type="button"
+          icon={Export} title="A file" hint="CSV &middot; TXT"
           onClick={() => importFileRef.current?.click()} aria-label="Import a CSV or text file" />
-        </div>{/* end two-up */}
-      </div>{/* end relative wrapper */}
 
-      {/* Typing a name is a first-class way in, not a footnote. It used to be
-          a 28%-opacity mono line with no field around it and a 14px tap
-          target; as a full-width pill it looks like something you can type
-          into and clears the 44px minimum. */}
-      {onManual && (
-        <div className="max-w-xl mx-auto w-full mt-3">
-          <button onClick={onManual}
-            className="w-full flex items-center gap-2.5 rounded-full transition-colors hover:brightness-110"
-            style={{
-              padding: '13px 18px',
-              background: isLight ? 'rgba(255,254,250,0.75)' : 'rgba(var(--fg),0.05)',
-              border: '1px solid rgba(var(--fg),0.12)',
-              color: 'rgba(var(--fg),0.42)',
-              fontSize: 14,
-              cursor: 'pointer',
-            }}>
-            <MagnifyingGlass size={15} />
-            Artist &amp; title
-          </button>
-        </div>
-      )}
+        {onManual && (
+          <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" index={3} type="button"
+            icon={MagnifyingGlass} title="By name" hint="Artist"
+            onClick={onManual} aria-label="Search for a record by artist and title" />
+        )}
+        </div>{/* end three-up */}
+      </div>{/* end relative wrapper */}
 
       {showCamera && <CameraModal onCapture={handleCapture} onBarcode={handleBarcode} onClose={() => setShowCamera(false)} />}
 

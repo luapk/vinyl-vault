@@ -63,10 +63,11 @@ concurrent-refresh race that guards the auth lock, account isolation on a
 shared device, the smart-crate runs (which may only ever ADD crate names), the
 file import under Discogs rate limiting (a 429 must never be saved as an
 unmatched record), and the rule that a community profile can never become
-somebody's home page, and the wishlist and Trace rules (a pinned record
+somebody's home page, the wishlist and Trace rules (a pinned record
 survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
-cannot use it).
+cannot use it), and the home screen's four ways in (all above the fold at
+360x740, and the scan card's state rule absent on an empty collection).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -259,6 +260,7 @@ src/
     supabase.js        # Supabase client (handles both legacy JWT and publishable keys)
     badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
     collectionFocus.js # decade buckets + the genre/decade slice filter (unit-tested)
+    homeStats.js       # the count + last-added line on the home scan card (unit-tested)
   App.jsx              # root: auth gate -> VinylVault or AuthScreen
 
 api/                   # Vercel serverless functions (all secret keys live here)
@@ -497,13 +499,34 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   copies would drift, and the failure is quiet (a bar reading 42 that opens
   onto 39). The focus is owned by `CollectionView`, which unmounts on
   navigation, so the collection is always whole when you come back to it.
-- **Three ways to add records**: the home screen has Scan, Upload photos and
-  Import (CSV / text) as one row of `AddCard`s. They are laid out as rows on
-  mobile and a three-column grid from `sm` up, so all three sit above the fold
-  on a 360x740 screen without scrolling; check that when changing the heading
-  block above them. The import itself is `useFileImport`
+- **Four ways to add records**: the home screen has Scan as a hero `AddCard`
+  and then Photos, A file and By name as a row of three beneath it. Searching
+  by name is one of the four, not a footnote under them: for anybody who knows
+  what they own it is the fastest route in, and it used to be the faintest
+  thing on the screen. All four sit above the fold on a 360x740 screen, which
+  `stress/home.spec.mjs` now asserts rather than asking a human to remember
+  when the heading block changes. The import itself is `useFileImport`
   (`src/components/FileImport.jsx`), shared with the account panel so both
   routes match and de-duplicate by identical rules.
+- **The hero card earns its size, it does not just have it.** It is the
+  biggest object on the home screen and for a long time it held an icon and
+  six words, spending about 180px of a 740px phone to say "Scan a record". A
+  rule along its bottom now carries what only this collection can say: how big
+  it is and when it last grew (`src/lib/homeStats.js`, unit-tested). Two rules
+  there. An empty collection shows **no rule at all** rather than "0 in the
+  crate, last added never". And the labels are calendar days, not elapsed
+  hours, so a record saved four minutes before midnight reads as "Yesterday"
+  the moment the date turns, instead of rounding to "Today". The rule is also
+  sized for the longest it can ever be, not for the test data: at 10px it
+  truncated the count on a five-figure collection, which the spec now checks.
+- **Acid marks the primary action, not every action.** `tone` on `AddCard` is
+  what carries the ranking in colour. All four tiles used to be the brand acid,
+  which is the only filled colour on the screen, so it distinguished nothing:
+  the code argued the four were not equals while the paint said they were. Only
+  the hero is acid now. The ghost tile the other three use is **not** the old
+  glass tile that was removed for being "a grey square on a grey card": that
+  failed because the icon was as dim as the tile, where this is a faint ring
+  with the glyph at 0.8 of the foreground, so what you read is the icon.
 - **A list can be pasted, not just uploaded**: the account panel's import
   section takes a pasted list in the same formats as a file, because on a phone
   saving a file and then finding it in the picker is most of the work. Both
