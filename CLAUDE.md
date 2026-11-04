@@ -18,9 +18,17 @@ is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
 as a phrase past roughly that, and a short subline justified to this measure
 needs over 1em to reach the edges. `public/logo-stamp-{acid,white,black}.svg` is the
 full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
-for anywhere under about 96px where that line stops being readable. `STAMP` and
-`STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>` cannot
-inherit `currentColor`, so the call site picks a colour rather than theming it.
+for anywhere genuinely too small to read it. That threshold was written down
+as 96px and is lower in fact: rendered at each device ratio the subline is
+mush at 34, soft at 44, and legible from 48 on a 2x or 3x screen, with a 1x
+display needing about 56. The app header therefore carries the FULL stamp, at
+`h-12 sm:h-14`, and the mark files are now used only by the static legal
+pages. Sizing the header off the subline rather than the wordmark is the
+point: 48 renders the lozenge at 32.3px against the old mark's 32.2px at 34,
+so the wordmark did not change size when the subline arrived under it.
+`STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>`
+cannot inherit `currentColor`, so the call site picks a colour rather than
+theming it.
 
 Every part is outlines, the subline included: it was converted from Hanken
 Grotesk rather than set as live text, so the logo never waits on a webfont and
