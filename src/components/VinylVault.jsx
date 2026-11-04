@@ -1638,7 +1638,9 @@ export default function VinylVault() {
 
       </main>
 
-      <SiteFooter accentRGB={accentRGB} isDark={isDark} onOpenAbout={() => { setAppView("about"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+      <SiteFooter accentRGB={accentRGB} isDark={isDark}
+        onOpenAbout={() => { setAppView("about"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+        onOpenPlans={() => setShowPricingModal(true)} />
 
       {/* Chat panel overlay */}
       {chatOpen && user && (
