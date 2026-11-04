@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { APP_NAME, STAMP } from '../lib/brand.js';
 
+// Matches the mode-switch link beneath it rather than inventing a third
+// treatment for the quietest line on the screen.
+const legalLink = {
+  color: 'rgba(var(--fg),0.8)',
+  textDecoration: 'underline',
+  textUnderlineOffset: 3,
+};
+
 // Google's own mark, inlined: an external asset would be one more thing that
 // can fail to load on the very first screen a new user sees.
 function GoogleMark() {
@@ -265,20 +273,49 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
             </>
           )}
 
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(var(--fg),0.25)', marginTop: 20, marginBottom: 0 }}>
+          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(var(--fg),0.6)', marginTop: 20, marginBottom: 0 }}>
             {mode === 'signup' ? (
               <>Already have an account?{' '}
                 <button onClick={() => { setMode('signin'); setError(''); setSuccess(''); }}
-                  style={{ color: 'rgba(var(--fg),0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
+                  style={{ color: 'rgba(var(--fg),0.8)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
                   Sign in
                 </button>
               </>
             ) : (
               <>New here?{' '}
                 <button onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
-                  style={{ color: 'rgba(var(--fg),0.45)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
+                  style={{ color: 'rgba(var(--fg),0.8)', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: 0 }}>
                   Create an account
                 </button>
+              </>
+            )}
+          </p>
+
+          {/* The legal line lives HERE and not only in SiteFooter, which
+              renders inside the signed-in app. This is the screen where the
+              account is created and the email address is collected, so it is
+              the screen where both pages have to be reachable:
+              UK GDPR Art 13 wants the privacy notice given at the point data
+              is collected, and the Consumer Contracts Regulations want the
+              pre-contract terms available before the person is bound. A
+              signed-in-only footer is too late for both. Google's OAuth
+              review and Stripe's account review also look for a privacy
+              policy reachable WITHOUT an account, which is exactly this page.
+
+              They open in a new tab on purpose: reading the terms must not
+              cost somebody the email and password they have already typed. */}
+          <p style={{ textAlign: 'center', fontSize: 11.5, lineHeight: 1.6, color: 'rgba(var(--fg),0.6)', marginTop: 14, marginBottom: 0 }}>
+            {mode === 'signup' ? (
+              <>By creating an account you agree to our{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={legalLink}>Terms</a>
+                {' '}and{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={legalLink}>Privacy Policy</a>.
+              </>
+            ) : (
+              <>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={legalLink}>Terms</a>
+                <span style={{ padding: '0 8px', opacity: 0.5 }}>&middot;</span>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={legalLink}>Privacy</a>
               </>
             )}
           </p>
