@@ -11,8 +11,12 @@ worker cache names, and the `vinylvault_*` localStorage keys. Renaming a
 storage key orphans the cache on every device that already holds one, and
 nobody sees any of these. Do not "finish the rename" by touching them.
 
-The logo is a keyline lozenge holding the wordmark, with the subline justified
-to the lozenge's own measure. `public/logo-stamp-{acid,white,black}.svg` is the
+The logo is a keyline lozenge holding the wordmark, with the subline ("YOUR
+VINYL, SORTED") set beneath it. The subline justifies to the lozenge's own
+measure where the string is long enough to do that at a readable setting, and
+is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
+as a phrase past roughly that, and a short subline justified to this measure
+needs over 1em to reach the edges. `public/logo-stamp-{acid,white,black}.svg` is the
 full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
 for anywhere under about 96px where that line stops being readable. `STAMP` and
 `STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>` cannot
