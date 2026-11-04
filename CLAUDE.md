@@ -500,7 +500,7 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   onto 39). The focus is owned by `CollectionView`, which unmounts on
   navigation, so the collection is always whole when you come back to it.
 - **Four ways to add records**: the home screen has Scan as a hero `AddCard`
-  and then Photos, A file and By name as a row of three beneath it. Searching
+  and then Photos, A file and Search as a row of three beneath it. Searching
   by name is one of the four, not a footnote under them: for anybody who knows
   what they own it is the fastest route in, and it used to be the faintest
   thing on the screen. All four sit above the fold on a 360x740 screen, which

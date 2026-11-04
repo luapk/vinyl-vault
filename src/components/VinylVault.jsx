@@ -2128,7 +2128,7 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
 
         {onManual && (
           <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" index={3} type="button"
-            icon={MagnifyingGlass} title="By name" hint="Artist"
+            icon={MagnifyingGlass} title="Search" hint="Artist"
             onClick={onManual} aria-label="Search for a record by artist and title" />
         )}
         </div>{/* end three-up */}

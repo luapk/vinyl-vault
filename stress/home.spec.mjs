@@ -17,11 +17,19 @@ test('all four ways in sit above the fold on a small phone', async ({ page, cont
   await page.setViewportSize(PHONE);
   await page.waitForTimeout(800);
 
-  for (const name of [/Scan a record/, /Photos/, /A file/, /By name/]) {
-    const card = page.locator('button,label').filter({ hasText: name }).first();
+  // "Search" is too common a word to match on the visible title: the
+  // collection's own search field would match it too. That card is found by
+  // its accessible name, the other three by the words on them.
+  const cards = [
+    page.locator('button,label').filter({ hasText: /Scan a record/ }).first(),
+    page.locator('button,label').filter({ hasText: /Photos/ }).first(),
+    page.locator('button,label').filter({ hasText: /A file/ }).first(),
+    page.getByRole('button', { name: 'Search for a record by artist and title' }),
+  ];
+  for (const card of cards) {
     await expect(card).toBeVisible();
     const box = await card.boundingBox();
-    expect(box, `${name} has no box`).not.toBeNull();
+    expect(box).not.toBeNull();
     // Above the fold, and a real tap target.
     expect(box.y + box.height).toBeLessThanOrEqual(PHONE.height);
     expect(box.height).toBeGreaterThanOrEqual(44);
