@@ -21,7 +21,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, STAMP } from '../lib/brand.js';
+import { APP_NAME, STAMP, STAMP_MARK } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1481,29 +1481,55 @@ export default function VinylVault() {
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The full lockup, subline included. The lozenge is drawn into the
-            artwork, so there is no painted background here: acid keyline in
-            the dark, ink keyline in the light.
+        {/* The mark, with the subline set as live text beneath it rather
+            than taken from the full stamp.
 
-            The two heights are one decision, not a guess. The subline is
-            87.5 of the stamp's 303 viewBox units, and its stems go sub-pixel
-            before the lockup does, so what the size has to clear is the
-            SUBLINE, not the wordmark. Measured against a render at each
-            device ratio: it is mush at 34, soft at 44, and reads from 48 on
-            a 2x or 3x screen, which is every phone. A 1x desktop display
-            needs 56 before it sharpens, and that is also where there is room
-            for it. Hence h-12 on mobile and h-14 from sm up.
+            The stamp's own subline is outlines, and at the size this header
+            can afford it goes soft: rendered at each device ratio it is mush
+            at 34, soft at 44, and only sharpens from 48 on a 2x screen or 56
+            on a 1x one. Live text at 8px stays crisp at every ratio, because
+            it gets hinting and subpixel treatment that scaled outlines do
+            not, and it keeps the wordmark at the 34px the nav row is built
+            around.
 
-            48 is not an arbitrary bump either: the lozenge is 204 units of
-            303 here and 204 of 215.5 in the subline-less mark, so 48 renders
-            the lozenge at 32.3px against the old mark's 32.2px at 34. The
-            wordmark is the size it has always been; the header simply grew
-            underneath it. */}
+            Tracking is 0.34em, measured rather than chosen. The lockup's
+            rule is that the subline sits on the lozenge's own measure, so the
+            two read as one block instead of a shape with a caption under it.
+            At 8px the mark is 132.5px wide and the line comes out 118.1px at
+            0.26em, 130.2px at 0.34em and 142.4px at 0.42em: 0.34 is the one
+            that sits flush. 0.42em is the cap the artwork uses, and a cap is
+            a maximum rather than a target, so landing under it is correct
+            here; going to it would hang the line past the lozenge.
+
+            The cost, and it is the reason the logo file uses outlines: this
+            line waits on Hanken Grotesk. The font is the app's body face and
+            loads with display=swap, so a cold cache shows it briefly in the
+            fallback. That is a few pixels of reflow on one small line, which
+            is worth the sharpness here but would NOT be worth it in the logo
+            asset itself, where a trademark filing and a webfront licence are
+            the other side of the trade. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
-          className="flex items-center shrink-0 transition-opacity hover:opacity-80"
+          className="flex flex-col items-center shrink-0 transition-opacity hover:opacity-80"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-          <img src={isDark ? STAMP.acid : STAMP.black} alt={APP_NAME}
-            className="h-12 sm:h-14 w-auto block" />
+          <img src={isDark ? STAMP_MARK.acid : STAMP_MARK.black} alt={APP_NAME}
+            style={{ height: 34, display: 'block' }} />
+          <span aria-hidden="true"
+            style={{
+              marginTop: 5,
+              fontSize: 8,
+              lineHeight: 1,
+              fontWeight: 600,
+              letterSpacing: '0.34em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              // The tracking adds a trailing space after the last letter,
+              // which pushes the line left of centre under the lozenge.
+              // Indenting by the same amount re-centres the visible glyphs.
+              textIndent: '0.34em',
+              color: isDark ? ACID : '#0a0a0d',
+            }}>
+            Your vinyl, sorted
+          </span>
         </button>
 
         <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">

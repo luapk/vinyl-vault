@@ -18,17 +18,28 @@ is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
 as a phrase past roughly that, and a short subline justified to this measure
 needs over 1em to reach the edges. `public/logo-stamp-{acid,white,black}.svg` is the
 full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
-for anywhere genuinely too small to read it. That threshold was written down
-as 96px and is lower in fact: rendered at each device ratio the subline is
-mush at 34, soft at 44, and legible from 48 on a 2x or 3x screen, with a 1x
-display needing about 56. The app header therefore carries the FULL stamp, at
-`h-12 sm:h-14`, and the mark files are now used only by the static legal
-pages. Sizing the header off the subline rather than the wordmark is the
-point: 48 renders the lozenge at 32.3px against the old mark's 32.2px at 34,
-so the wordmark did not change size when the subline arrived under it.
-`STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>`
-cannot inherit `currentColor`, so the call site picks a colour rather than
-theming it.
+for anywhere too small to read it. The app header is exactly that case and
+solves it a third way: the MARK at 34px with the subline set as **live text**
+beneath, not the stamp's outlines. Rendered at each device ratio the stamp's
+subline is mush at 34, soft at 44, and only sharpens from 48 on a 2x screen
+or 56 on a 1x one, where live text at 8px stays crisp at every ratio because
+it gets hinting and subpixel treatment that scaled outlines do not, and the
+wordmark stays the 34px the nav row is built around.
+
+Its tracking is 0.34em, measured rather than picked. The lockup's rule is
+that the subline sits on the lozenge's own measure, and at 8px the mark is
+132.5px wide against 118.1px at 0.26em, 130.2px at 0.34em and 142.4px at
+0.42em. The artwork's 0.42em is a CAP, not a target, so landing under it is
+correct; going to it would hang the line past the lozenge. The tracking also
+adds a trailing space after the last letter, so an equal `text-indent` pulls
+the visible glyphs back to centre.
+
+Live text is the right trade HERE and the wrong one in the logo asset: this
+line waits on Hanken Grotesk and reflows a few pixels on a cold cache, which
+is cheap for one small line and not worth a webfont licence inside a
+trademark filing. `STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the
+paths, and an `<img>` cannot inherit `currentColor`, so the call site picks a
+colour rather than theming it.
 
 Every part is outlines, the subline included: it was converted from Hanken
 Grotesk rather than set as live text, so the logo never waits on a webfont and

@@ -27,11 +27,14 @@ export const STAMP = {
 // The same stamp without the subline, for anywhere too small to read it.
 //
 // "Too small" was guessed at 96px and is actually lower. Rendered and read at
-// each device ratio, the subline is mush at 34, soft at 44, and legible from
-// 48 on a 2x or 3x screen; a 1x display needs about 56. The app header now
-// carries the full stamp for that reason. These files are still live: the
-// static legal pages under /public/legal reference them directly, and they
-// are the right asset anywhere genuinely tiny.
+// each device ratio, the stamp's subline is mush at 34, soft at 44, and
+// legible from 48 on a 2x or 3x screen; a 1x display needs about 56.
+//
+// The app header uses these files at 34px and sets the subline as live text
+// underneath instead, which stays crisp at every ratio and keeps the wordmark
+// at the size the nav row is built around. That trade is right for app chrome
+// and wrong for the asset: live text waits on a webfont, which is the whole
+// reason the subline inside the stamp is outlines.
 export const STAMP_MARK = {
   acid:  '/logo-mark-acid.svg',
   white: '/logo-mark-white.svg',
