@@ -303,9 +303,14 @@ when the reader is signed out, and when Stripe's reviewer loads them cold. They
 load no webfont, which also keeps the privacy page from making a third-party
 request while explaining third-party requests.
 
-Highlighted `[LEGAL NAME]`, `[TRADING ADDRESS]` and `[SUPPORT EMAIL]`
-placeholders are live on those pages and MUST be filled before taking payment.
-They are styled to be impossible to miss rather than hidden in a comment.
+Highlighted placeholders are live on those pages and MUST all be filled before
+taking payment: `[LEGAL NAME]`, `[PLACE OF REGISTRATION]`, `[COMPANY NUMBER]`,
+`[TRADING ADDRESS]`, `[SUPPORT EMAIL]` and `[PRIVACY CONTACT EMAIL]`. They are
+styled to be impossible to miss rather than hidden in a comment. The registered
+number and place of registration are not optional politeness: a UK company must
+publish both on its website (Companies Act 2006 s.82, and reg 25 of the Names and
+Trading Disclosures Regulations 2015), and the entity named here has to be the one
+that holds the Stripe account, or the mismatch is a review flag.
 
 `SiteFooter` renders under `<main>` on every signed-in screen and is the only
 route to `AboutView`, which existed in the file unrendered for a long time, so
