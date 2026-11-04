@@ -27,9 +27,13 @@ a 2.5% rag reads as a mistake. Header height is 48px, chosen on cap height
 rather than box height, which puts the words at 14.3px against the horizontal
 mark's 15.8px at 34px: smaller per line, but two lines carry the name.
 
-**Neither logo's generator is in this repo.** Both were built from potrace
-traces of the original artwork by scripts that live outside it, so
-regenerating or recolouring either one means rebuilding that toolchain. The subline justifies to the lozenge's own
+**Every logo file in `public/` is generated**, by `brand/stamp.py` and
+`brand/stacked.py` from the potrace traces in `brand/traces/`. Do not
+hand-edit one: the next run overwrites it. Both scripts are deterministic and
+reproduce all nine files byte for byte, which is the check to run after
+touching anything in `brand/`. The original artwork the traces came from is
+NOT in the repo, so those two trace files are the source of truth for the
+letterforms. See `brand/README.md`. The subline justifies to the lozenge's own
 measure where the string is long enough to do that at a readable setting, and
 is centred at a capped 0.42em tracking where it is not. Uppercase stops reading
 as a phrase past roughly that, and a short subline justified to this measure
@@ -317,6 +321,14 @@ api/                   # Vercel serverless functions (all secret keys live here)
   lib/aiUsage.js       # books every Claude call to the ai_usage ledger
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
+
+brand/                 # the logo toolchain: public/logo-*.svg is GENERATED
+  stamp.py             # the horizontal lozenge -> logo-stamp-*, logo-mark-*
+  stacked.py           # FOUND over SOUND -> logo-block-*  (--variants for the rest)
+  letters.py           # pulls individual letters out of a potrace trace
+  traces/              # potrace output; the source of truth for the letterforms
+  fonts/               # Hanken Grotesk, a build input for the subline outlines
+  README.md            # how to regenerate, and the one known colour inconsistency
 
 email/                 # founder campaign email
   founder-resident.html  # the build (also .txt for the plain-text part)

@@ -12,3 +12,7 @@ playwright-report/
 
 # Campaign send log: contains real recipient addresses, never commit
 email/.sent-*.log
+
+# Python bytecode from the brand/ logo scripts
+__pycache__/
+*.pyc

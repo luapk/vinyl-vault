@@ -53,10 +53,9 @@ export const STAMP_MARK = {
 // close.
 //
 // Generated from the same traced outlines as the stamp, so it is the same
-// drawing rather than a second interpretation of it. NOTE: the generator
-// (stacked.py, on top of letters.py and the w1/w2 traces) is not in this
-// repo, exactly like the stamp's own generator. Regenerating or recolouring
-// either logo means rebuilding that toolchain first.
+// drawing rather than a second interpretation of it. Every logo file in
+// public/ is built by brand/stacked.py and brand/stamp.py; see brand/README.md
+// before hand-editing one, because the next run overwrites it.
 export const BLOCK = {
   acid:  '/logo-block-acid.svg',
   white: '/logo-block-white.svg',
