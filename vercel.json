@@ -7,6 +7,18 @@
   ],
   "rewrites": [
     {
+      "source": "/terms",
+      "destination": "/legal/terms.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/legal/privacy.html"
+    },
+    {
+      "source": "/refunds",
+      "destination": "/legal/refunds.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

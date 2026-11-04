@@ -294,6 +294,23 @@ supabase/
   admin-analytics.sql  # feature_tiers overrides, billing columns, payments + ai_usage ledgers
 ```
 
+### Legal pages and the footer
+`public/legal/{terms,privacy,refunds}.html` are **plain static HTML, not app
+views**, served at `/terms`, `/privacy` and `/refunds` by rewrites that sit
+BEFORE the SPA catch-all in `vercel.json` (after it, they would never match).
+They are deliberately outside React: they have to render when the bundle fails,
+when the reader is signed out, and when Stripe's reviewer loads them cold. They
+load no webfont, which also keeps the privacy page from making a third-party
+request while explaining third-party requests.
+
+Highlighted `[LEGAL NAME]`, `[TRADING ADDRESS]` and `[SUPPORT EMAIL]`
+placeholders are live on those pages and MUST be filled before taking payment.
+They are styled to be impossible to miss rather than hidden in a comment.
+
+`SiteFooter` renders under `<main>` on every signed-in screen and is the only
+route to `AboutView`, which existed in the file unrendered for a long time, so
+the one page explaining the product could not be opened by anyone.
+
 ## Security rules
 
 - **All API keys (Anthropic, Discogs, Spotify) live in Vercel environment variables and are accessed only from `/api/*.js` handlers. Never expose them to the client.**

@@ -12,6 +12,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useTheme } from "../hooks/useTheme.js";
 import { useSubscription } from "../hooks/useSubscription.js";
 import AuthScreen from "./AuthScreen.jsx";
+import SiteFooter from "./SiteFooter.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import CommunityView from "./Community.jsx";
 import ChatPanel from "./ChatPanel.jsx";
@@ -1617,6 +1618,7 @@ export default function VinylVault() {
         {appView === "batch" && (
           <BatchView queue={batchQueue} processing={batchProcessing} onResolve={resolveBatchDisambiguation} onBatch={startBatch} onStop={stopBatch} accentRGB={accentRGB} onSignOut={signOut} />
         )}
+        {appView === "about" && <AboutView accentRGB={accentRGB} />}
         {appView === "community" && (
           <CommunityView
             currentUser={user}
@@ -1635,6 +1637,8 @@ export default function VinylVault() {
         )}
 
       </main>
+
+      <SiteFooter accentRGB={accentRGB} isDark={isDark} onOpenAbout={() => { setAppView("about"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
 
       {/* Chat panel overlay */}
       {chatOpen && user && (
