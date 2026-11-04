@@ -5739,57 +5739,45 @@ function StatsView({ collection, accentRGB, onExplore, onOpenCrate }) {
 
 // ----- AboutView -------------------------------------------------------------
 
-// The four onboarding steps. Each is an acid tile with a looping mascot
-// animation as the hero (the video's own acid backdrop matches the tile, so
-// the frame edge is invisible -- same trick as the splash). Until a clip is
-// wired in, the tile shows a big black step icon on acid as a placeholder.
-// To add a clip: set `video`/`poster` to the processed asset paths.
-const HOW_STEPS = [
-  { num: 1, title: 'Photograph', Icon: Camera,      video: null, poster: null, desc: 'Point your camera at the sleeve or label. A single photo is all it takes.' },
-  { num: 2, title: 'Identify',   Icon: Scan,        video: null, poster: null, desc: 'The exact pressing is matched against the global record database: label, catalogue number, year, country.' },
-  { num: 3, title: 'Enrich',     Icon: Sparkle,     video: null, poster: null, desc: 'The tracklist and BPM for every track are pulled automatically where available.' },
-  { num: 4, title: 'File',       Icon: VinylRecord, video: null, poster: null, desc: 'Assign the record to one or more crates, or save it unassigned and sort later.' },
-];
-
-function HowStep({ num, title, desc, Icon, video, poster }) {
-  // Play the clip only while the tile is on screen (battery/decode friendly).
-  const vidRef = useRef(null);
-  useEffect(() => {
-    const el = vidRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) el.play?.().catch(() => {}); else el.pause?.();
-    }, { threshold: 0.3 });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [video]);
-
+// The walkthrough, as a carousel, at the top of About.
+//
+// Same card the user met on first run, so About opens on something already
+// familiar rather than re-explaining the product in different words. It is a
+// carousel rather than a sequence here: it wraps at both ends, every step is
+// reachable from the rail, and there is no Skip, because nothing is being
+// skipped.
+function AboutWalkthrough() {
+  const steps = WALKTHROUGH_STEPS;
+  const [step, setStep] = useState(0);
+  const go = (i) => setStep((i + steps.length) % steps.length);
+  const btn = {
+    background: 'rgba(8,8,12,0.08)', color: '#08080c', border: 'none',
+    fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer',
+  };
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: '#cafe04' }}>
-      <div className="relative w-full aspect-video">
-        {video ? (
-          <video ref={vidRef} src={video} poster={poster || undefined} muted loop playsInline preload="none"
-            className="w-full h-full object-contain" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Icon size={58} weight="regular" style={{ color: '#08080c' }} />
-          </div>
-        )}
-        <span className="absolute top-2.5 left-2.5 w-6 h-6 rounded-full flex items-center justify-center font-mono text-[12px] font-bold"
-          style={{ background: '#08080c', color: '#cafe04' }}>{num}</span>
-      </div>
-      <div className="px-4 pt-3 pb-4">
-        <div className="text-[15px] font-display mb-1" style={{ color: '#08080c' }}>{title}</div>
-        <div className="text-[13.5px] leading-relaxed font-mono" style={{ color: 'rgba(8,8,12,0.72)' }}>{desc}</div>
-      </div>
+    <div className="flex justify-center mb-12 md:mb-14">
+      <WalkthroughCard index={step} steps={steps} onSelect={go} footer={
+        <div className="flex w-full gap-2">
+          <button type="button" onClick={() => go(step - 1)} aria-label="Previous step"
+            className="flex-1 py-3 rounded-xl text-sm transition-opacity hover:opacity-70" style={btn}>
+            Back
+          </button>
+          <button type="button" onClick={() => go(step + 1)} aria-label="Next step"
+            className="flex-1 py-3 rounded-xl text-sm transition-opacity hover:opacity-85"
+            style={{ ...btn, background: '#08080c', color: '#ffffff', fontWeight: 700 }}>
+            Next
+          </button>
+        </div>
+      } />
     </div>
   );
 }
 
-// eslint-disable-next-line no-unused-vars -- built, not yet routed to.
 function AboutView({ accentRGB }) {
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
+      <AboutWalkthrough />
+
       <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/25 font-mono">About</div>
       <h2 className="text-4xl md:text-5xl leading-[0.95] mb-8 font-display tracking-tight">
         Built for the crate,<br />
@@ -5807,13 +5795,6 @@ function AboutView({ accentRGB }) {
           <p>
             The crate system is intentional. Instead of flat tags, {APP_NAME} organises records the way a real DJ would: by feel, era, energy, purpose. Crate names come from the music, not a dropdown. And if the suggestions are not right for how you think, you can name them yourself.
           </p>
-        </div>
-
-        <div>
-          <div className="text-[13px] tracking-[0.3em] uppercase text-white/30 mb-4 font-mono">How it works</div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {HOW_STEPS.map(step => <HowStep key={step.title} {...step} />)}
-          </div>
         </div>
 
         <div className="pt-2 border-t border-white/[0.06] text-[14px] text-white/20 font-mono leading-relaxed">
@@ -7473,61 +7454,96 @@ const WALKTHROUGH_STEPS = [
   },
 ];
 
+// The acid card itself, shared by the first-run overlay and the About page.
+// It was inlined in the overlay, and the About page carried a second, separate
+// "How it works" grid that explained the same four things with placeholder
+// icons because no clip was ever wired into it. Two explanations of one
+// product, one of them with the artwork and one without. This is the one with
+// the artwork, and now both screens show it.
+//
+// Everything above the footer is identical in both places on purpose: the
+// point of putting it on About is that it is the thing the user already saw.
+// Only the controls underneath differ, which is what `footer` is for.
+function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer }) {
+  const [clipFailed, setClipFailed] = useState({});
+  const current = steps[index];
+  const StepIcon = current.icon;
+  const showClip = !clipFailed[index];
+  const Rail = onSelect ? 'button' : 'div';
+
+  return (
+    <div
+      className="w-full max-w-sm rounded-3xl px-7 pt-7 pb-6 flex flex-col items-center text-center"
+      style={{ background: '#cafe04', animation: 'fadeUp 0.3s ease-out' }}
+      key={index}
+    >
+      {/* Mascot clip, or the icon while the clips are still being made */}
+      <div className="flex items-center justify-center mb-4" style={{ height: 168, width: '100%' }}>
+        {showClip ? (
+          <img
+            src={current.clip}
+            alt=""
+            onError={() => setClipFailed(f => ({ ...f, [index]: true }))}
+            style={{ maxHeight: 168, maxWidth: '100%', objectFit: 'contain' }}
+          />
+        ) : (
+          <div className="rounded-2xl flex items-center justify-center"
+            style={{ width: 84, height: 84, border: '2px solid #08080c' }}>
+            <StepIcon size={36} weight="light" style={{ color: '#08080c' }} />
+          </div>
+        )}
+      </div>
+
+      {/* Step counter */}
+      <div className="font-mono mb-2" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'rgba(8,8,12,0.5)' }}>
+        {String(index + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
+      </div>
+
+      <h2 className="text-2xl font-display mb-2.5" style={{ color: '#08080c' }}>{current.title}</h2>
+
+      <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(8,8,12,0.7)' }}>{current.body}</p>
+
+      {/* Progress rail. On the overlay it reports progress through a sequence,
+          so it fills up to the current step. On About nothing is in sequence
+          and every step is reachable, so it becomes a row of real buttons and
+          marks only the one you are on. A filled-to-here rail would otherwise
+          imply a progress you are not making. */}
+      <div className="flex w-full gap-1.5 mb-6">
+        {steps.map((stepDef, i) => (
+          <Rail
+            key={i}
+            {...(onSelect ? {
+              type: 'button',
+              onClick: () => onSelect(i),
+              'aria-label': `Step ${i + 1}: ${stepDef.title}`,
+              'aria-current': i === index ? 'true' : undefined,
+            } : {})}
+            className={`flex-1 rounded-full transition-all${onSelect ? ' cursor-pointer' : ''}`}
+            style={{
+              height: onSelect ? 4 : 3,
+              padding: 0,
+              border: 'none',
+              background: (onSelect ? i === index : i <= index) ? '#08080c' : 'rgba(8,8,12,0.18)',
+            }} />
+        ))}
+      </div>
+
+      {footer}
+    </div>
+  );
+}
+
 function WalkthroughOverlay({ onDismiss }) {
   const steps = WALKTHROUGH_STEPS;
   const [step, setStep] = useState(0);
-  const [clipFailed, setClipFailed] = useState({});
   const isLast = step === steps.length - 1;
-  const current = steps[step];
-  const StepIcon = current.icon;
-  const showClip = !clipFailed[step];
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center px-4"
       style={{ background: 'rgba(8,8,12,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
     >
-      <div
-        className="w-full max-w-sm rounded-3xl px-7 pt-7 pb-6 flex flex-col items-center text-center"
-        style={{ background: '#cafe04', animation: 'fadeUp 0.3s ease-out' }}
-        key={step}
-      >
-        {/* Mascot clip, or the icon while the clips are still being made */}
-        <div className="flex items-center justify-center mb-4" style={{ height: 168, width: '100%' }}>
-          {showClip ? (
-            <img
-              src={current.clip}
-              alt=""
-              onError={() => setClipFailed(f => ({ ...f, [step]: true }))}
-              style={{ maxHeight: 168, maxWidth: '100%', objectFit: 'contain' }}
-            />
-          ) : (
-            <div className="rounded-2xl flex items-center justify-center"
-              style={{ width: 84, height: 84, border: '2px solid #08080c' }}>
-              <StepIcon size={36} weight="light" style={{ color: '#08080c' }} />
-            </div>
-          )}
-        </div>
-
-        {/* Step counter */}
-        <div className="font-mono mb-2" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'rgba(8,8,12,0.5)' }}>
-          {String(step + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
-        </div>
-
-        <h2 className="text-2xl font-display mb-2.5" style={{ color: '#08080c' }}>{current.title}</h2>
-
-        <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(8,8,12,0.7)' }}>{current.body}</p>
-
-        {/* Progress rail */}
-        <div className="flex w-full gap-1.5 mb-6">
-          {steps.map((_, i) => (
-            <div key={i} className="flex-1 rounded-full transition-all" style={{
-              height: 3,
-              background: i <= step ? '#08080c' : 'rgba(8,8,12,0.18)',
-            }} />
-          ))}
-        </div>
-
+      <WalkthroughCard index={step} steps={steps} footer={<>
         <button
           onClick={() => { if (isLast) { onDismiss(); } else { setStep(s => s + 1); } }}
           className="w-full py-3 rounded-xl text-sm mb-2.5 transition-opacity hover:opacity-85"
@@ -7542,7 +7558,7 @@ function WalkthroughOverlay({ onDismiss }) {
         >
           Skip
         </button>
-      </div>
+      </>} />
     </div>
   );
 }

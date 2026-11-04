@@ -106,7 +106,7 @@ concurrent-refresh race that guards the auth lock, account isolation on a
 shared device, the smart-crate runs (which may only ever ADD crate names), the
 file import under Discogs rate limiting (a 429 must never be saved as an
 unmatched record), and the rule that a community profile can never become
-somebody's home page, the wishlist and Trace rules (a pinned record
+somebody's home page, the About route and its walkthrough carousel, the wishlist and Trace rules (a pinned record
 survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), and the home screen's four ways in (all above the fold at
@@ -373,7 +373,23 @@ that holds the Stripe account, or the mismatch is a review flag.
 
 `SiteFooter` renders under `<main>` on every signed-in screen and is the only
 route to `AboutView`, which existed in the file unrendered for a long time, so
-the one page explaining the product could not be opened by anyone.
+the one page explaining the product could not be opened by anyone. That route
+is now asserted by `stress/about.spec.mjs` rather than trusted.
+
+**About opens on the first-run walkthrough, as a carousel.** `WalkthroughCard`
+is shared by `WalkthroughOverlay` and `AboutWalkthrough`, and everything above
+the footer is identical in both on purpose: the point of putting it on About
+is that it is the thing the user already saw. Only the controls differ. On the
+overlay it is a sequence, so the rail fills up to the current step and there
+is a Skip. On About nothing is in sequence, so it wraps at both ends, the rail
+becomes real buttons that mark only the current step, and there is no Skip,
+because nothing is being skipped. A filled-to-here rail would imply a progress
+the reader is not making.
+
+This replaced a second "How it works" grid on About that explained the same
+four steps with `video: null` placeholder icons, because no clip was ever
+wired into it. Two explanations of one product, one of them without the
+artwork. Do not reintroduce it: the walkthrough steps are the single copy.
 
 ## Security rules
 
