@@ -1,4 +1,4 @@
-import { APP_NAME, STAMP } from '../lib/brand.js';
+import { APP_NAME } from '../lib/brand.js';
 
 // The footer every signed-in screen ends on.
 //
@@ -16,9 +16,13 @@ import { APP_NAME, STAMP } from '../lib/brand.js';
 //
 // Three things here were wrong the first time and are worth not repeating:
 //
-//   The full stamp goes here, not the stripped mark. The mark's subline IS the
-//   tagline, so pairing the stripped mark with a line of prose saying the same
-//   thing in other words set the lockup against itself.
+//   There is no logo here. There was: the full stamp at 58px, which was the
+//   largest object in the footer and the first thing the eye landed on, to
+//   say a name the sticky header is already showing at the top of the same
+//   screen and the copyright line repeats at the bottom of this one. Three
+//   statements of the name on one screen is two too many, and the one that
+//   earned its place least was the one taking the most room. The links are
+//   what this component is for.
 //
 //   A <button> centres its text and an <a> does not, so a column mixing the two
 //   came out visibly ragged. Every item is forced to the same alignment and
@@ -26,7 +30,7 @@ import { APP_NAME, STAMP } from '../lib/brand.js';
 //
 //   Plans pointed at "/#pricing", which is an anchor to nothing. Pricing is a
 //   modal in this app, so it has to be a callback.
-export default function SiteFooter({ accentRGB, isDark, onOpenAbout, onOpenPlans }) {
+export default function SiteFooter({ accentRGB, onOpenAbout, onOpenPlans }) {
   const year = new Date().getFullYear();
 
   const itemStyle = {
@@ -66,12 +70,7 @@ export default function SiteFooter({ accentRGB, isDark, onOpenAbout, onOpenPlans
       className="relative z-10 px-5 md:px-10 pt-12 pb-14 max-w-7xl mx-auto mt-20 md:mt-28"
       style={{ borderTop: '1px solid rgba(var(--fg),0.08)' }}>
 
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-12">
-        {/* The lockup, whole. Its subline is the tagline, so nothing is
-            written underneath it. */}
-        <img src={isDark ? STAMP.acid : STAMP.black} alt={APP_NAME}
-          style={{ height: 58, width: 'auto', display: 'block', alignSelf: 'flex-start' }} />
-
+      <div className="flex flex-col md:flex-row md:items-start gap-12">
         <div className="flex gap-16 sm:gap-24">
           <nav className="flex flex-col gap-2.5 items-start">
             <Heading>Product</Heading>

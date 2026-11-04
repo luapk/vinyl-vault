@@ -1646,7 +1646,7 @@ export default function VinylVault() {
 
       </main>
 
-      <SiteFooter accentRGB={accentRGB} isDark={isDark}
+      <SiteFooter accentRGB={accentRGB}
         onOpenAbout={() => { setAppView("about"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
         onOpenPlans={() => setShowPricingModal(true)} />
 
