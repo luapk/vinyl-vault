@@ -77,3 +77,55 @@ test('the state rule fills in once there are records, and never truncates', asyn
   expect(fit.rowOverflows).toBe(false);
   expect(fit.countTruncated).toBe(false);
 });
+
+// The header has to hold the logo AND every tab without the nav row
+// scrolling sideways. Nothing asserted this with a FULL tab row, and it was
+// quietly broken: Tracks only appears once the collection has records, so
+// every check that ran against an empty account saw three tabs and passed
+// while a real user with four was scrolling the row.
+//
+// 320 and 640 still overflow and are not claimed here. 640 is where the tab
+// labels appear, which costs about 90px on its own; that predates the script
+// lockup and is its own problem.
+test('the header fits logo and every tab without the nav scrolling', async ({ page, context }) => {
+  await stubApi(context);
+  let n = 0;
+  await context.route('**/api/discogs-search', (route) => {
+    n += 1;
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ matches: [discogsMatch(n)] }) });
+  });
+  await page.setViewportSize(PHONE);
+  await signIn(page);
+  await fileImportInput(page).setInputFiles(csvFile(
+    Array.from({ length: 3 }, (_, i) => ({ artist: `Artist ${i + 1}`, title: `Album ${i + 1}` }))));
+  await page.getByText(/Added \d+ records/).waitFor({ timeout: 40_000 });
+  const done = page.getByRole('button', { name: /^(Done|Close)$/ }).first();
+  if (await done.count()) await done.click();
+  await page.waitForTimeout(800);
+
+  for (const width of [360, 390, 430, 768]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(350);
+    const fit = await page.evaluate(() => {
+      const h = document.querySelector('header');
+      const cs = getComputedStyle(h);
+      const kids = [...h.children];
+      const content = kids.reduce((a, k) => a + k.scrollWidth, 0)
+        + parseFloat(cs.columnGap || 0) * (kids.length - 1);
+      const nav = h.querySelector('nav');
+      return {
+        tabs: nav.children.length,
+        navScrolls: nav.scrollWidth > nav.clientWidth + 1,
+        spare: Math.round(h.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - content),
+        logoW: Math.round(h.querySelector('img').getBoundingClientRect().width),
+      };
+    });
+    expect(fit.tabs, `four tabs at ${width}px`).toBe(4);
+    expect(fit.navScrolls, `nav scrolls sideways at ${width}px`).toBe(false);
+    expect(fit.spare, `header has no room left at ${width}px`).toBeGreaterThanOrEqual(0);
+    // The script lockup has a legibility floor of roughly 110px at 1x; the
+    // header runs it under that and leans on device pixel ratio, so it must
+    // not be shrunk any further to buy space.
+    expect(fit.logoW, `logo shrunk below its floor at ${width}px`).toBeGreaterThanOrEqual(84);
+  }
+});

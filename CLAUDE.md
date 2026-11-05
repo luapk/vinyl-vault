@@ -11,10 +11,12 @@ worker cache names, and the `vinylvault_*` localStorage keys. Renaming a
 storage key orphans the cache on every device that already holds one, and
 nobody sees any of these. Do not "finish the rename" by touching them.
 
-The logo comes in two lockups. The HORIZONTAL one is a keyline lozenge
+The logo comes in three lockups. The HORIZONTAL one is a keyline lozenge
 holding the wordmark, with the subline ("YOUR VINYL, SORTED") set beneath it.
 The STACKED one (`public/logo-block-*.svg`, `BLOCK` in `src/lib/brand.js`) is
-FOUND over SOUND inside a rounded keyline, and it is what the app header uses.
+FOUND over SOUND inside a rounded keyline. The SCRIPT one now carries the app
+header and the three big screens; see below. `BLOCK` is currently unused and
+kept for the reasoning it carries.
 
 Stacking works because of a property of the name: FOUND and SOUND are five
 letters each differing only in the first, so at matched cap height they are
@@ -54,12 +56,31 @@ version keeps that structure by carrying no ground at all, so whatever is
 behind it shows through between the keyline and the letters. That is what lets
 two files cover all three grounds: black on acid, black on paper, white on ink.
 
-Its floor is about **110px wide** -- below that the bevel is under a pixel, the
-counters close and FOUND and SOUND stop reading as two words. The header gives
-a mark 61x48, so the header keeps `BLOCK` and always will. Size it on HEIGHT,
-not width: it is 1.36:1 where the horizontal `STAMP` is 2.77:1, so carrying the
-old width across doubles the vertical the logo eats. All three call sites were
-re-sized when they were swapped for exactly that reason.
+Its floor is about **110px wide at 1x**, where the bevel falls under a pixel.
+The header runs it at 84 and leans on device pixel ratio: on a 2x phone, which
+is almost all of them, 84 is clean, and even 62 reads. An earlier note here
+said it was unreadable at 61px and that the header would keep `BLOCK` forever.
+That was measured on the FIRST trace, which flattened the artwork's layers and
+so merged its own overlapping strokes. The retraced version holds its counters
+and the claim no longer stands.
+
+Size it on HEIGHT, not width: it is 1.36:1 where the horizontal `STAMP` is
+2.77:1, so carrying an old width across doubles the vertical the logo eats.
+Every call site was re-sized when it was swapped for exactly that reason.
+
+**The header is the tight one, and the nav row is the constraint.** With a
+real collection there are FOUR tabs, because Tracks appears only once records
+exist. Nothing asserted the fit with four, so every check ran against an empty
+account, saw three, and passed: the shipped block header was in fact
+overflowing by 24px at 360 and scrolling the nav sideways, which is the exact
+failure the block was brought in to prevent. `stress/home.spec.mjs` now holds
+the line at 360, 390, 430 and 768 with four tabs. The room for the script came
+from the nav's own padding (`px-2`), not from shrinking the mark, and the test
+asserts the logo is never taken below 84 to buy space.
+
+Two widths still overflow and are deliberately not claimed: 320, and 640,
+where the tab labels appear and cost about 90px on their own. Both were worse
+before this change. 640 predates the script and is its own problem.
 
 **The tagline lives in the home screen's eyebrow slot instead**, where
 "New scan" used to be. That slot was labelling a screen you had already

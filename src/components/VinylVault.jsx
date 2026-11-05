@@ -21,7 +21,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, SCRIPT, BLOCK } from '../lib/brand.js';
+import { APP_NAME, SCRIPT } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -1476,31 +1476,29 @@ export default function VinylVault() {
       </div>
 
       {/* Header — sticky, frosted glass so content scrolls cleanly underneath */}
-      <header className="sticky top-0 z-30 px-5 md:px-10 py-3 flex items-center justify-between gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)", paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
+      <header className="sticky top-0 z-30 px-4 sm:px-5 md:px-10 py-3 flex items-center justify-between gap-2 sm:gap-3" style={{ background: "rgba(var(--bg),0.80)", backdropFilter: "blur(24px) saturate(180%)", WebkitBackdropFilter: "blur(24px) saturate(180%)", borderBottom: "1px solid rgba(var(--fg),0.07)", paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
         {/* The wordmark is the way home, from anywhere and in any state --
             mid-scan, on a result, deep in the community. It aborts an
             in-flight scan the same way Cancel does rather than leaving a
             request running against a screen nobody is looking at. */}
-        {/* The stacked lockup, not the horizontal one.
-            The name stacks almost perfectly (see BLOCK in brand.js), and the
-            header is the place that benefits: the horizontal mark is 3.90:1
-            and ate 132.5px of a 360px phone's top bar, leaving the nav row
-            to scroll sideways. At 1.33:1 this holds the same name in a third
-            of the width.
+        {/* The script lockup, white on dark and black on light.
 
-            48px is a cap-height decision, not a height one. The lockup's
-            words are 100 of its 335 viewBox units, so 48 sets them at 14.3px
-            against the horizontal mark's 15.8px at 34px. Slightly smaller
-            per line, but there are two lines carrying the name, so the ink
-            on screen is greater, not less. */}
+            This is the tight one. The script is 1.36:1, so a 48px height
+            gives it 65px of width, and its floor is about 110px: see SCRIPT
+            in brand.js. It is taken as wide as the top bar can spare rather
+            than as tall as the bar is, which is why the height here is set
+            from a WIDTH and the row below it had to lose a little gap to pay
+            for it. The nav row must not scroll sideways on a 360px phone --
+            that is the thing the stacked block was brought in to fix, and
+            stress/home.spec.mjs holds the line. */}
         <button type="button" onClick={goHome} aria-label={`${APP_NAME} home`}
           className="flex items-center shrink-0 transition-opacity hover:opacity-80"
           style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
-          <img src={isDark ? BLOCK.acid : BLOCK.black} alt={APP_NAME}
-            style={{ height: 48, display: 'block' }} />
+          <img src={isDark ? SCRIPT.white : SCRIPT.black} alt={APP_NAME}
+            className="block w-[84px] lg:w-[104px]" />
         </button>
 
-        <nav className="vv-nav-row flex items-center gap-1.5 min-w-0 overflow-x-auto">
+        <nav className="vv-nav-row flex items-center gap-1 sm:gap-1.5 min-w-0 overflow-x-auto">
           {navItems.map(({ id, label, icon: Icon, badge, locked }) => (
             <button
               key={id}
@@ -1518,7 +1516,7 @@ export default function VinylVault() {
               // accessible name on exactly the screens most people use.
               aria-label={label}
               aria-current={appView === id ? 'page' : undefined}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
+              className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 rounded-full text-[14px] tracking-[0.12em] uppercase font-mono transition-all"
               style={appView === id
                 ? { background: `rgba(${navAccentRGB},0.15)`, border: `1px solid rgba(${navAccentRGB},0.35)`, color: `rgb(${navAccentRGB})`, boxShadow: `0 0 12px -4px rgba(${navAccentRGB},0.3)` }
                 : { background: "transparent", border: `1px solid rgba(var(--fg),${isDark ? 0.07 : 0.15})`, color: `rgba(var(--fg),${isDark ? 0.4 : 0.6})` }
