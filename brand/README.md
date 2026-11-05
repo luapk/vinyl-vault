@@ -90,3 +90,10 @@ reconciled; the app is the easier of the two to change if it ever should be.
 
 `fonts/Hanken_Grotesk_700.ttf` is a build input, not a shipped asset. See
 `fonts/NOTICE.md`.
+
+## v2, the script lockup
+
+`v2/` holds a traced vector of the ornate script drawing, with its own
+toolchain and its own README. **Nothing in the app uses it.** It was traced
+and auditioned, and the audition found it unreadable at the 48px the header
+gives a mark, so it cannot replace the block there. See `v2/README.md`.
