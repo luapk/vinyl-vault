@@ -391,6 +391,17 @@ four steps with `video: null` placeholder icons, because no clip was ever
 wired into it. Two explanations of one product, one of them without the
 artwork. Do not reintroduce it: the walkthrough steps are the single copy.
 
+**The walkthrough clips are transparent, and must stay that way.** They are
+animated WebP with an alpha channel and no background; the acid comes from
+`WalkthroughCard`, which is `#cafe04`. Each clip originally baked in its own
+background, and all four greens were different and none was `#CAFE04`
+(`#C3F400`, `#C1EF00`, `#C3EE00`, `#C0EE00`), so every clip sat on the card
+as a visible rectangle of slightly wrong green. Keying them out costs 1.7MB
+across the set and is worth it: it fixes the seam, and it means the brand
+colour lives in exactly one place instead of being baked into four binaries
+that nobody would think to re-export. `public/walkthrough/BRIEFS.md` has the
+two-step key and the trap in it.
+
 ## Security rules
 
 - **All API keys (Anthropic, Discogs, Spotify) live in Vercel environment variables and are accessed only from `/api/*.js` handlers. Never expose them to the client.**

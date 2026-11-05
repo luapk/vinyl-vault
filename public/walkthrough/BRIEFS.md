@@ -18,8 +18,17 @@ automatically; until then each step falls back to a line icon.
   rubber-hose arms and legs. Thick black outlines, flat black-and-white artwork
   with halftone shading on the case body. 1930s rubber-hose cartoon styling,
   the same character as the existing splash clips.
-- **Background**: solid `#cafe04` acid green, edge to edge, no gradient, no
-  shadow on the background itself (the character keeps its own ground shadow).
+- **Background**: TRANSPARENT. The shipped clips carry an alpha channel and no
+  background at all; the acid comes from the card they sit on, which is
+  `#cafe04` in `WalkthroughCard`.
+
+  Generate against solid acid as before, then key it out (see "Keying out the
+  background" below). Do NOT ship a baked-in background. Every one of the four
+  original clips baked a slightly DIFFERENT green (`#C3F400`, `#C1EF00`,
+  `#C3EE00`, `#C0EE00`), none of them `#CAFE04`, so each sat on the card as a
+  visible rectangle of the wrong green. Nobody noticed for months because the
+  greens are close enough to pass a glance and wrong enough to see once the
+  clip is beside the card edge.
 - **Format**: animated WebP, transparent not required, 780 x 440, 5 seconds,
   seamless loop. The shipped set is 16 fps, which is plenty for motion this
   unhurried and keeps the files small enough for a first run on mobile data.
@@ -70,3 +79,30 @@ generated from a frame of it cropped to the acid panel.
 The shipped set was made with Higgsfield (`seedance_2_0`, image reference,
 5 s, 16:9, silent) and converted with
 `ffmpeg -vf "fps=16,scale=780:440" -c:v libwebp_anim -q:v 70 -loop 0`.
+
+## Keying out the background
+
+Two steps, and the order matters. Recolour the clip's own green to `#CAFE04`
+FIRST, then punch that out. Keying the original green directly leaves the
+anti-aliased edge ramping toward the wrong colour, which fringes against the
+card; ramping it toward the card colour first makes the leftover fringe
+invisible where it actually lands.
+
+```bash
+convert step-NAME.webp -coalesce   -fuzz 18% -fill "#CAFE04" -opaque "rgb(R,G,B)" \   # that clip's own green
+  -fuzz 6%  -transparent "#CAFE04"   -quality 70 step-NAME.webp
+```
+
+Read the clip's own green first, do not assume it:
+`convert step-NAME.webp[0] -resize 10% -format %c -depth 8 histogram:info: | sort -rn | head -1`
+
+`-coalesce` is not optional. These are sub-frame optimised, so frame N is a
+delta; indexing a frame without coalescing gives a partial image with holes.
+
+Alpha costs size: the four clips went from 3.17 MB to 4.90 MB in total. That
+is the price of the acid being right on every surface, and of the clips
+working on any background later.
+
+A ~1px fringe of the old ramp survives at the character's edge. It is
+invisible at the 168px display size and invisible on the acid card. It would
+show on a strongly contrasting background.
