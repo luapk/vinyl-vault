@@ -94,6 +94,11 @@ reconciled; the app is the easier of the two to change if it ever should be.
 ## v2, the script lockup
 
 `v2/` holds a traced vector of the ornate script drawing, with its own
-toolchain and its own README. **Nothing in the app uses it.** It was traced
-and auditioned, and the audition found it unreadable at the 48px the header
-gives a mark, so it cannot replace the block there. See `v2/README.md`.
+toolchain and its own README. **Nothing in the app uses it.** It keeps the
+artwork's four layers (black ground, acid keyline, acid letters, cream bevel)
+rather than flattening them, which is where the depth in that drawing lives,
+and it ships nine colourways. Unlike this directory it has its source raster
+in the repo, so the separation can be re-run.
+
+The audition found it unreadable at the 48px the header gives a mark, so it
+cannot replace the block there. See `v2/README.md`.

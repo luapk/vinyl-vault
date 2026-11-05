@@ -1,75 +1,138 @@
 # Logo v2: the script lockup
 
 A traced vector of the ornate script "Found Sound" drawing. **Nothing in the
-app uses it.** It was traced and auditioned on the real screens, and the
-audition is written down below, because the result decides where it can and
-cannot go.
+app uses it.** It is traced, cleaned and colour-wayed here so it can be
+adopted later without redoing any of this. The audition findings, including
+the one that decides where it can go, are at the bottom.
 
-Nothing here is wired into `src/` and nothing is copied into `public/`. The
-shipped marks are still the ones `../stamp.py` and `../stacked.py` generate.
+## The artwork is four layers, and the trace keeps them
 
-## What is here
+The drawing is a sticker, and the depth in it is structural rather than an
+effect. From the back forward:
 
-| File | What it is |
+1. a **black ground**, the sticker body
+2. an **acid keyline** around that ground
+3. the **acid letters**, floating in the ground with black between them
+4. a **cream hairline** inset inside the letters: the bevel that makes the
+   lettering read as rounded rather than flat
+
+Three bitmaps carry all four, because (2) and (3) are the same colour and so
+trace as one path:
+
+| `traces/` | What it is |
 | --- | --- |
-| `traces/union.svg` | every inked pixel, keyline included |
-| `traces/cream.svg` | the pale inner ribbon alone |
-| `traces/acid.svg` | the acid fill alone (union minus cream) |
-| `compose.py` | the three layers -> the six colourways in `out/` |
-| `trace.sh` | the separation recipe, for re-running from a raster |
-| `out/script-*.svg` | generated; do not hand-edit |
+| `body.svg` | the filled silhouette: ground plus keyline |
+| `ink.svg` | the keyline and the letters |
+| `cream.svg` | the bevel |
 
-The original raster is not in the repo, exactly as with `../traces/`: the
-three files in `traces/` are the source of truth for these letterforms.
-`trace.sh` documents how they were separated so the recipe can be argued with,
-but it needs artwork that this repo does not hold.
+The first version of this trace flattened all of that into one silhouette and
+an outline, which threw the depth away: it came back as a flat acid shape with
+a pale edge, nothing behind the letters, and no sticker. The layers are the
+whole point of the drawing, so they are what gets traced.
 
-`compose.py` is deterministic. Running it reproduces all six files in `out/`
-byte for byte, which is the check to run after touching anything here.
+## Separation
 
-## The six colourways
+`build.py` does it. Luminance alone cannot tell the acid fill from the cream
+bevel, so the split is by **saturation**: inked pixels cluster at S 0.15-0.40
+(cream) and S 0.65-0.98 (acid) with a clear valley between, and the threshold
+sits in that valley. Luminance only decides what is inked at all.
 
-`script-full` is the three-tone treatment as drawn. The three single-colour
-versions fill the **acid** path rather than the union, which matters more here
-than on a normal wordmark: this script overlaps its own strokes constantly,
-and the pale ribbon is the only thing separating them. Filling the union
-instead merges every overlap and the lettering collapses into a blob. The two
-`-keyed` versions are lettering plus keyline with no inner fill distinction.
+The ground cannot be thresholded for directly, because the artwork's
+background is dark too. It is derived instead: take the keyline loop and fill
+its interior. **The artwork is cropped on the left**, so the loop runs off the
+canvas and a flood fill leaks straight out of it; `build.py` walls off that
+opening before filling. See the known issue below.
 
-The keyline is not traced. It sits outside the lettering in the original, so
-`compose.py` regenerates it by stroking the union path and painting it behind
-everything. That gives a clean, adjustable keyline instead of a traced
-approximation of a drop shadow, and it is what lets the whole lockup be
-re-weighted or flattened to one colour at all.
+Each layer is then supersampled 4x, opened and closed to drop spurs and
+notches, and softened, so the contour lands on a sub-pixel position instead of
+following the stair-steps of a 1052px raster. The layers get different
+treatment: the bevel is a hairline and is barely opened at all, because the
+radius that tidies the letters erases it.
 
-## The audition, and what it rules out
+## Cleanups applied on top
 
-Auditioned on the three screens the mark actually appears on, in the real app
-in a real browser rather than on a sheet.
+- **The flourish above the "o" of Sound is one line.** A detached blob sat
+  beside it; it is dropped, so the flourish reads as a single stroke.
+- **The specks are gone.** Five grain islands, the largest 32x21px, scattered
+  through the F bowl, the S bowl and around the "n" of Found. They are listed
+  by component id in `DROP` in `build.py`, so any of them can be put back by
+  deleting one number.
+- **The crossing above the "u" of Found is smoothed.** Where the F's tail
+  crosses the flourish, the source is soft and it traced with a stepped,
+  notched foot. That one box gets a heavier closing and blur. It is blended
+  through a feathered window rather than applied inside a rectangle: a hard
+  box leaves its own outline printed across the mark, because the contour
+  lands a fraction of a pixel differently on each side of the boundary. That
+  happened, and the seam was visible.
 
-- **Splash, 300px: excellent.** It is the best the brand has looked. It shares
-  an ink-outline cartoon vocabulary with the crate mascot directly beneath it,
-  which the geometric block lockup does not, so the two read as one drawing
-  instead of a logo above an illustration.
-- **Auth screen: good.** Same reasoning, with room to breathe.
-- **Header, 48px tall (61x48 as rendered): unreadable.** It is a green
-  squiggle. Not "tight but legible": the counters close, the ribbon separating
-  the overlapping strokes disappears, and FOUND and SOUND stop being two
-  words.
+## Colourways
 
-The size ramp puts the floor at roughly **110px wide**. Below that the inner
-ribbon is under a pixel and the thing that makes the script readable is gone.
-The header gives it 61px.
+`out/`, all generated:
 
-So this cannot replace the stacked block in the nav, and the stacked block was
-chosen for the nav on exactly this kind of measurement (see the top of
-`CLAUDE.md`: 132.5px of a 360px top bar down to 64px, which is what stopped
-the nav row scrolling sideways). If the script is ever adopted it is as a
-**large-format lockup alongside** the block, not instead of it: splash, auth,
-About, print, merch, the app store listing. Two marks with a size rule
-between them, which is an ordinary thing for a brand to have.
+| File | Ground | Letters | Bevel |
+| --- | --- | --- | --- |
+| `script-full` | ink | acid | cream |
+| `script-paper` | paper | acid | ink |
+| `script-acid-ink` | ink | acid | - |
+| `script-ink-acid` | acid | ink | - |
+| `script-black` / `-white` / `-acid` | - | that colour | - |
+| `script-black-bevel` / `-white-bevel` | - | that colour | knocked out |
 
-The texture of the original drawing (the grain inside the strokes) is
-deliberately dropped. It does not survive a two-colour separation, it would
-not survive being rendered at 61px either, and it is not something a vector
-mark should be carrying.
+The one-colour versions carry no ground, so whatever is behind them shows
+through between the keyline and the letters. That is what makes `script-black`
+work on acid and `script-white` work on ink: the structure survives with one
+ink, because the ground is the page.
+
+## Regenerating
+
+```
+pip install numpy scipy pillow
+./trace.sh
+```
+
+Deterministic: a clean run reproduces `traces/*.svg` and `out/*.svg` byte for
+byte, which is the check to run after touching anything here.
+`source/script-artwork.png` is the artwork the trace comes from and is in the
+repo, unlike v1's, so the separation can actually be re-run and argued with.
+
+## Known issue: the artwork is cropped
+
+The left edge of the lockup runs off the left edge of the source file. Two
+things are cut: the acid keyline, at two places, and the terminal of the F's
+left swirl, across 45px of stroke. The keyline is walled off and filled so the
+ground is correct, but the mark still ends in a straight vertical cut on that
+side, which reads as a mistake at any size.
+
+This cannot be fixed from this file. Reconstructing a swirl terminal is
+drawing, not tracing, and it would be an invention sitting inside a logo.
+**An uncropped original closes it**, and nothing else here needs to change.
+
+## The audition
+
+Auditioned in the real app in a real browser, not on a sheet.
+
+- **Splash, 300px, `script-black` on acid: excellent.** The ground drops out
+  and the acid page shows through between keyline and letters, so it reads as
+  ink on acid, which is exactly the mascot's own vocabulary. The two now look
+  like one drawing instead of a logo above an illustration.
+- **Auth, `script-white` on ink: excellent**, the same trick the other way up.
+- **Header, 48px tall (61x48 as rendered): unreadable.** A green squiggle. The
+  counters close, the bevel separating the overlapping strokes disappears, and
+  FOUND and SOUND stop being two words.
+
+The size ramp puts the floor around **110px wide**. Below that the bevel is
+under a pixel and the thing that makes a script readable is gone. The header
+gives it 61.
+
+So this cannot replace the stacked block in the nav, and the block was chosen
+for the nav on exactly this kind of measurement (see the top of `CLAUDE.md`).
+If the script is adopted it is a **large-format lockup alongside** the block,
+not instead of it: splash, auth, About, print, merch, the store listing. Two
+marks with a size rule between them, which is an ordinary thing for a brand to
+have.
+
+The grain texture inside the strokes is deliberately dropped. It does not
+survive a two-colour separation, it would not survive 61px either, and it is
+not something a vector mark should carry. If the distressed look is ever
+wanted for print it belongs as a texture overlay on top of this clean vector,
+which is the same call `../README.md` makes for v1.
