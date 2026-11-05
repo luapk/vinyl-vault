@@ -109,8 +109,9 @@ unmatched record), and the rule that a community profile can never become
 somebody's home page, the About route and its walkthrough carousel, the wishlist and Trace rules (a pinned record
 survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
-cannot use it), and the home screen's four ways in (all above the fold at
-360x740, and the scan card's state rule absent on an empty collection).
+cannot use it), the home screen's four ways in (all above the fold at
+360x740, and the scan card's state rule absent on an empty collection), and
+the splash clip order (hero first, then rotation, never a broken image).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -390,6 +391,22 @@ This replaced a second "How it works" grid on About that explained the same
 four steps with `video: null` placeholder icons, because no clip was ever
 wired into it. Two explanations of one product, one of them without the
 artwork. Do not reintroduce it: the walkthrough steps are the single copy.
+
+**The splash shows one deliberate hero on a first open, then rotates.**
+`SPLASH_HERO` (`/splash-flight.webp`, the rocket flight) is what everybody's
+first sight of the app is, because a first impression is not a thing to
+randomise. `SPLASH_CLIPS` is the rotation a returning user gets, so the
+splash stays varied for the people who see it most, and the hero does not
+re-enter it. One localStorage key does both jobs: `vv_splash_i` absent means
+a first open, and its value otherwise is the rotation index, so there is no
+second key to keep in step. No storage at all (private window, blocked site
+data) serves the hero, since every open looks like a first one there.
+
+The `<img>` falls back to the first rotation clip `onError`. A missing or
+failed hero must not leave the first thing anybody sees as a broken image
+icon. `stress/splash.spec.mjs` asserts the order, the wrap, and that whatever
+is chosen actually decoded, which is the leg that holds whether the hero
+loads or falls back.
 
 **The walkthrough clips are transparent, and must stay that way.** They are
 animated WebP with an alpha channel and no background; the acid comes from

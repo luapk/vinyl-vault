@@ -6002,31 +6002,52 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
 const SPLASH_ACID = '#cafe04';
 
 // Two mascot animations, alternated on each visit so the boot screen varies.
-// The chosen index is advanced in localStorage at module load (once per app
-// open), falling back to a fixed clip if storage is unavailable.
 // Clips are transparent animated WebP (not video): WebP is sRGB, so there is
 // no YUV colour-range shift -- the transparent background lets the page's own
 // acid show through, making a colour mismatch impossible. `dur` (seconds) is
 // used to hold the splash for one full loop. Bump SPLASH_V when a clip's bytes
 // change at the same path, to bust browser/CDN caches.
 const SPLASH_V = '4';
+
+// The hero. A first open gets this one and only this one, because a first
+// impression is not a thing to randomise: everybody's first sight of the app
+// is the same deliberate shot. The rotation below is what a returning user
+// gets, so the splash stays varied for the people who see it most.
+const SPLASH_HERO = { src: `/splash-flight.webp?v=${SPLASH_V}`, dur: 5 };
+
 const SPLASH_CLIPS = [
   { src: `/splash.webp?v=${SPLASH_V}`, dur: 5 },
   { src: `/splash2.webp?v=${SPLASH_V}`, dur: 5 },
   { src: `/splash4.webp?v=${SPLASH_V}`, dur: 6 },
 ];
 
+// Chosen once at module load, which is once per app open.
+//
+// The absence of `vv_splash_i` is what marks a first open, so the key is
+// written on that first pass even though the hero does not come from the
+// rotation. Reading the key as "how many times this device has opened the
+// app" rather than "which clip is next" is what lets one localStorage value
+// carry both jobs without a second key to keep in step.
 const splashClip = (() => {
   try {
-    const next = (parseInt(localStorage.getItem('vv_splash_i') || '0', 10) || 0) % SPLASH_CLIPS.length;
+    const seen = localStorage.getItem('vv_splash_i');
+    if (seen === null) {
+      localStorage.setItem('vv_splash_i', '0');
+      return SPLASH_HERO;
+    }
+    const next = (parseInt(seen, 10) || 0) % SPLASH_CLIPS.length;
     localStorage.setItem('vv_splash_i', String((next + 1) % SPLASH_CLIPS.length));
     return SPLASH_CLIPS[next];
   } catch {
-    return SPLASH_CLIPS[0];
+    // No storage (private window, blocked site data). Every open looks like a
+    // first open here, so serve the hero rather than always the same arbitrary
+    // member of the rotation.
+    return SPLASH_HERO;
   }
 })();
 
 function SplashScreen() {
+  const [clip, setClip] = useState(splashClip);
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
@@ -6036,9 +6057,13 @@ function SplashScreen() {
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
       <img
-        src={splashClip.src}
+        src={clip.src}
         alt=""
         className="w-[98vw] max-w-[620px]"
+        // A missing or failed clip must not leave the first thing anybody
+        // sees as a broken image icon. Fall back to the first of the
+        // rotation, which has shipped for as long as the splash has.
+        onError={() => { if (clip.src !== SPLASH_CLIPS[0].src) setClip(SPLASH_CLIPS[0]); }}
         style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
       />
       <div
