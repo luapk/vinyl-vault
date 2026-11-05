@@ -111,7 +111,8 @@ survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), the home screen's four ways in (all above the fold at
 360x740, and the scan card's state rule absent on an empty collection), and
-the splash clip order (hero first, then rotation, never a broken image).
+the splash clip order (an existing install still gets a new hero, the
+rotation advances and wraps, and a failed clip never leaves a broken image).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
 run `npm run stress` before shipping.
@@ -392,21 +393,32 @@ four steps with `video: null` placeholder icons, because no clip was ever
 wired into it. Two explanations of one product, one of them without the
 artwork. Do not reintroduce it: the walkthrough steps are the single copy.
 
-**The splash shows one deliberate hero on a first open, then rotates.**
-`SPLASH_HERO` (`/splash-flight.webp`, the rocket flight) is what everybody's
-first sight of the app is, because a first impression is not a thing to
-randomise. `SPLASH_CLIPS` is the rotation a returning user gets, so the
-splash stays varied for the people who see it most, and the hero does not
-re-enter it. One localStorage key does both jobs: `vv_splash_i` absent means
-a first open, and its value otherwise is the rotation index, so there is no
-second key to keep in step. No storage at all (private window, blocked site
-data) serves the hero, since every open looks like a first one there.
+**The splash leads with the hero, then rotates, hero included.**
+`SPLASH_HERO` (`/splash-flight.webp`, the rocket flight) leads, and it also
+keeps its place in `SPLASH_CLIPS` rather than being the best asset in the set
+and shown once.
 
-The `<img>` falls back to the first rotation clip `onError`. A missing or
-failed hero must not leave the first thing anybody sees as a broken image
-icon. `stress/splash.spec.mjs` asserts the order, the wrap, and that whatever
-is chosen actually decoded, which is the leg that holds whether the hero
-loads or falls back.
+**The hero is keyed to the ASSET, not to the device being new**, and that
+distinction is the whole point. `vv_splash_hero` stores the hero's own `src`
+(the `?v=` included); a device is served the hero whenever that does not
+match. The first version keyed off "has this device ever opened the app"
+(`vv_splash_i` being absent), which meant every existing install skipped the
+hero permanently, because the rotation counter was already set on all of
+them. The one change whose purpose was to be seen was invisible to everybody
+who already used the app. Keying on the asset means a new or changed hero
+reaches every device exactly once, and bumping `SPLASH_V` re-triggers it the
+same way it busts the cache.
+
+`vv_splash_i` is now only the rotation index, and the hero does not advance
+it: being shown the hero is not a turn of the wheel. No storage at all
+(private window, blocked site data) leads with the hero, since nothing can be
+remembered there.
+
+The `<img>` falls back `onError` to any clip that is not the one that just
+failed. A missing or failed clip must not leave the first thing anybody sees
+as a broken image icon. `stress/splash.spec.mjs` covers four cases, and the
+first is the one that was broken: an existing install, mid-rotation, that has
+never seen this hero.
 
 **The walkthrough clips are transparent, and must stay that way.** They are
 animated WebP with an alpha channel and no background; the acid comes from

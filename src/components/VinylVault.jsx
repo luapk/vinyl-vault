@@ -6009,39 +6009,45 @@ const SPLASH_ACID = '#cafe04';
 // change at the same path, to bust browser/CDN caches.
 const SPLASH_V = '4';
 
-// The hero. A first open gets this one and only this one, because a first
-// impression is not a thing to randomise: everybody's first sight of the app
-// is the same deliberate shot. The rotation below is what a returning user
-// gets, so the splash stays varied for the people who see it most.
+// The hero: the shot that leads, and the one a person meets the product with.
 const SPLASH_HERO = { src: `/splash-flight.webp?v=${SPLASH_V}`, dur: 5 };
 
+// The rotation INCLUDES the hero. It leads, and then it keeps its place in
+// the mix rather than being the best asset in the set and shown once.
 const SPLASH_CLIPS = [
+  SPLASH_HERO,
   { src: `/splash.webp?v=${SPLASH_V}`, dur: 5 },
   { src: `/splash2.webp?v=${SPLASH_V}`, dur: 5 },
   { src: `/splash4.webp?v=${SPLASH_V}`, dur: 6 },
 ];
 
-// Chosen once at module load, which is once per app open.
+// The hero is shown when this device has not yet seen THIS hero, which is not
+// the same thing as the device being new.
 //
-// The absence of `vv_splash_i` is what marks a first open, so the key is
-// written on that first pass even though the hero does not come from the
-// rotation. Reading the key as "how many times this device has opened the
-// app" rather than "which clip is next" is what lets one localStorage value
-// carry both jobs without a second key to keep in step.
+// That distinction is the whole point. Keying it off "has this device ever
+// opened the app" meant every existing install skipped the hero for good: the
+// rotation counter was already set on every one of them, so the one change
+// whose purpose was to be seen was invisible to everybody who already used
+// the app. Storing the hero's own src (the `?v=` included) instead means a
+// new or changed hero reaches every device exactly once, and bumping
+// SPLASH_V re-triggers it the same way it busts the cache.
+const SPLASH_HERO_KEY = 'vv_splash_hero';
+
 const splashClip = (() => {
   try {
-    const seen = localStorage.getItem('vv_splash_i');
-    if (seen === null) {
-      localStorage.setItem('vv_splash_i', '0');
+    if (localStorage.getItem(SPLASH_HERO_KEY) !== SPLASH_HERO.src) {
+      localStorage.setItem(SPLASH_HERO_KEY, SPLASH_HERO.src);
+      // Leave the rotation where it was: the hero is not a turn of the wheel.
       return SPLASH_HERO;
     }
-    const next = (parseInt(seen, 10) || 0) % SPLASH_CLIPS.length;
+    const seen = localStorage.getItem('vv_splash_i');
+    const next = (parseInt(seen || '0', 10) || 0) % SPLASH_CLIPS.length;
     localStorage.setItem('vv_splash_i', String((next + 1) % SPLASH_CLIPS.length));
     return SPLASH_CLIPS[next];
   } catch {
-    // No storage (private window, blocked site data). Every open looks like a
-    // first open here, so serve the hero rather than always the same arbitrary
-    // member of the rotation.
+    // No storage (private window, blocked site data). Nothing can be
+    // remembered, so lead with the hero rather than always the same
+    // arbitrary member of the rotation.
     return SPLASH_HERO;
   }
 })();
@@ -6063,7 +6069,7 @@ function SplashScreen() {
         // A missing or failed clip must not leave the first thing anybody
         // sees as a broken image icon. Fall back to the first of the
         // rotation, which has shipped for as long as the splash has.
-        onError={() => { if (clip.src !== SPLASH_CLIPS[0].src) setClip(SPLASH_CLIPS[0]); }}
+        onError={() => { const alt = SPLASH_CLIPS.find(c => c.src !== clip.src); if (alt) setClip(alt); }}
         style={{ animation: 'splashFadeUp 0.7s ease-out both' }}
       />
       <div
