@@ -1,0 +1,1 @@
+Pricing tier stickers, round, with a wrinkled paper texture and the tier name in condensed black capitals. Digger on `crate-purple`, Selector on acid, Resident on `crate-violet`. Raster PNGs at about 1000px; show them at 120px or less. They are illustrations of the tiers, not buttons or badges, and are not the milestone badges.

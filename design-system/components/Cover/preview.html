@@ -1,0 +1,48 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: var(--bg); }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--bg); }
+  .art { position: absolute; inset: 0; }
+  .acid { fill: var(--acid); }
+  .ink { fill: var(--ink); }
+  .purple { fill: var(--crate-purple); }
+  .violet { fill: var(--crate-violet); }
+  .hole { fill: var(--acid); }
+  .groove { fill: none; stroke: var(--crate-slate); stroke-width: 1; }
+  .pill-a { rx: 28px; }
+  .text { position: absolute; left: 40px; bottom: 28px; max-width: 440px; }
+  .name { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 104px; line-height: 0.92; letter-spacing: -0.025em; color: var(--fg); }
+  .tag { margin: 12px 0 0; font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg class="art" width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <!--
+      blocks: acid 448x216 slab bleeding top and right (radius 0); crate-purple 200x56 pill (radius-full); crate-violet 232x56 bleeding right; ink record r=92 on the acid.
+      arrangement: one tall acid slab with a strip of two unequal bands beneath, gap space-4 (16px), everything right of x=512.
+      pattern row: literal motif. A record is the subject, and rounds (radius-full, 171 uses) are the house shape: one disc with four grooves in crate-slate and a violet label.
+      steps and radii: space-4 gaps, space-10 left inset, space-7 bottom inset; radius-full on the pill and the disc.
+    -->
+    <rect class="acid" x="512" y="0" width="448" height="216" />
+    <rect class="purple pill-a" x="512" y="232" width="200" height="56" />
+    <rect class="violet" x="728" y="232" width="232" height="56" />
+    <circle class="ink" cx="736" cy="108" r="92" />
+    <circle class="groove" cx="736" cy="108" r="80" />
+    <circle class="groove" cx="736" cy="108" r="68" />
+    <circle class="groove" cx="736" cy="108" r="56" />
+    <circle class="groove" cx="736" cy="108" r="44" />
+    <circle class="violet" cx="736" cy="108" r="28" />
+    <circle class="hole" cx="736" cy="108" r="4" />
+  </svg>
+  <div class="text">
+    <h1 class="name">Found<br>Sound</h1>
+    <p class="tag">Your vinyl, sorted</p>
+  </div>
+</div>
+</body>
+</html>

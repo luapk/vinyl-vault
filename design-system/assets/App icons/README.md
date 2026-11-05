@@ -1,0 +1,1 @@
+Home-screen and browser icons. `icon-512.png` and `apple-touch-icon.png` are the open-lid trunk on acid. `favicon.svg` is a leftover from the Vinyl Vault era: a purple (`#9d8df1`) record on ink that matches nothing else in the brand, included as found and due a replacement.
