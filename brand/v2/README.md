@@ -95,17 +95,36 @@ byte, which is the check to run after touching anything here.
 `source/script-artwork.png` is the artwork the trace comes from and is in the
 repo, unlike v1's, so the separation can actually be re-run and argued with.
 
-## Known issue: the artwork is cropped
+## The left edge is reconstructed, not redrawn
 
-The left edge of the lockup runs off the left edge of the source file. Two
-things are cut: the acid keyline, at two places, and the terminal of the F's
-left swirl, across 45px of stroke. The keyline is walled off and filled so the
-ground is correct, but the mark still ends in a straight vertical cut on that
-side, which reads as a mistake at any size.
+The artwork runs off the left of its own canvas, so the mark used to end in a
+flat vertical cut. The F's left swirl lost a slice and the acid keyline that
+bulges around it was missing outright for 129 rows.
 
-This cannot be fixed from this file. Reconstructing a swirl terminal is
-drawing, not tracing, and it would be an invention sitting inside a logo.
-**An uncropped original closes it**, and nothing else here needs to change.
+`build.py` restores it, and the reason that is legitimate rather than an
+invention is that the geometry there is measurable and says what the missing
+part has to be:
+
+- the swirl's left boundary fits a circle to **0.33px mean residual, 0.88
+  worst**, over the rows either side of the cut;
+- the keyline runs **concentric with it**. Measured radially from the swirl's
+  own centre, its outer edge holds 126.0 and its inner edge 114.7, steady to a
+  fifth of a pixel through the rows approaching each cut.
+
+So the missing piece is two arcs on one centre. The swirl turns out to have
+been clipped by only 2px; the keyline by 26.
+
+Two rules in that code. The swirl gets only the **crescent** beyond the cut,
+never the filled disc, or the spiral's own counter fills in. And the keyline
+band is **not clipped to the padding**: cutting it off at the canvas edge
+leaves a vertical step where the restored arc butts against the surviving
+keyline, and a step in a keyline reads as a kink, so the band runs on into
+what already exists and the join becomes a union of two copies of the same
+arc. `KEY_ROWS` bounds it to the stretch where the keyline really is on that
+circle; past that it drifts off and would draw where it does not belong.
+
+None of this is a substitute for the uncropped original. If that ever turns
+up, delete the uncrop block and re-run.
 
 ## The audition
 

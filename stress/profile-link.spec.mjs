@@ -21,8 +21,11 @@ async function publicPaul() {
   await control('/__test/seed-records', { email: 'paul@test.local', records: [PAUL_RECORD] });
 }
 
-// "New scan" in the DOM, uppercased by CSS.
-const onScanHome = (page) => expect(page.getByText('New scan', { exact: true }).first()).toBeVisible();
+// The home screen's own marker. It used to be the "New scan" eyebrow; that
+// slot carries the tagline now, and this spec kept looking for a label that
+// had moved, so both tests here failed for a while against an app that was
+// working. The hero card's title is the thing that cannot leave this screen.
+const onScanHome = (page) => expect(page.getByText('Scan a record', { exact: true }).first()).toBeVisible();
 const onPaulsProfile = (page) => expect(page.getByText('@paul', { exact: true }).first()).toBeVisible();
 
 test('opening a profile in-app does not survive into the next launch', async ({ page, context }) => {

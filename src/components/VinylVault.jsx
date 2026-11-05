@@ -21,7 +21,7 @@ import WishlistView from "./Wishlist.jsx";
 import { getNotificationCount, getLastSeenTs, markNotifsSeen, getUnreadMessageCount } from '../lib/social.js';
 import { spaceIconFor } from '../lib/avatarIcon.js';
 import { tierAllows } from '../lib/pricing.js';
-import { APP_NAME, STAMP, BLOCK } from '../lib/brand.js';
+import { APP_NAME, SCRIPT, BLOCK } from '../lib/brand.js';
 import { CODE_INPUT_PROPS } from '../lib/codeInput.js';
 import { useFeatureTiers } from '../hooks/useFeatureTiers.js';
 import { useAuthProviders } from '../hooks/useAuthProviders.js';
@@ -6057,9 +6057,13 @@ function SplashScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-2 overflow-hidden" style={{ background: SPLASH_ACID }}>
       <img
-        src={STAMP.black}
+        // Sized on HEIGHT, not on the width the horizontal stamp used. This
+        // lockup is 1.30:1 against the stamp's 2.77:1, so keeping the old
+        // 300px width would have taken 230px of vertical off a 740px screen
+        // and pushed the mascot into the loading pill.
+        src={SCRIPT.black}
         alt={APP_NAME}
-        className="w-[54vw] max-w-[300px]"
+        className="w-[58vw] max-w-[270px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
       <img

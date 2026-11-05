@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { APP_NAME, STAMP } from '../lib/brand.js';
+import { APP_NAME, SCRIPT } from '../lib/brand.js';
 
 // Matches the mode-switch link beneath it rather than inventing a third
 // treatment for the quietest line on the screen.
@@ -100,9 +100,9 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
             down the screen. */}
         <div className="flex justify-center mb-10">
           <img
-            src={isLight ? STAMP.black : STAMP.white}
+            src={isLight ? SCRIPT.black : SCRIPT.white}
             alt={APP_NAME}
-            style={{ width: 260, height: 'auto', opacity: 0.92 }}
+            style={{ width: 200, height: 'auto', opacity: 0.92 }}
           />
         </div>
 

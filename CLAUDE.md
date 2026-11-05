@@ -27,9 +27,11 @@ a 2.5% rag reads as a mistake. Header height is 48px, chosen on cap height
 rather than box height, which puts the words at 14.3px against the horizontal
 mark's 15.8px at 34px: smaller per line, but two lines carry the name.
 
-**Every logo file in `public/` is generated**, by `brand/stamp.py` and
-`brand/stacked.py` from the potrace traces in `brand/traces/`. Do not
-hand-edit one: the next run overwrites it. Both scripts are deterministic and
+**Every logo file in `public/` is generated.** `logo-stamp-*`, `logo-mark-*`
+and `logo-block-*` come from `brand/stamp.py` and `brand/stacked.py`, from the
+potrace traces in `brand/traces/`. `logo-script-*` comes from `brand/v2/`,
+which is a separate toolchain over separate artwork. Do not hand-edit one: the
+next run overwrites it. Both scripts are deterministic and
 reproduce all nine files byte for byte, which is the check to run after
 touching anything in `brand/`. The original artwork the traces came from is
 NOT in the repo, so those two trace files are the source of truth for the
@@ -42,6 +44,22 @@ full lockup; `public/logo-mark-*.svg` is the same stamp without the subline,
 for anywhere too small to read it. The app header is exactly that case: the
 stamp's subline is mush at 34px and only sharpens from 48 on a 2x screen or
 56 on a 1x one, so the header carries the MARK and no subline at all.
+
+**There is a second lockup, and it is size-gated.** `SCRIPT`
+(`public/logo-script-{black,white}.svg`, traced in `brand/v2/`) is a drawn
+script, and it carries the three big screens: the splash, the pricing landing
+and the auth screen. It is ONE colour on purpose. The artwork is a sticker
+(black ground, acid keyline, acid letters, cream bevel) and the single-ink
+version keeps that structure by carrying no ground at all, so whatever is
+behind it shows through between the keyline and the letters. That is what lets
+two files cover all three grounds: black on acid, black on paper, white on ink.
+
+Its floor is about **110px wide** -- below that the bevel is under a pixel, the
+counters close and FOUND and SOUND stop reading as two words. The header gives
+a mark 61x48, so the header keeps `BLOCK` and always will. Size it on HEIGHT,
+not width: it is 1.36:1 where the horizontal `STAMP` is 2.77:1, so carrying the
+old width across doubles the vertical the logo eats. All three call sites were
+re-sized when they were swapped for exactly that reason.
 
 **The tagline lives in the home screen's eyebrow slot instead**, where
 "New scan" used to be. That slot was labelling a screen you had already

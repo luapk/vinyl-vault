@@ -61,3 +61,26 @@ export const BLOCK = {
   white: '/logo-block-white.svg',
   black: '/logo-block-black.svg',
 };
+
+// THE SCRIPT LOCKUP, for anywhere big enough to read it.
+//
+// A drawn script, traced in brand/v2/. It is ONE colour on purpose. The
+// artwork is a sticker -- black ground, acid keyline, acid letters, cream
+// bevel -- and the single-ink version keeps the structure by carrying no
+// ground at all, so whatever is behind it shows through between the keyline
+// and the letters. That is what lets the same two files work on all three
+// grounds: black on acid and on paper, white on ink.
+//
+// IT HAS A SIZE FLOOR, and it is high: about 110px wide. Below that the bevel
+// is under a pixel, the counters close, and FOUND and SOUND stop reading as
+// two words. The app header gives a mark 61x48, so the header keeps BLOCK and
+// always will. This is for the splash, the pricing landing and the auth
+// screen, which give it 200px and up.
+//
+// Note the proportion when sizing: this is 1.36:1 where the horizontal STAMP
+// is 2.77:1, so matching the old WIDTH more than doubles the height the logo
+// takes off the screen. Size it on height.
+export const SCRIPT = {
+  black: '/logo-script-black.svg',
+  white: '/logo-script-white.svg',
+};
