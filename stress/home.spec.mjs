@@ -5,7 +5,7 @@
 // where it matters, and the failure is quiet: a fourth entry point slides
 // under the fold on a small phone and simply stops being found.
 import { test, expect } from '@playwright/test';
-import { resetMock, signIn, stubApi, csvFile, discogsMatch, fileImportInput } from './helpers.mjs';
+import { resetMock, signIn, stubApi, csvFile, discogsMatch, fileImportInput, allowImport } from './helpers.mjs';
 
 test.beforeEach(async () => { await resetMock(); });
 
@@ -46,6 +46,7 @@ test('the scan card says nothing about a collection of none', async ({ page, con
 });
 
 test('the state rule fills in once there are records, and never truncates', async ({ page, context }) => {
+  await allowImport();   // importing a list is a Selector feature
   await stubApi(context);
   let n = 0;
   await context.route('**/api/discogs-search', (route) => {
@@ -88,6 +89,7 @@ test('the state rule fills in once there are records, and never truncates', asyn
 // labels appear, which costs about 90px on its own; that predates the script
 // lockup and is its own problem.
 test('the header fits logo and every tab without the nav scrolling', async ({ page, context }) => {
+  await allowImport();   // importing a list is a Selector feature
   await stubApi(context);
   let n = 0;
   await context.route('**/api/discogs-search', (route) => {

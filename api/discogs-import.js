@@ -1,3 +1,6 @@
+import { requireAuth } from './lib/auth.js';
+import { requireTier } from './lib/tier.js';
+
 const BASE = 'https://api.discogs.com';
 const UA = 'VinylVault/1.0';
 
@@ -59,6 +62,16 @@ function mapRelease(item) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  // Pulling somebody's collection is a paged walk of the Discogs API: a 900
+  // record collection is nine requests against the 60-a-minute budget that
+  // everyone's live scanning shares. That is third-party quota, so the gate
+  // belongs here and not on the button -- this endpoint shipped with no auth
+  // at all, which made the username in the query string the only thing
+  // standing between an anonymous caller and the whole rate limit.
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!(await requireTier('bulkImport', user.id, res))) return;
 
   if (!process.env.DISCOGS_PERSONAL_ACCESS_TOKEN) {
     return res.status(503).json({ error: 'Discogs not configured' });

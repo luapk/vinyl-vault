@@ -32,6 +32,17 @@ export async function signIn(page, { email, password } = JON) {
   if (await skip.isVisible().catch(() => false)) await skip.click();
 }
 
+// Bulk import (a file, a pasted list, a Discogs collection) is a Selector
+// feature: FEATURE_TIER.bulkImport. One file is up to a thousand Discogs
+// lookups against a limit shared with everyone's live scanning, so the free
+// tier does not get it. Any spec that imports has to sign in as an account
+// that can, or it is exercising the paywall rather than the importer -- which
+// is how three wishlist specs sat failing for months against code that was
+// doing exactly what the tier table said.
+export async function allowImport(email = JON.email) {
+  await control('/__test/set-tier', { email, tier: 'selector' });
+}
+
 // The signed-out marker: a SIGNED_OUT event lands on the AuthScreen
 // ("Welcome back"), while a fresh signed-out visit lands on the pricing
 // screen ("Already have an account?"). Either counts as safely signed out.

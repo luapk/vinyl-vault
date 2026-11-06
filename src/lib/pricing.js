@@ -41,6 +41,7 @@ export const TIERS = {
 // purpose: a gate should have to be written down.
 export const FEATURE_TIER = {
   scanUnlimited: TIERS.SELECTOR,
+  bulkImport:    TIERS.SELECTOR,
   wishlist:      TIERS.SELECTOR,
   smartCrates:   TIERS.SELECTOR,
   bpmSorter:     TIERS.RESIDENT,
@@ -53,6 +54,7 @@ export const FEATURE_TIER = {
 // person moving it remembers.
 export const FEATURE_META = {
   scanUnlimited: { label: 'Unlimited scans',   enforced: 'server', where: 'api/scan.js',         note: 'Free tier is capped at ' + FREE_SCANS + ' scans a month.' },
+  bulkImport:    { label: 'Bulk import',       enforced: 'server', where: 'api/discogs-import.js + api/import-worker.js', note: 'A file is up to 1000 Discogs lookups, against a limit shared with live scanning.' },
   wishlist:      { label: 'Wishlist tab',      enforced: 'client', where: 'nav gate',            note: 'A view over data the user already owns.' },
   smartCrates:   { label: 'Smart crates',      enforced: 'server', where: 'api/smart-crates.js', note: 'Sends up to 2MB to Claude and asks 8192 tokens back.' },
   bpmSorter:     { label: 'BPM sorter',        enforced: 'client', where: 'Tracks tab gate',     note: 'A view over data the user already owns.' },

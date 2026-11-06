@@ -1,7 +1,7 @@
 // Sync resilience: the no-data-loss invariant under database faults, and
 // cross-device convergence.
 import { test, expect } from '@playwright/test';
-import { resetMock, mockState, signIn, stubApi, csvFile, discogsMatch, fileImportInput } from './helpers.mjs';
+import { resetMock, mockState, signIn, stubApi, csvFile, discogsMatch, fileImportInput, allowImport } from './helpers.mjs';
 
 test.beforeEach(async () => { await resetMock(); });
 
@@ -16,6 +16,7 @@ async function stubDiscogsPerRow(context) {
 }
 
 test('records added while the database is down survive a reload and sync on recovery', async ({ page, context }) => {
+  await allowImport();   // importing a list is a Selector feature
   await stubApi(context);
   await stubDiscogsPerRow(context);
   await signIn(page);
@@ -53,6 +54,7 @@ test('records added while the database is down survive a reload and sync on reco
 });
 
 test('two devices on one account converge', async ({ browser, context, page }) => {
+  await allowImport();   // importing a list is a Selector feature
   await stubApi(context);
   await stubDiscogsPerRow(context);
 

@@ -154,8 +154,9 @@ the no-data-loss sync invariant under database faults, and the PWA + tab
 concurrent-refresh race that guards the auth lock, account isolation on a
 shared device, the smart-crate runs (which may only ever ADD crate names), the
 file import under Discogs rate limiting (a 429 must never be saved as an
-unmatched record), and the rule that a community profile can never become
-somebody's home page, the About route and its walkthrough carousel, the wishlist and Trace rules (a pinned record
+unmatched record) and the tier gate on it (a free account is offered the
+upgrade and spends no Discogs quota, a Selector account still imports), and
+the rule that a community profile can never become somebody's home page, the About route and its walkthrough carousel, the wishlist and Trace rules (a pinned record
 survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), the home screen's four ways in (all above the fold at
@@ -199,6 +200,7 @@ to be written down.
 | Feature | Tier | Enforced |
 | --- | --- | --- |
 | Unlimited scans | Selector | `api/scan.js`, server |
+| Bulk import (Discogs, CSV, pasted list) | Selector | `api/discogs-import.js` + `api/import-worker.js`, server |
 | Wishlist tab | Selector | client only |
 | Smart crates | Selector | `api/smart-crates.js`, server |
 | BPM sorter (Tracks) | Resident | client only |
@@ -211,15 +213,40 @@ to be written down.
   views over data the user already owns, so there is nothing to abuse.
 - **`requireTier` fails CLOSED.** A profile it cannot read answers 503, not
   access. Failing open would make an unreachable database the cheapest way to
-  use a paid feature.
+  use a paid feature. `userTier` / `userAllows` are the same check without an
+  HTTP response to write to, for the import worker, which runs on a cron and
+  has to judge the OWNER of a queued job with nobody to send a 402 to.
+- **The import gate is on the queue, not on the button.** A file import is up
+  to `IMPORT_ROW_CAP` Discogs lookups against the 60-a-minute budget shared
+  with everyone's live scanning, so it is server-gated like anything else that
+  spends quota. The interesting part is WHERE: a job row is inserted by the
+  client straight into `import_jobs` under RLS, so gating only
+  `/api/import-worker`'s on-demand kick would leave the queue open -- insert
+  the row, skip the endpoint, and the cron spends the quota for you two
+  minutes later. `import-worker` therefore checks the job's owner at claim
+  time and marks a job it will not run `failed` with
+  `error = 'bulkImport_requires_upgrade'`, which the client reads as an upsell
+  rather than as a run that stopped. An owner whose profile cannot be read
+  releases the lock and waits for the next tick: failing closed here means
+  leaving the job queued, never destroying somebody's import.
+- **The in-browser import loop is the one path that is client-gated only.** It
+  is the fallback for a database where `supabase/import-jobs.sql` has not been
+  run, and it spends quota through `/api/discogs-search`, which is unauthed and
+  shared with free manual search -- so it cannot be gated there without
+  breaking a free feature. It opens no hole that `discogs-search` does not
+  already have (see the security rules), and it is reachable only by a client
+  that has defeated its own gate.
 - **A lapsed subscriber is a free user, not an exempt one.** `tierAllows` takes
   `isActive` for that reason. The scan limit was once skipped unless the
   subscription was active, so cancelling granted unlimited scans: the one status
   that should have restricted a person was the one that let them through.
-- **Do not put a claim on the pricing card that nothing checks.** Label
-  printing, CSV export and multi-device sync were all sold on Selector and none
-  was ever enforced, which made two thirds of that tier things the free tier
-  already had. `FREE_LABELS` is still exported and still unenforced; it is
+- **Do not put a claim on the pricing card that nothing checks**, and do not
+  leave a gated feature advertised on the free card either. Label printing, CSV
+  export and multi-device sync were all sold on Selector and none was ever
+  enforced, which made two thirds of that tier things the free tier already
+  had. "Discogs, CSV and text import" ran the same fault the other way round:
+  it sat on the Digger card after the gate went in, which is a free tier
+  promising something it no longer gets. `FREE_LABELS` is still exported and still unenforced; it is
   annotated as such and no copy claims it.
 - Camelot key notation was removed from the product entirely. Track `key` may
   still arrive in scan data, but nothing displays it.
@@ -508,7 +535,7 @@ two-step key and the trap in it.
 - **All API keys (Anthropic, Discogs, Spotify) live in Vercel environment variables and are accessed only from `/api/*.js` handlers. Never expose them to the client.**
 - **A `SECURITY DEFINER` function is public unless you revoke it.** Postgres grants EXECUTE to everyone by default, and Supabase exposes every function in `public` at `/rest/v1/rpc/<name>`, so a definer function is reachable with the anon key that ships in the browser bundle. `upsert_subscription` was live like that: read your own `stripe_customer_id` (checkout writes it to your profile), POST it back with `p_tier: 'resident'`, and you hold the top tier for nothing. Every definer function called only by `/api/*` (which uses the service role, and so bypasses grants) must end with a `REVOKE EXECUTE ... FROM public, anon, authenticated` -- see the end of `payments-schema.sql`. `get_advisors` (Supabase MCP, type `security`) lists any that are still open.
 - **RLS is row-level, not column-level.** `profiles_select` lets anyone read a profile whose `is_public` is true, and that means the whole row. The app's own queries ask for a safe handful of columns; nothing stops a client with the anon key asking PostgREST for the rest, and four public profiles were handing out their email address that way. Fixed in `supabase/profile-privacy.sql` with column privileges, which apply per role rather than per row. **A column-level `revoke` cannot subtract from a table-wide `grant`**: `anon` and `authenticated` held plain SELECT on the whole table, so `revoke select (email, ...)` reported success and changed nothing, and `has_column_privilege` still said true. The working form revokes SELECT on the table and grants back the safe columns by name, which also means a column added later is private until somebody lists it. Check it with `has_column_privilege`, never with a successful-looking revoke. **The policy itself must keep `is_public = true`**: the community screens read profiles through PostgREST embeds (comment authors, reactors, follower lists) that resolve against this table under this policy, so removing it blanks every name in the community view. Nothing in the browser needs those three columns -- the signed-in user's address is on the auth session as `user.email`, and the Stripe ids are read only by `/api/*` with the service role. The admin panel is the exception and goes through `admin_list_users()`, a definer function that checks `is_admin()` before answering -- **falling back to the table read when that function is not there**, because the client deploys from `main` the moment it is pushed while the SQL is run by hand, and a screen must not break in the window between the two. It did once: the panel reported a missing function on a database that was answering perfectly well. Anything else added to `profiles` that a stranger should not see needs the same revoke.
-- **Any endpoint that spends money or third-party quota must call `requireAuth`** (see `api/lib/auth.js`), and the client must send `Authorization: Bearer <token>` using `freshAccessToken()`. Endpoints that legitimately cannot: `stripe-webhook` (verified by Stripe signature), `unsubscribe` (clicked from email, HMAC-signed), and `image-proxy` / `audio-proxy` (loaded by `<img>` / `<audio>`, which cannot send headers). `import-worker` accepts the `CRON_SECRET` bearer (or the `x-vercel-cron` stamp) for the scheduled run and `requireAuth` for the on-demand kick, and is never open. Still unprotected and worth closing: `discogs-search`, `discogs-release`, `discogs-import`, `spotify-features` -- these burn the shared Discogs/Spotify rate limit rather than money, so abuse degrades scanning for everyone.
+- **Any endpoint that spends money or third-party quota must call `requireAuth`** (see `api/lib/auth.js`), and the client must send `Authorization: Bearer <token>` using `freshAccessToken()`. Endpoints that legitimately cannot: `stripe-webhook` (verified by Stripe signature), `unsubscribe` (clicked from email, HMAC-signed), and `image-proxy` / `audio-proxy` (loaded by `<img>` / `<audio>`, which cannot send headers). `import-worker` accepts the `CRON_SECRET` bearer (or the `x-vercel-cron` stamp) for the scheduled run and `requireAuth` for the on-demand kick, and is never open. `discogs-import` now calls both (it walks somebody's whole collection a page at a time). Still unprotected and worth closing: `discogs-search`, `discogs-release`, `spotify-features` -- these burn the shared Discogs/Spotify rate limit rather than money, so abuse degrades scanning for everyone. `discogs-search` is the awkward one: it is shared by free manual search and by the in-browser import fallback, so it cannot simply be gated on the import tier without taking a free feature away with it.
 - No em dashes anywhere -- in code comments, docs, copy, or UI strings.
 
 ## Environment variables

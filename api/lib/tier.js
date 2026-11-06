@@ -55,10 +55,13 @@ export async function refreshFeatureOverrides() {
 }
 
 /**
- * Answers 402 and returns null when the caller's tier does not reach `feature`.
- * Returns { tier, isActive } when it does.
+ * What tier a user is on right now, or null if the profile could not be read.
+ *
+ * Split out of requireTier because not every gate is answering an HTTP request
+ * on that user's behalf: the import worker runs on a cron and has to judge the
+ * OWNER of a queued job, with nobody to send a 402 to.
  */
-export async function requireTier(feature, userId, res) {
+export async function userTier(userId) {
   await refreshFeatureOverrides();
 
   const { data: profile, error } = await admin()
@@ -67,19 +70,38 @@ export async function requireTier(feature, userId, res) {
     .eq('id', userId)
     .single();
 
+  if (error || !profile) return null;
+
+  return {
+    tier: profile.subscription_tier || 'digger',
+    isActive: !profile.subscription_status || ACTIVE.has(profile.subscription_status),
+  };
+}
+
+/** Does this user reach the feature? null when the profile could not be read. */
+export async function userAllows(feature, userId) {
+  const who = await userTier(userId);
+  if (!who) return null;
+  return tierAllows(feature, who.tier, who.isActive);
+}
+
+/**
+ * Answers 402 and returns null when the caller's tier does not reach `feature`.
+ * Returns { tier, isActive } when it does.
+ */
+export async function requireTier(feature, userId, res) {
+  const who = await userTier(userId);
+
   // A profile we cannot read is not permission to proceed. Failing open here
   // would make an unreachable database the cheapest way to use a paid feature.
-  if (error || !profile) {
+  if (!who) {
     res.status(503).json({ error: 'Could not check your subscription. Try again in a moment.' });
     return null;
   }
 
-  const tier = profile.subscription_tier || 'digger';
-  const isActive = !profile.subscription_status || ACTIVE.has(profile.subscription_status);
-
-  if (!tierAllows(feature, tier, isActive)) {
-    res.status(402).json({ error: `${feature}_requires_upgrade`, feature, tier });
+  if (!tierAllows(feature, who.tier, who.isActive)) {
+    res.status(402).json({ error: `${feature}_requires_upgrade`, feature, tier: who.tier });
     return null;
   }
-  return { tier, isActive };
+  return who;
 }

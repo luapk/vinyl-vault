@@ -28,7 +28,6 @@ const TIERS = [
     features: [
       `${FREE_SCANS} AI photo scans a month`,
       'Barcode and sleeve scanning',
-      'Discogs, CSV and text import',
       'BPM label printing',
       'Community, profiles and messages',
     ],
@@ -45,6 +44,7 @@ const TIERS = [
     founding:  `or £${PRICE_FOUNDING} lifetime -- first ${FOUNDING_SEATS}`,
     features: [
       'Unlimited AI scans',
+      'Import from Discogs, CSV or a pasted list',
       'Wishlist: keep what you are hunting in one place',
       'Smart crates: sorted by sound, era and scene',
       'All Digger features',

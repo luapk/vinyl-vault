@@ -1581,7 +1581,7 @@ export default function VinylVault() {
         )}
         {appView === "scan" && (
           <>
-            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} onRemoveRecord={removeRecord} userId={userId} onReload={reloadFromCloud} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} />}
+            {phase === "idle" && <IdleView showCamera={cameraOpen} setShowCamera={setCameraOpen} onUpload={processImage} onBarcode={processBarcode} onBatch={startBatch} onAddRecordsBulk={addRecordsBulk} onUpdateRecord={updateRecord} onRemoveRecord={removeRecord} userId={userId} onReload={reloadFromCloud} accentRGB={accentRGB} greeting={greeting} collection={collection} onManual={() => setPhase("manual")} canImport={can('bulkImport')} onUpsell={() => setShowPricingModal(true)} />}
             {phase === "processing" && <ProcessingView imageUrl={imageUrl} status={status} accentRGB={accentRGB} onCancel={cancelScan} />}
             {phase === "manual" && (
               <ManualSearchView
@@ -1715,6 +1715,7 @@ export default function VinylVault() {
           isAdmin={isAdmin}
           onOpenAdmin={() => { setShowAccount(false); setAppView('admin'); }}
           onUpgrade={() => { setShowAccount(false); setShowPricingModal(true); }}
+          canImport={can('bulkImport')}
           tier={tier}
           isPaid={isPaid}
           onManageSubscription={openPortal}
@@ -1981,7 +1982,7 @@ function AddCard({ isLight, accentRGB, glow = false, variant = 'compact', tone =
   );
 }
 
-function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, onRemoveRecord, userId, onReload, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera }) {
+function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateRecord, onRemoveRecord, userId, onReload, accentRGB, greeting, collection = [], onManual, showCamera, setShowCamera, canImport = true, onUpsell }) {
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   // What the scan card's bottom rule says. Recomputed only when the
   // collection changes: the label is a calendar day, so it cannot go stale
@@ -1995,7 +1996,7 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
     stopImport, fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
-  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload });
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload, canImport, onUpsell });
   const [recs, setRecs] = useState([]);
   const [recsSource, setRecsSource] = useState([]);
 
@@ -2137,9 +2138,14 @@ function IdleView({ onUpload, onBarcode, onBatch, onAddRecordsBulk, onUpdateReco
             put where records actually get added from. The input is a sibling,
             not a child, since a button may not contain another control. */}
         <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
+        {/* Gated on Selector. The tile stays on the screen rather than
+            disappearing: one of the four ways in going missing is a worse
+            answer than one of them naming its tier, and the hint is already
+            the slot that says what a route costs you. */}
         <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" index={2} type="button"
-          icon={Export} title="A file" hint="CSV &middot; TXT"
-          onClick={() => importFileRef.current?.click()} aria-label="Import a CSV or text file" />
+          icon={Export} title="A file" hint={canImport ? "CSV &middot; TXT" : "SELECTOR"}
+          onClick={() => { if (!canImport) { onUpsell?.(); return; } importFileRef.current?.click(); }}
+          aria-label={canImport ? "Import a CSV or text file" : "Importing a file needs Selector"} />
 
         {onManual && (
           <AddCard isLight={isLight} accentRGB={accentRGB} tone="ghost" index={3} type="button"
@@ -4307,7 +4313,26 @@ function PriceGraph({ price, accentRGB, mediaCondition, onRefresh, refreshing })
 
 // ----- AccountModal -----------------------------------------------------------
 
-function AccountSection({ label, open, onToggle, children }) {
+// A section the current tier cannot reach. It still opens, and still says what
+// it is for: a row that silently does nothing, or one that vanishes, both read
+// as a bug rather than as a price.
+function SectionLocked({ note, onUnlock }) {
+  return (
+    <div style={{ padding: '2px 0 4px' }}>
+      <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', lineHeight: 1.6, marginBottom: 12 }}>
+        {note}
+      </p>
+      <button onClick={onUnlock}
+        style={{ padding: '9px 16px', borderRadius: 999, fontSize: 13, fontFamily: 'monospace', letterSpacing: '0.1em',
+                 textTransform: 'uppercase', background: ACID, color: '#08080c',
+                 border: 'none', cursor: 'pointer' }}>
+        See plans
+      </button>
+    </div>
+  );
+}
+
+function AccountSection({ label, open, onToggle, locked = false, lockNote, onUnlock, children }) {
   return (
     <div style={{ borderBottom: '1px solid rgba(var(--fg),0.07)' }}>
       <button
@@ -4316,10 +4341,13 @@ function AccountSection({ label, open, onToggle, children }) {
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '14px 0' }}>
         {/* Menu rows carry real weight: at 0.4 the labels washed out to near
             invisible against the light theme's warm paper background. */}
-        <span style={{ fontSize: 13, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.95)' : 'rgba(var(--fg),0.8)' }}>{label}</span>
+        <span style={{ fontSize: 13, fontFamily: 'monospace', color: open ? 'rgba(var(--fg),0.95)' : 'rgba(var(--fg),0.8)', display: 'flex', alignItems: 'center', gap: 7 }}>
+          {label}
+          {locked && <LockSimple size={10} weight="fill" style={{ color: 'rgba(var(--fg),0.4)' }} />}
+        </span>
         <CaretRight size={12} style={{ color: 'rgba(var(--fg),0.45)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
-      {open && <div className="pb-4">{children}</div>}
+      {open && <div className="pb-4">{locked ? <SectionLocked note={lockNote} onUnlock={onUnlock} /> : children}</div>}
     </div>
   );
 }
@@ -4341,7 +4369,7 @@ function AccountLink({ label, onClick }) {
   );
 }
 
-function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, onRemoveRecord, onReload, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, onManageSubscription }) {
+function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, onRemoveRecord, onReload, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, canImport = true, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -4391,6 +4419,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
   async function startImport() {
     const uname = discogsUser.trim();
     if (!uname || importing) return;
+    if (!canImport) { onUpgrade?.(); return; }
     cancelImport.current = false;
     setImporting(true);
     setImportError('');
@@ -4400,8 +4429,16 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     try {
       for (let page = 1; ; page++) {
         if (cancelImport.current) break;
-        const res = await fetch(`/api/discogs-import?username=${encodeURIComponent(uname)}&page=${page}`);
+        // The endpoint needs a bearer now: it walks the Discogs API on the
+        // caller's behalf, so it checks who is asking and what they are on.
+        const token = await freshAccessToken();
+        const res = await fetch(`/api/discogs-import?username=${encodeURIComponent(uname)}&page=${page}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} });
         const data = await res.json();
+        // The server disagreeing with the client gate is not an error to show
+        // as text: it is the upsell, and the one case where the two can differ
+        // is an admin moving the gate while somebody has the panel open.
+        if (res.status === 402) { setImporting(false); onUpgrade?.(); return; }
         if (!res.ok) throw new Error(data.error || 'Import failed');
         if (page === 1) setImportProgress({ done: 0, total: data.total });
         const { added, skipped } = await onAddRecordsBulk(data.records);
@@ -4428,7 +4465,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     fileConfirm, confirmImport,
     unmatchedCount, retryUnmatched,
     duplicateCount, confirmDedupe, removeDuplicateDrafts,
-  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId: user?.id, onReload });
+  } = useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId: user?.id, onReload, canImport, onUpsell: onUpgrade });
 
   function toggleSection(name) {
     setOpenSection(prev => prev === name ? null : name);
@@ -4722,7 +4759,9 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             </div>
           </AccountSection>
 
-          <AccountSection label="Import from Discogs" open={openSection === 'discogs-import'} onToggle={() => toggleSection('discogs-import')}>
+          <AccountSection label="Import from Discogs" open={openSection === 'discogs-import'} onToggle={() => toggleSection('discogs-import')}
+            locked={!canImport} onUnlock={onUpgrade}
+            lockNote={`Pulling a Discogs collection into ${APP_NAME} is a Selector feature. It walks the Discogs API a page at a time, against a rate limit shared with everyone's scanning.`}>
             {!importing && !importResult && (
               <>
                 <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
@@ -4800,7 +4839,9 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
             )}
           </AccountSection>
 
-          <AccountSection label="Import a list" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}>
+          <AccountSection label="Import a list" open={openSection === 'file-import'} onToggle={() => toggleSection('file-import')}
+            locked={!canImport} onUnlock={onUpgrade}
+            lockNote="Importing a file or a pasted list is a Selector feature. Every row is looked up on Discogs, so a single list can be a thousand requests.">
             <input ref={importFileRef} type="file" accept=".csv,.txt,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden" onChange={handleImportFile} />
             {fileConfirm && !fileImporting && (
               <ImportShapeWarning

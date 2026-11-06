@@ -7,9 +7,9 @@
 // importer read as "no such record" and filed accordingly. A rate limit must
 // never decide what a record is.
 import { test, expect } from '@playwright/test';
-import { resetMock, mockState, signIn, stubApi, csvFile, trackListFile, discogsMatch, fileImportInput, openPasteImport } from './helpers.mjs';
+import { resetMock, mockState, signIn, stubApi, csvFile, trackListFile, discogsMatch, fileImportInput, openPasteImport, allowImport } from './helpers.mjs';
 
-test.beforeEach(async () => { await resetMock(); });
+test.beforeEach(async () => { await resetMock(); await allowImport(); });
 
 // Route registration order matters: the last matching route wins, so this has
 // to be registered after stubApi's generic handler.
@@ -237,4 +237,42 @@ test('back to results returns to the pressings already fetched, for free', async
   await expect(page.getByText('Stress Album 2').first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Stress Album 3').first()).toBeVisible();
   expect(searches).toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// The gate
+// ---------------------------------------------------------------------------
+// Importing is Selector (FEATURE_TIER.bulkImport): a file is up to a thousand
+// Discogs lookups against a limit shared with everyone's live scanning, so it
+// is not free. Asserted here rather than trusted, because a client-only gate
+// that nobody exercises is how the wishlist specs ran for months as an account
+// that could not open the tab they were testing.
+
+test('a free account is offered the upgrade instead of the importer', async ({ page, context }) => {
+  await resetMock();                       // undo the beforeEach's Selector
+  await stubApi(context);
+  // Nothing may reach Discogs on this account's behalf. A request here is the
+  // failure: the whole point of the gate is that the quota is never spent.
+  let searched = 0;
+  await context.route('**/api/discogs-search', (route) => { searched += 1; route.abort(); });
+  await signIn(page);
+
+  // The tile stays on the home screen -- one of the four ways in going missing
+  // reads as a bug -- but it names its tier and opens the plans.
+  const tile = page.getByRole('button', { name: /Importing a file needs Selector/i });
+  await expect(tile).toBeVisible();
+  await tile.click();
+  // `.vv-pricing-wrap` is the sheet itself. Matching on the word "Selector"
+  // instead finds a tier panel the carousel is holding off-screen.
+  await expect(page.locator('.vv-pricing-wrap')).toBeVisible({ timeout: 10_000 });
+  expect(searched).toBe(0);
+});
+
+test('a Selector account still gets the importer', async ({ page, context }) => {
+  await allowImport();
+  await stubApi(context, { discogsMatches: [discogsMatch(1)] });
+  await signIn(page);
+
+  await fileImportInput(page).setInputFiles(csvFile([{ artist: 'Aphex Twin', title: 'Selected Ambient Works' }]));
+  await expect(page.getByText(/Imported|added/i).first()).toBeVisible({ timeout: 25_000 });
 });

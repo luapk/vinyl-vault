@@ -294,7 +294,7 @@ function resultFromJob(job) {
 // UI it likes around these values. collection + onUpdateRecord enable the
 // retry pass over rows an earlier import could not match; userId + onReload
 // enable the server-side queue (onReload pulls in what the worker wrote).
-export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload } = {}) {
+export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, onRemoveRecord, userId, onReload, canImport = true, onUpsell } = {}) {
   // File import (CSV / text) state
   const [fileImporting, setFileImporting] = useState(false);
   const [fileProgress, setFileProgress] = useState({ done: 0, total: 0, matched: 0 });
@@ -395,6 +395,14 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
       })));
       setFileProgress({ done: job.cursor || 0, total: job.total || rows.length, matched: job.matched || 0 });
       if (UNFINISHED.includes(job.status)) { setTimeout(tick, JOB_POLL_MS); return; }
+      // A job the worker refused on tier grounds is not a failed import, it is
+      // an upsell. Say so rather than reporting it as a run that stopped.
+      if (job.status === 'failed' && job.error === 'bulkImport_requires_upgrade') {
+        setFileImporting(false);
+        jobIdRef.current = null;
+        onUpsell?.();
+        return;
+      }
       // Done: the records were written by the worker, so pull them in.
       setFileResult(resultFromJob(job));
       setFileImporting(false);
@@ -403,7 +411,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     };
     tick();
     return () => { stop = true; };
-  }, [onReload]);
+  }, [onReload, onUpsell]);
 
   // Rejoin an import left running by an earlier session. This is the whole
   // point of the queue: the phone locked, the tab closed, the import carried
@@ -486,7 +494,22 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
     setFileImporting(false);
   }
 
+  // Importing a list is gated on Selector. The gate lives here rather than on
+  // each button because a file and a pasted list are the same run by the time
+  // they reach startImport, and a third route (retry) spends the same quota --
+  // three buttons to keep in step is how one of them ends up ungated.
+  //
+  // The server gates it too (api/import-worker.js judges the job's owner, and
+  // api/discogs-import.js checks before it walks the collection). This half
+  // exists so the user is told, not to stop anybody.
+  function gateImport() {
+    if (canImport) return true;
+    onUpsell?.();
+    return false;
+  }
+
   async function startImport(rows, overflow) {
+    if (!canImport) return;   // silent backstop: gateImport already spoke
     cancelFileImport.current = false;
     setFileConfirm(null);
     setFileImporting(true);
@@ -507,6 +530,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
   // shape check and the run are shared.
   async function importText(text, { badSource = 'Could not read that.' } = {}) {
     if (fileImporting) return;
+    if (!gateImport()) return;
     let rows, overflow = 0;
     try {
       // Parse everything, then apply the cap here so the count left behind is
@@ -580,6 +604,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
   // in the record that is already there.
   async function retryUnmatched() {
     if (fileImporting) return;
+    if (!gateImport()) return;
     const drafts = unmatchedImports(collectionRef.current);
     if (!drafts.length) return;
 

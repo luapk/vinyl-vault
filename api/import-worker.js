@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { searchDiscogs } from './lib/discogs.js';
 import { requireAuth } from './lib/auth.js';
+import { requireTier, userAllows } from './lib/tier.js';
 import { recordFromMatch, draftFromRow, patchFromMatch } from './lib/importRecord.js';
 import { rowCanIdentify } from '../src/lib/importParse.js';
 
@@ -64,7 +65,10 @@ async function authorize(req, res) {
   if (secret && bearer === secret) return { cron: true, via: 'cron-secret' };
   if (req.headers['x-vercel-cron']) return { cron: true, via: 'cron-header' };
   const user = await requireAuth(req, res);
-  if (user) return { cron: false, via: 'user', user };
+  if (user) {
+    if (!(await requireTier('bulkImport', user.id, res))) return null;
+    return { cron: false, via: 'user', user };
+  }
 
   // A cron tick that cannot authenticate is the failure that hides itself: the
   // schedule fires, the function answers 401, nothing is written, and the only
@@ -250,6 +254,31 @@ export default async function handler(req, res) {
       }
       // A claim that found nothing comes back as null, or as an all-null row.
       if (!job || !job.id) break;
+
+      // Gating only the kick would leave the queue itself open: a job row is
+      // inserted by the client straight into import_jobs under RLS, so anyone
+      // who can write their own row could skip the endpoint entirely and let
+      // the cron spend the quota for them a couple of minutes later. The
+      // owner is judged here, where the spending actually happens.
+      const allowed = await userAllows('bulkImport', job.user_id);
+      if (allowed === null) {
+        // Profile unreadable. Do not fail the job over a database wobble:
+        // release it and let the next tick judge it again. Failing CLOSED here
+        // means leaving it queued, not destroying somebody's import.
+        await db.from('import_jobs').update({ locked_until: null }).eq('id', job.id);
+        console.warn(`[import-worker] job=${job.id} owner tier unreadable, released`);
+        break;
+      }
+      if (!allowed) {
+        await db.from('import_jobs').update({
+          status: 'failed', locked_until: null,
+          error: 'bulkImport_requires_upgrade',
+        }).eq('id', job.id);
+        console.log(`[import-worker] job=${job.id} blocked: owner cannot bulkImport`);
+        handled.push({ id: job.id, outcome: 'blocked' });
+        continue;
+      }
+
       const before = job.cursor || 0;
       const outcome = await processJob(db, job, deadline);
       handled.push({ id: job.id, outcome });

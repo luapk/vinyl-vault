@@ -18,6 +18,10 @@ describe('tierAllows', () => {
     expect(tierAllows('wishlist', TIERS.SELECTOR)).toBe(true);
     expect(tierAllows('smartCrates', TIERS.SELECTOR)).toBe(true);
     expect(tierAllows('scanUnlimited', TIERS.SELECTOR)).toBe(true);
+    // Bulk import spends Discogs quota by the thousand, so it is not free.
+    expect(tierAllows('bulkImport', TIERS.SELECTOR)).toBe(true);
+    expect(tierAllows('bulkImport', TIERS.RESIDENT)).toBe(true);
+    expect(tierAllows('bulkImport', TIERS.DIGGER)).toBe(false);
     // The BPM sorter and Trace are what Resident is for.
     expect(tierAllows('bpmSorter', TIERS.SELECTOR)).toBe(false);
     expect(tierAllows('trace', TIERS.SELECTOR)).toBe(false);
@@ -31,6 +35,7 @@ describe('tierAllows', () => {
     // a person was the one that let them through.
     expect(tierAllows('trace', TIERS.RESIDENT, false)).toBe(false);
     expect(tierAllows('wishlist', TIERS.SELECTOR, false)).toBe(false);
+    expect(tierAllows('bulkImport', TIERS.SELECTOR, false)).toBe(false);
   });
 
   it('leaves anything not in the map free to everyone', () => {
