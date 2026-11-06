@@ -96,3 +96,44 @@ test('a clip that fails to load never leaves a broken image', async ({ page }) =
   expect(first.img.w).toBeGreaterThan(0); // and something else decoded
   expect(name(first.img.src)).not.toBe(HERO);
 });
+
+// The tagline under the lockup. Two things about it are easy to break and
+// invisible in review: a tracked, centred line sits off-centre unless the
+// trailing letter-space is compensated, and black on acid is darker than it
+// looks -- 0.55 alpha is 4.28:1, under AA for text this size.
+test('the tagline is centred under the lockup and passes AA on acid', async ({ page }) => {
+  await prime(page);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1400);
+
+  const m = await page.evaluate(() => {
+    const el = [...document.querySelectorAll('div')]
+      .find(d => d.children.length === 0 && /your vinyl, sorted/i.test(d.textContent || ''));
+    if (!el) return null;
+    // A Range measures the GLYPH RUN, where the element box also counts the
+    // letter-space that follows the last character.
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const ink = r.getBoundingClientRect();
+    const logo = document.querySelector('img[src*="logo-script"]').getBoundingClientRect();
+    const lum = (rgb) => {
+      const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
+    };
+    const parse = (c) => c.match(/[\d.]+/g).map(Number);
+    const [cr, cg, cb, ca = 1] = parse(getComputedStyle(el).color);
+    const bg = [202, 254, 4];
+    const comp = [cr, cg, cb].map((v, i) => v * ca + bg[i] * (1 - ca));
+    const [hi, lo] = [lum(bg), lum(comp)].sort((a, b) => b - a);
+    return {
+      offsetFromLogoCentre: (ink.left + ink.width / 2) - (logo.left + logo.width / 2),
+      contrast: (hi + 0.05) / (lo + 0.05),
+      narrowerThanLogo: ink.width < logo.width,
+    };
+  });
+
+  expect(m, 'the tagline is on the splash').not.toBeNull();
+  expect(Math.abs(m.offsetFromLogoCentre)).toBeLessThan(2);   // optically centred
+  expect(m.contrast).toBeGreaterThanOrEqual(4.5);             // WCAG AA, normal text
+  expect(m.narrowerThanLogo).toBe(true);                      // sits under the mark
+});

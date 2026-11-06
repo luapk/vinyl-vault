@@ -6064,6 +6064,28 @@ function SplashScreen() {
         className="w-[58vw] max-w-[270px]"
         style={{ animation: 'splashFadeUp 1.1s ease-out 0.35s both' }}
       />
+      {/* The tagline, in the app's own mono eyebrow voice rather than the
+          lockup's Hanken setting -- it is a line under the logo, not part of
+          it, and borrowing the lockup's typography outside the lockup is how
+          a wordmark stops being one. Same reasoning as the home eyebrow.
+
+          textIndent is not decoration: letter-spacing adds its space AFTER
+          the last glyph too, so the box is one full step wider than the ink
+          and centring the box leaves the ink HALF a step left of true centre.
+          The indent is therefore half the tracking, not all of it. Measured
+          in the browser: a full step lands 1.9px to the right. */}
+      <div
+        className="font-mono uppercase text-[11px] sm:text-[12px] tracking-[0.34em] text-center"
+        style={{
+          // 0.62, not the 0.55 this started at: black on acid at 0.55 is
+          // 4.28:1, under the 4.5 AA needs for text this size. 0.62 is 5.49.
+          color: 'rgba(8,8,12,0.62)',
+          textIndent: '0.17em',
+          animation: 'splashFadeUp 0.9s ease-out 0.55s both',
+        }}
+      >
+        Your vinyl, sorted
+      </div>
       <img
         src={clip.src}
         alt=""

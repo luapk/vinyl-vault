@@ -97,8 +97,18 @@ it worked (8px at 0.34em tracking, which is what puts it flush with the
 lozenge's 132.5px measure; the artwork's 0.42em is a cap, not a target, and
 overshoots by 10px at that size). It is in the git history if it is ever
 wanted back. Note the trap if so: letter-spacing leaves a trailing space
-after the last letter, so an equal `text-indent` is needed to re-centre the
-glyphs.
+after the last letter, so a centred line needs a `text-indent` of **half**
+the tracking to put the glyphs back on centre. This used to say an equal
+indent; that over-corrects by the other half, measured at 1.9px to the right
+on the splash before it was halved.
+
+**The splash carries the tagline under the lockup**, in the eyebrow's mono
+voice rather than the logo's Hanken setting, for the same reason the home
+eyebrow does: it is a line under the mark, not part of it. Two things there
+are invisible in review and asserted by `stress/splash.spec.mjs` instead: the
+half-tracking indent above, and the colour. Black on acid is darker than it
+looks going the other way -- `rgba(8,8,12,0.55)` is only 4.28:1, under AA for
+text this size, so it is 0.62 (5.49:1).
 
 `STAMP` and `STAMP_MARK` in `src/lib/brand.js` hold the paths, and an `<img>`
 cannot inherit `currentColor`, so the call site picks a colour rather than
