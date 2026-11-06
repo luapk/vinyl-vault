@@ -469,9 +469,32 @@ as a broken image icon. `stress/splash.spec.mjs` covers four cases, and the
 first is the one that was broken: an existing install, mid-rotation, that has
 never seen this hero.
 
+**The card is a keyline, not a fill.** It used to be a solid acid slab, which
+on a dark page read as a highlighter block rather than a panel and stood 523px
+tall. It is now drawn the way every other panel in the app is: the page's own
+ground, a 1px accent keyline, and the acid kept for the DISC the mascot stands
+on, which breaks the top edge.
+
+Two things that are not decoration. The disc carries a `boxShadow` ring in the
+page colour, which KNOCKS OUT the keyline where the disc crosses it: without
+it the line runs on behind the disc and the join reads as two things
+overlapping by accident. And because the card no longer brings its own ground
+it has to answer to the theme -- acid on a light ground measures **1.11:1**,
+so in light mode the keyline, the counter and the rail become ink, the same
+swap `AddCard` makes on the home screen. The disc stays acid in both: it is a
+fill behind black-and-white artwork, not text.
+
+Both footers go through `walkthroughBtn` so the two callers cannot drift.
+They were each written for the acid card (ink on a faint ink wash) and would
+have been black on black here.
+
+Note for anyone writing a test against this card: find it by STRUCTURE, not by
+colour. `about.spec.mjs` climbed the tree until it hit an acid background, and
+the moment the acid moved to the disc that walk landed on the disc instead.
+
 **The walkthrough clips are transparent, and must stay that way.** They are
-animated WebP with an alpha channel and no background; the acid comes from
-`WalkthroughCard`, which is `#cafe04`. Each clip originally baked in its own
+animated WebP with an alpha channel and no background; the acid now comes from
+the disc inside `WalkthroughCard`, which is `#cafe04`. Each clip originally baked in its own
 background, and all four greens were different and none was `#CAFE04`
 (`#C3F400`, `#C1EF00`, `#C3EE00`, `#C0EE00`), so every clip sat on the card
 as a visible rectangle of slightly wrong green. Keying them out costs 1.7MB

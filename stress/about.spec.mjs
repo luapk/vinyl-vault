@@ -17,10 +17,13 @@ async function openAbout(page) {
 
 const cardState = (page) => page.evaluate(() => {
   const img = document.querySelector('img[src*="/walkthrough/"]');
-  // React serialises the background to rgb(), so walk up to the acid ancestor
-  // rather than matching the hex in the style attribute.
+  // Find the card by STRUCTURE, not by colour. This used to climb until it
+  // hit an acid background, which stopped working the moment the card became
+  // a keyline and the acid moved to the disc behind the mascot: the walk
+  // landed on the disc and every field below came back undefined. The card is
+  // the ancestor holding the heading.
   let card = img;
-  while (card && getComputedStyle(card).backgroundColor !== 'rgb(202, 254, 4)') card = card.parentElement;
+  while (card && !card.querySelector('h2')) card = card.parentElement;
   const rail = [...document.querySelectorAll('button[aria-label^="Step "]')];
   return {
     clip: img?.getAttribute('src') || null,

@@ -5748,21 +5748,18 @@ function AboutWalkthrough() {
   const steps = WALKTHROUGH_STEPS;
   const [step, setStep] = useState(0);
   const go = (i) => setStep((i + steps.length) % steps.length);
-  const btn = {
-    background: 'rgba(8,8,12,0.08)', color: '#08080c', border: 'none',
-    fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer',
-  };
   return (
     <div className="flex justify-center mb-12 md:mb-14">
       <WalkthroughCard index={step} steps={steps} onSelect={go} footer={
         <div className="flex w-full gap-2">
           <button type="button" onClick={() => go(step - 1)} aria-label="Previous step"
-            className="flex-1 py-3 rounded-xl text-sm transition-opacity hover:opacity-70" style={btn}>
+            className="flex-1 py-2.5 rounded-xl text-sm transition-opacity hover:opacity-70"
+            style={walkthroughBtn('ghost')}>
             Back
           </button>
           <button type="button" onClick={() => go(step + 1)} aria-label="Next step"
-            className="flex-1 py-3 rounded-xl text-sm transition-opacity hover:opacity-85"
-            style={{ ...btn, background: '#08080c', color: '#ffffff', fontWeight: 700 }}>
+            className="flex-1 py-2.5 rounded-xl text-sm transition-opacity hover:opacity-85"
+            style={walkthroughBtn('primary')}>
             Next
           </button>
         </div>
@@ -7526,37 +7523,64 @@ function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer })
   const showClip = !clipFailed[index];
   const Rail = onSelect ? 'button' : 'div';
 
+  // The card is a KEYLINE, not a fill, which is how every other panel in the
+  // app is drawn. That means it sits on the page's own ground rather than
+  // bringing its own, so unlike the old acid card it has to answer to the
+  // theme. Acid on a light ground measures 1.11:1 -- not a borderline call,
+  // it simply is not there -- so in light mode the accents become ink, the
+  // same swap AddCard makes on the home screen. The DISC stays acid in both:
+  // it is a fill behind black-and-white artwork, not text.
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const accent = isLight ? '#08080c' : ACID;
+  const DISC = 152;
+
   return (
     <div
-      className="w-full max-w-sm rounded-3xl px-7 pt-7 pb-6 flex flex-col items-center text-center"
-      style={{ background: '#cafe04', animation: 'fadeUp 0.3s ease-out' }}
+      className="w-full max-w-sm rounded-3xl px-7 pb-6 flex flex-col items-center text-center"
+      style={{
+        border: `1px solid ${accent}`,
+        // Opaque: the overlay floats this over the live app, and a translucent
+        // card there shows the screen it is explaining through its own body.
+        background: `linear-gradient(${isLight ? 'rgba(8,8,12,0.03)' : 'rgba(202,254,4,0.05)'} 0 100%), rgb(var(--bg))`,
+        marginTop: DISC / 2,
+        paddingTop: 0,
+        animation: 'fadeUp 0.3s ease-out',
+      }}
       key={index}
     >
-      {/* Mascot clip, or the icon while the clips are still being made */}
-      <div className="flex items-center justify-center mb-4" style={{ height: 168, width: '100%' }}>
+      {/* The mascot's own ground, breaking the top edge.
+          The ring is the page colour, not a border: it KNOCKS OUT the keyline
+          where the disc crosses it. Without it the line runs on behind the
+          disc and the join reads as two things overlapping by accident
+          rather than one sitting in front of the other. boxShadow rather
+          than a border so it costs no layout. */}
+      <div
+        className="rounded-full flex items-center justify-center shrink-0"
+        style={{
+          width: DISC, height: DISC, marginTop: -(DISC / 2),
+          background: ACID,
+          boxShadow: '0 0 0 7px rgb(var(--bg))',
+        }}
+      >
         {showClip ? (
           <img
             src={current.clip}
             alt=""
             onError={() => setClipFailed(f => ({ ...f, [index]: true }))}
-            style={{ maxHeight: 168, maxWidth: '100%', objectFit: 'contain' }}
+            style={{ maxHeight: DISC - 36, maxWidth: DISC - 24, objectFit: 'contain' }}
           />
         ) : (
-          <div className="rounded-2xl flex items-center justify-center"
-            style={{ width: 84, height: 84, border: '2px solid #08080c' }}>
-            <StepIcon size={36} weight="light" style={{ color: '#08080c' }} />
-          </div>
+          <StepIcon size={46} weight="light" style={{ color: '#08080c' }} />
         )}
       </div>
 
-      {/* Step counter */}
-      <div className="font-mono mb-2" style={{ fontSize: 10, letterSpacing: '0.26em', color: 'rgba(8,8,12,0.5)' }}>
+      <div className="font-mono mt-5 mb-2" style={{ fontSize: 10, letterSpacing: '0.26em', color: accent }}>
         {String(index + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
       </div>
 
-      <h2 className="text-2xl font-display mb-2.5" style={{ color: '#08080c' }}>{current.title}</h2>
+      <h2 className="text-2xl font-display mb-2.5">{current.title}</h2>
 
-      <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(8,8,12,0.7)' }}>{current.body}</p>
+      <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(var(--fg),0.62)' }}>{current.body}</p>
 
       {/* Progress rail. On the overlay it reports progress through a sequence,
           so it fills up to the current step. On About nothing is in sequence
@@ -7578,7 +7602,7 @@ function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer })
               height: onSelect ? 4 : 3,
               padding: 0,
               border: 'none',
-              background: (onSelect ? i === index : i <= index) ? '#08080c' : 'rgba(8,8,12,0.18)',
+              background: (onSelect ? i === index : i <= index) ? accent : 'rgba(var(--fg),0.16)',
             }} />
         ))}
       </div>
@@ -7586,6 +7610,22 @@ function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer })
       {footer}
     </div>
   );
+}
+
+// The card's own button styles, so the two callers cannot drift apart. Both
+// footers used to be written for an acid card -- ink text on a faint ink
+// wash -- which on this one is black on black.
+export function walkthroughBtn(kind) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const accent = isLight ? '#08080c' : ACID;
+  const onAccent = isLight ? '#ffffff' : '#08080c';
+  // Acid marks the PRIMARY action and nothing else, the same rule the home
+  // screen's tiles follow: one filled thing on the card, and it is the one
+  // that moves you forward.
+  if (kind === 'primary') {
+    return { background: accent, color: onAccent, border: 'none', fontWeight: 700, letterSpacing: '0.02em', cursor: 'pointer' };
+  }
+  return { background: 'transparent', color: 'rgba(var(--fg),0.72)', border: '1px solid rgba(var(--fg),0.18)', fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer' };
 }
 
 function WalkthroughOverlay({ onDismiss }) {
@@ -7602,14 +7642,14 @@ function WalkthroughOverlay({ onDismiss }) {
         <button
           onClick={() => { if (isLast) { onDismiss(); } else { setStep(s => s + 1); } }}
           className="w-full py-3 rounded-xl text-sm mb-2.5 transition-opacity hover:opacity-85"
-          style={{ background: '#08080c', color: '#ffffff', fontWeight: 700, letterSpacing: '0.02em', border: 'none' }}
+          style={walkthroughBtn('primary')}
         >
           {isLast ? "Start digging" : 'Next'}
         </button>
         <button
           onClick={onDismiss}
           className="text-xs font-mono transition-opacity hover:opacity-70"
-          style={{ color: 'rgba(8,8,12,0.45)' }}
+          style={{ color: 'rgba(var(--fg),0.45)', background: 'transparent', border: 'none', cursor: 'pointer' }}
         >
           Skip
         </button>
