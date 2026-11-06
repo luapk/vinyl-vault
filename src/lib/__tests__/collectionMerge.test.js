@@ -116,3 +116,61 @@ describe('planLoadMerge -- unconfirmed local edits (dirty records) beat the clou
     expect(plan.toUpdate).toHaveLength(0);
   });
 });
+
+// A dirty record must not carry a hollowed-out photo list over the cloud copy.
+//
+// The local cache strips data-URL photos for any record that has a DB row,
+// and on a cold start the in-memory collection IS that cache. The dirty rule
+// then made the stripped copy the source of truth and dbUpdate -- which
+// rewrites `data` wholesale -- destroyed the photo in the cloud. The photos
+// this could destroy are the ones that exist nowhere else: a user's own cover
+// whose bucket upload failed.
+describe('a dirty record never destroys the cloud copy of a photo', () => {
+  const PHOTO = 'data:image/jpeg;base64,abc123';
+  const OTHER = 'data:image/jpeg;base64,zzz999';
+
+  it('restores a stripped coverUrl and images before pushing', () => {
+    const cloud = { id: 'r1', artist: 'Kiko Rand', savedAt: 1,
+                    coverUrl: PHOTO, images: [PHOTO, 'https://cdn/x.jpg'], _dbId: 'row-1' };
+    // what the cache gives back: photos gone, the edit intact
+    const local = { id: 'r1', artist: 'Kiko Rand', savedAt: 1,
+                    coverUrl: null, images: ['https://cdn/x.jpg'], notes: 'edited offline' };
+
+    const plan = planLoadMerge([cloud], [local], new Set(), new Set(['r1']));
+
+    expect(plan.toUpdate).toHaveLength(1);
+    expect(plan.toUpdate[0].notes).toBe('edited offline');   // the edit still wins
+    expect(plan.toUpdate[0].coverUrl).toBe(PHOTO);           // the photo survives
+    expect(plan.toUpdate[0].images).toContain(PHOTO);
+    expect(plan.records[0].coverUrl).toBe(PHOTO);
+  });
+
+  it('leaves a cover the user actually changed alone', () => {
+    const cloud = { id: 'r1', savedAt: 1, coverUrl: PHOTO, _dbId: 'row-1' };
+    const local = { id: 'r1', savedAt: 1, coverUrl: 'https://cdn/new-cover.jpg' };
+
+    const plan = planLoadMerge([cloud], [local], new Set(), new Set(['r1']));
+
+    expect(plan.toUpdate[0].coverUrl).toBe('https://cdn/new-cover.jpg');
+  });
+
+  it('does not duplicate a photo the local copy still holds', () => {
+    const cloud = { id: 'r1', savedAt: 1, images: [PHOTO, OTHER], _dbId: 'row-1' };
+    const local = { id: 'r1', savedAt: 1, images: [PHOTO] };
+
+    const plan = planLoadMerge([cloud], [local], new Set(), new Set(['r1']));
+
+    expect(plan.toUpdate[0].images.filter(u => u === PHOTO)).toHaveLength(1);
+    expect(plan.toUpdate[0].images).toContain(OTHER);
+  });
+
+  it('leaves a clean (non-dirty) record on the cloud copy as before', () => {
+    const cloud = { id: 'r1', savedAt: 1, coverUrl: PHOTO, notes: 'cloud', _dbId: 'row-1' };
+    const local = { id: 'r1', savedAt: 1, coverUrl: null, notes: 'stale local' };
+
+    const plan = planLoadMerge([cloud], [local], new Set(), new Set());
+
+    expect(plan.toUpdate).toHaveLength(0);
+    expect(plan.records[0].notes).toBe('cloud');
+  });
+});

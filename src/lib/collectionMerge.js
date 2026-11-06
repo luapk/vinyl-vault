@@ -27,6 +27,38 @@
 //                  leave them in `records` as unsynced, never dropped)
 //   toUpdate    -- dirty local records that DO have a DB row (push these with
 //                  dbUpdate; failures keep them dirty for the retry loop)
+const isDataUrl = (v) => typeof v === 'string' && v.startsWith('data:');
+
+// Put back any photo the LOCAL CACHE stripped, before a dirty record is
+// pushed over the cloud copy.
+//
+// The cache deliberately drops data-URL photos for records that have a DB row
+// (localCache.photosToKeep), because the cloud is holding them. But on a cold
+// start the in-memory collection IS that stripped cache, so a record carrying
+// an unconfirmed edit replaced the cloud copy with a hollowed-out version and
+// dbUpdate -- which rewrites `data` wholesale -- destroyed the photo. The only
+// photos that can be destroyed this way are the ones that exist NOWHERE else:
+// a user's own cover whose upload to the bucket failed, where the data URL is
+// the last copy. The fallback meant to protect the photo was losing it.
+//
+// Only `data:` payloads are restored, and only where the local copy has none.
+// That is exactly what the cache removes and nothing else, so a cover the user
+// actually changed still wins.
+function restoreStrippedPhotos(local, cloud) {
+  if (!cloud) return local;
+  const out = { ...local };
+  if (!out.coverUrl && isDataUrl(cloud.coverUrl)) out.coverUrl = cloud.coverUrl;
+  const rescued = (Array.isArray(cloud.images) ? cloud.images : []).filter(isDataUrl);
+  if (rescued.length) {
+    const have = new Set(Array.isArray(out.images) ? out.images : []);
+    const missing = rescued.filter(u => !have.has(u));
+    // Appended rather than re-interleaved: the original positions are not
+    // recoverable from a stripped list, and `coverUrl` is what gets displayed.
+    if (missing.length) out.images = [...(Array.isArray(out.images) ? out.images : []), ...missing];
+  }
+  return out;
+}
+
 export function planLoadMerge(dbRows, localRecords, tombstones, dirtyIds = new Set()) {
   const byId = new Map();
   const spareRowIds = [];
@@ -62,8 +94,9 @@ export function planLoadMerge(dbRows, localRecords, tombstones, dirtyIds = new S
         replacedDirty.add(record.id);
         const idx = records.findIndex(r => r.id === record.id);
         if (idx !== -1) {
-          records[idx] = record;
-          if (dbIdMap[record.id]) toUpdate.push(record);
+          const whole = restoreStrippedPhotos(record, records[idx]);
+          records[idx] = whole;
+          if (dbIdMap[record.id]) toUpdate.push(whole);
         }
       }
       continue;

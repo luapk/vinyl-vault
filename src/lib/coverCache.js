@@ -70,3 +70,26 @@ export async function uploadUserCover(userId, blob, contentType = 'image/jpeg') 
     return null;
   }
 }
+
+// A photo that is still sitting in the record as a base64 data URL, because
+// its original upload to the bucket failed. Those payloads are ~300KB each,
+// they live inside the record's jsonb, and every device re-downloads all of
+// them on every load: one account was carrying 37MB of them. This moves one
+// into storage so the record can hold a URL instead.
+//
+// Returns the public URL, or null if the upload is still not possible, in
+// which case the data URL stays exactly where it was and nothing is lost.
+export async function promoteDataUrlCover(userId, dataUrl) {
+  if (!supabase || !userId || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    if (!blob.size || !blob.type.startsWith('image/')) return null;
+    return await uploadUserCover(userId, blob, blob.type);
+  } catch {
+    return null;
+  }
+}
+
+export const holdsDataUrlPhoto = (r) =>
+  (typeof r?.coverUrl === 'string' && r.coverUrl.startsWith('data:'))
+  || (Array.isArray(r?.images) && r.images.some(u => typeof u === 'string' && u.startsWith('data:')));

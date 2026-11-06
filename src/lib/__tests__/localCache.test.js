@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slimForCache, writeCollectionCache, safeSetItem, photosToKeep } from '../localCache.js';
+import { slimForCache, writeCollectionCache, safeSetItem, photosToKeep, recordsToPin } from '../localCache.js';
 
 const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(2000);
 const HOSTED = 'https://example.com/cover.jpg';
@@ -119,5 +119,80 @@ describe('photosToKeep -- derived from the records being written', () => {
 
   it('ignores records without an id', () => {
     expect([...photosToKeep([{ artist: 'no id' }, null], {})]).toEqual([]);
+  });
+});
+
+// The ladder cuts by recency, which on its own decides by WHEN a record was
+// saved rather than by whether this device is the last place it exists. An
+// old unsynced record was being dropped while 400 records the cloud already
+// holds were kept; the cloud ones come back on the next load, that one does
+// not.
+describe('the cache never drops a record the cloud does not have', () => {
+  const bulky = (id, savedAt) => ({
+    id, savedAt, artist: 'A'.repeat(400), title: 'T'.repeat(400),
+    tracklist: Array.from({ length: 30 }, (_, k) => ({ position: `A${k}`, title: 'Track '.repeat(40), bpm: 120 })),
+  });
+
+  // A storage at its quota, like a real browser.
+  const tightStorage = (quota) => {
+    const store = new Map();
+    return {
+      store,
+      getItem: (k) => store.get(k) ?? null,
+      setItem: (k, v) => {
+        if (v.length > quota) { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+        store.set(k, v);
+      },
+    };
+  };
+
+  it('keeps an old never-synced record when the ladder has to cut', () => {
+    const records = Array.from({ length: 500 }, (_, i) => bulky(`r${i}`, 10_000 + i));
+    const orphan = bulky('ORPHAN', 1);          // oldest, and in no cloud row
+    records.push(orphan);
+    const confirmed = Object.fromEntries(records.filter(r => r.id !== 'ORPHAN').map(r => [r.id, 'row']));
+    const storage = tightStorage(2_000_000);
+
+    const res = writeCollectionCache(storage, 'k', records,
+      photosToKeep(records, confirmed), recordsToPin(records, confirmed));
+
+    expect(res.ok).toBe(true);
+    expect(res.dropped).toBeGreaterThan(0);                       // it did have to cut
+    const cached = JSON.parse(storage.getItem('k'));
+    expect(cached.some(r => r.id === 'ORPHAN')).toBe(true);
+  });
+
+  it('keeps an old record whose edit has not been confirmed', () => {
+    const records = Array.from({ length: 500 }, (_, i) => bulky(`r${i}`, 10_000 + i));
+    records.push(bulky('STRANDED', 1));
+    const confirmed = Object.fromEntries(records.map(r => [r.id, 'row']));   // all in the cloud
+    const dirty = new Set(['STRANDED']);                                     // but one edit is pending
+    const storage = tightStorage(2_000_000);
+
+    writeCollectionCache(storage, 'k', records,
+      photosToKeep(records, confirmed, dirty), recordsToPin(records, confirmed, dirty));
+
+    const cached = JSON.parse(storage.getItem('k'));
+    expect(cached.some(r => r.id === 'STRANDED')).toBe(true);
+  });
+
+  it('keeps the photo of a dirty record, so the merge cannot push a hollow one', () => {
+    const r = { id: 'r1', savedAt: 1, coverUrl: 'data:image/jpeg;base64,abc' };
+    const keep = photosToKeep([r], { r1: 'row-1' }, new Set(['r1']));
+    expect(keep.has('r1')).toBe(true);
+  });
+
+  it('falls back to only what exists nowhere else rather than failing', () => {
+    const records = Array.from({ length: 300 }, (_, i) => bulky(`r${i}`, 10_000 + i));
+    records.push(bulky('ORPHAN', 1));
+    const confirmed = Object.fromEntries(records.filter(r => r.id !== 'ORPHAN').map(r => [r.id, 'row']));
+    const storage = tightStorage(60_000);       // nothing like enough for 50
+
+    const res = writeCollectionCache(storage, 'k', records,
+      photosToKeep(records, confirmed), recordsToPin(records, confirmed));
+
+    expect(res.ok).toBe(true);
+    expect(res.level).toBe('pinned-only');
+    expect(JSON.parse(storage.getItem('k')).map(r => r.id)).toEqual(['ORPHAN']);
   });
 });

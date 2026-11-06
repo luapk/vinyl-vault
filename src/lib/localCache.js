@@ -41,12 +41,24 @@ export function slimForCache(records, keepPhotosFor = new Set()) {
 // the list being written rather than from component state: a record created a
 // moment ago is not in state yet, and computing this from state stripped the
 // newest scan's photo -- the one most likely to be the only copy.
-export function photosToKeep(records, confirmedIds = {}) {
-  return new Set(records.filter(r => r?.id && !confirmedIds[r.id]).map(r => r.id));
+export function photosToKeep(records, confirmedIds = {}, dirtyIds = new Set()) {
+  return new Set(records
+    .filter(r => r?.id && (!confirmedIds[r.id] || dirtyIds.has(r.id)))
+    .map(r => r.id));
+}
+
+// Records this device may hold the ONLY copy of: never uploaded (no DB row),
+// or carrying an edit the DB has not confirmed. The ladder below may drop
+// anything, but not these -- a record the cloud has comes back on the next
+// load, and one it does not have is simply gone.
+export function recordsToPin(records, confirmedIds = {}, dirtyIds = new Set()) {
+  return new Set(records
+    .filter(r => r?.id && (!confirmedIds[r.id] || dirtyIds.has(r.id)))
+    .map(r => r.id));
 }
 
 // Progressively smaller candidates, best first. Exported for tests.
-export function cacheCandidates(records, keepPhotosFor = new Set()) {
+export function cacheCandidates(records, keepPhotosFor = new Set(), pinned = new Set()) {
   const slim = slimForCache(records, keepPhotosFor);
   const candidates = [{ level: 'slim', records: slim }];
 
@@ -56,17 +68,37 @@ export function cacheCandidates(records, keepPhotosFor = new Set()) {
   const noPhotos = candidates[candidates.length - 1].records;
 
   // Newest first, so if we have to cut, the oldest go. savedAt is a timestamp.
+  //
+  // Recency alone is the wrong rule on its own: it decides by WHEN a record
+  // was saved, not by whether this device is the last place it exists. An
+  // unsynced record that is old (added while offline, or an edit stranded by
+  // an expired session) was being cut while 400 records the cloud already
+  // holds were kept. Pinned ids ride along on every rung.
   const byNewest = [...noPhotos].sort((a, b) => (b?.savedAt || 0) - (a?.savedAt || 0));
+  const withPinned = (head) => {
+    const ids = new Set(head.map(r => r?.id));
+    const rescued = byNewest.filter(r => pinned.has(r?.id) && !ids.has(r?.id));
+    return rescued.length ? [...head, ...rescued] : head;
+  };
   for (const keep of [400, 200, 100, 50]) {
-    if (byNewest.length > keep) candidates.push({ level: `newest-${keep}`, records: byNewest.slice(0, keep) });
+    if (byNewest.length > keep) {
+      candidates.push({ level: `newest-${keep}`, records: withPinned(byNewest.slice(0, keep)) });
+    }
+  }
+  // Last resort. If even fifty will not fit, keep only what exists nowhere
+  // else: everything dropped here is still in the cloud and comes back on the
+  // next load, and this is the difference between a slow start and data loss.
+  const onlyPinned = byNewest.filter(r => pinned.has(r?.id));
+  if (onlyPinned.length && onlyPinned.length < byNewest.length) {
+    candidates.push({ level: 'pinned-only', records: onlyPinned });
   }
   return candidates;
 }
 
 // Writes the largest form that fits. Returns what it managed:
 //   { ok, level, wrote, dropped }  or  { ok: false } if even the smallest fails.
-export function writeCollectionCache(storage, key, records, keepPhotosFor = new Set()) {
-  for (const candidate of cacheCandidates(records, keepPhotosFor)) {
+export function writeCollectionCache(storage, key, records, keepPhotosFor = new Set(), pinned = new Set()) {
+  for (const candidate of cacheCandidates(records, keepPhotosFor, pinned)) {
     try {
       storage.setItem(key, JSON.stringify(candidate.records));
       return {

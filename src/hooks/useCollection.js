@@ -1,8 +1,8 @@
 import { useReducer, useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, isSupabaseEnabled } from '../lib/supabase';
-import { cacheCover, isCachedCover } from '../lib/coverCache';
+import { cacheCover, isCachedCover, promoteDataUrlCover, holdsDataUrlPhoto } from '../lib/coverCache';
 import { planLoadMerge } from '../lib/collectionMerge';
-import { writeCollectionCache, safeSetItem, photosToKeep } from '../lib/localCache';
+import { writeCollectionCache, safeSetItem, photosToKeep, recordsToPin } from '../lib/localCache';
 
 // EVERY local key is scoped to the signed-in user.
 //
@@ -57,11 +57,20 @@ function save(userId, records, confirmedIds = {}) {
   if (!key) return;
   // Derived from the records being written, so a record added a moment ago
   // (not yet in component state) still counts as photo-only-here.
-  const res = writeCollectionCache(localStorage, key, records, photosToKeep(records, confirmedIds));
+  //
+  // Dirty records count too, for both photos and pinning. A record whose edit
+  // has not been confirmed is treated by the merge as the source of truth and
+  // pushed over the cloud copy, so the cache must not hollow it out first, and
+  // must not drop it: the edit lives only here until the write lands.
+  const dirty = loadDirty(userId);
+  const res = writeCollectionCache(
+    localStorage, key, records,
+    photosToKeep(records, confirmedIds, dirty),
+    recordsToPin(records, confirmedIds, dirty));
   if (!res.ok) {
     console.warn('[cache] could not write the local collection:', res.error?.message);
   } else if (res.dropped > 0) {
-    console.warn(`[cache] local storage is full: cached the newest ${res.wrote} records, left out ${res.dropped}. They are still in the cloud.`);
+    console.warn(`[cache] local storage is full: cached ${res.wrote} records, left out ${res.dropped}. Anything not yet in the cloud was kept.`);
   }
 }
 
@@ -379,6 +388,41 @@ export function useCollection(userId = null) {
     }).catch(console.error);
   }, [useDb, userId, cacheCoverFor]);
 
+  // Move a record's base64 photos into the covers bucket and swap them for
+  // URLs. These only exist because AddCoverTile's upload failed at the time
+  // and fell back to a data URL; nothing ever retried it, so the base64 stayed
+  // in the row and shipped to every device on every load forever.
+  //
+  // Safe by construction: the data URL is only replaced once the upload has
+  // returned a URL, and the record is re-read from current state first, so a
+  // cover changed while the upload was in flight is not clobbered.
+  const promotePhotosFor = useCallback(async (record) => {
+    if (!useDb || !record?.id || !holdsDataUrlPhoto(record)) return;
+    const isData = (v) => typeof v === 'string' && v.startsWith('data:');
+    const sources = new Set();
+    if (isData(record.coverUrl)) sources.add(record.coverUrl);
+    for (const u of Array.isArray(record.images) ? record.images : []) if (isData(u)) sources.add(u);
+
+    const mapped = new Map();
+    for (const dataUrl of sources) {
+      const url = await promoteDataUrlCover(userId, dataUrl);
+      if (url) mapped.set(dataUrl, url);
+    }
+    if (!mapped.size) return;
+
+    const current = collectionRef.current.find(r => r.id === record.id);
+    if (!current) return;
+    const patch = {};
+    if (isData(current.coverUrl) && mapped.has(current.coverUrl)) patch.coverUrl = mapped.get(current.coverUrl);
+    if (Array.isArray(current.images) && current.images.some(u => mapped.has(u))) {
+      patch.images = current.images.map(u => mapped.get(u) || u);
+    }
+    if (!Object.keys(patch).length) return;
+    dispatch({ type: 'UPDATE', id: record.id, patch });
+    const dbId = dbIds.current[record.id];
+    if (dbId) dbUpdate(dbId, { ...current, ...patch }).catch(() => {});
+  }, [useDb, userId]);
+
   // Load from Supabase when userId arrives or changes.
   useEffect(() => { reloadFromCloud(); }, [reloadFromCloud]);
 
@@ -404,6 +448,13 @@ export function useCollection(userId = null) {
           cacheCoverFor(r);
         } catch { break; }
       }
+      // Drain the base64 photos a few at a time. Deliberately unhurried: this
+      // is housekeeping, each one is an upload plus a row rewrite, and the
+      // backlog is historical rather than growing.
+      for (const r of collectionRef.current.filter(holdsDataUrlPhoto).slice(0, 2)) {
+        await promotePhotosFor(r);
+      }
+
       // Re-push edits whose dbUpdate failed earlier (expired session, network
       // drop). The record stays flagged dirty until a write is confirmed.
       for (const id of loadDirty(userId)) {
@@ -418,7 +469,7 @@ export function useCollection(userId = null) {
       }
     }, 25000);
     return () => clearInterval(t);
-  }, [useDb, userId, cacheCoverFor]);
+  }, [useDb, userId, cacheCoverFor, promotePhotosFor]);
 
   // Always persist to localStorage so logout never destroys local data.
   // Debounced 800ms so rapid state changes (crate edits, BPM updates) don't

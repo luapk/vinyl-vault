@@ -586,6 +586,22 @@ updater and took the whole app down with the crash screen.
 - Always writes to localStorage on every state change (local-first); new records and edits are additionally persisted immediately (not just via the 800ms debounce)
 - On login, `dbLoad` merges cloud + local via `planLoadMerge` (`src/lib/collectionMerge.js`, unit-tested). Invariants: a record on this device only leaves the collection via an explicit user delete (tombstoned in `vinylvault_deleted_ids`); a record with an unconfirmed local **edit** (flagged in `vinylvault_dirty_ids`) beats the cloud copy and is re-pushed. Otherwise the cloud copy wins for records it has.
 - A 25s background retry re-attempts failed inserts (unsynced records) and failed updates (dirty records) until confirmed -- an expired session or offline period costs latency, never data
+- **A stripped record must never be pushed over a fuller cloud copy.** The
+  cache drops data-URL photos for any record with a DB row, and on a cold start
+  the in-memory collection IS that cache, so a record flagged dirty replaced the
+  cloud copy with a hollowed-out version and `dbUpdate` -- which rewrites `data`
+  wholesale -- destroyed the photo. The only photos reachable that way are the
+  ones that exist nowhere else, so the fallback meant to protect a photo was
+  what lost it. `restoreStrippedPhotos` (`collectionMerge.js`) puts back
+  `data:` payloads the cloud row has and the local copy lacks, and nothing
+  else, so a cover the user actually changed still wins
+- **The cache ladder cuts by recency, so it must be told what not to cut.**
+  Recency decides by WHEN a record was saved, not by whether this device is the
+  last place it exists: an old unsynced record was dropped while 400 records
+  the cloud already holds were kept. `recordsToPin` (`localCache.js`) pins
+  anything unsynced or dirty onto every rung, and a final `pinned-only` rung
+  keeps just those if even fifty will not fit. Everything dropped above that
+  line is in the cloud and returns on the next load
 - `syncedIds` Set tracks which records are confirmed in Supabase; unsynced records show an amber `!` badge
 
 ### Milestone badges
@@ -639,7 +655,19 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   (`AddCoverTile`). The upload goes to the same `covers` bucket as cached
   Discogs art, whose per-user RLS policies already exist in
   `supabase/storage.sql`, so there is no migration. A failed upload falls back
-  to a local data URL: the photo is never lost, it just does not sync.
+  to a local data URL so the photo is never lost.
+
+  **That fallback used to say "it just does not sync", and that was wrong.**
+  `dbInsert`/`dbUpdate` write the whole record blob, `images[]` included, so
+  every fallback rode into Postgres and was re-downloaded by every device on
+  every load, forever, with nothing ever retrying the upload. It reached 249
+  photos and 64MB across six accounts, two thirds of the entire `records`
+  table; one 906-record account was pulling a 43MB response on every open, 37MB
+  of it base64. The visible symptom was "only my newest records appear, then
+  the rest arrive a minute later". `promoteDataUrlCover` (`coverCache.js`) now
+  drains them: the 25s retry loop moves two a tick into the bucket and swaps
+  the data URL for the public URL. The data URL is only replaced once the
+  upload has returned, so a storage outage still costs sync and not the photo.
 - **Stats bars open the collection**: tapping a genre row, decade bar, label
   row or crate chip on the Stats tab focuses the collection on that slice,
   browsed in whichever view mode the user last used, exactly like a crate. A
