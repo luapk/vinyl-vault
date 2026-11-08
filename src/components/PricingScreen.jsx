@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Check, CaretRight } from '@phosphor-icons/react';
 import {
   PRICE_SELECTOR_YEAR,
@@ -8,6 +8,7 @@ import {
   FREE_SCANS,
 } from '../lib/pricing.js';
 import { APP_NAME, SCRIPT } from '../lib/brand.js';
+import { supabase } from '../lib/supabase.js';
 
 // Brand acid + ink. This screen is deliberately theme-independent: acid page,
 // black chrome, dark cards with white interiors -- matching the splash and app
@@ -91,7 +92,7 @@ const UPSELL = {
   Selector: 'Resident adds Trace and the BPM sorter',
 };
 
-function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {
+function TierCard({ tier, onGetStarted, onCheckout, onUpsell, foundingSold }) {
   const { image, name, price, billing, comingSoon, founding, features, priceEnvKey, foundingPriceEnvKey } = tier;
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
@@ -104,13 +105,32 @@ function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {
     try { await onCheckout(priceId); } catch { setCheckoutLoading(false); }
   };
 
+  // Set when the server refuses the sale. The displayed count can be stale by
+  // the time somebody clicks -- two people on seat 500 is exactly the case the
+  // server gate exists for -- and the loser of that race should watch the
+  // offer go rather than press a link that does nothing.
+  const [soldOutLate, setSoldOutLate] = useState(false);
+
   const handleFounding = async () => {
     if (!foundingPriceEnvKey || !onCheckout) return;
     const priceId = import.meta.env[foundingPriceEnvKey];
     if (!priceId) return;
     setCheckoutLoading(true);
-    try { await onCheckout(priceId); } catch { setCheckoutLoading(false); }
+    try {
+      await onCheckout(priceId);
+    } catch (err) {
+      setCheckoutLoading(false);
+      if (String(err?.message) === 'founding_sold_out') setSoldOutLate(true);
+    }
   };
+
+  // Seats sold, read for display only. The real cap is in api/stripe-checkout,
+  // which refuses the session; this just stops the card offering something
+  // that would then fail. So it fails OPEN on purpose -- a count that cannot
+  // be read leaves the offer showing and lets the server be the one to say no,
+  // which is the right way round: a cosmetic read must never be able to take
+  // the offer down on its own.
+  const soldOut = soldOutLate || (foundingSold != null && foundingSold >= FOUNDING_SEATS);
 
   const upsell = UPSELL[name];
 
@@ -165,7 +185,7 @@ function TierCard({ tier, onGetStarted, onCheckout, onUpsell }) {
         </div>
 
         {/* Founding note */}
-        {founding && (
+        {founding && !soldOut && (
           <div style={{ fontSize: 10, textAlign: 'center', marginBottom: 10, color: 'rgba(8,8,12,0.7)', fontFamily: 'monospace', fontWeight: 600 }}>
             {foundingPriceEnvKey && import.meta.env[foundingPriceEnvKey]
               ? <button onClick={handleFounding} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', padding: 0, textDecoration: 'underline', textUnderlineOffset: 2 }}>{founding}</button>
@@ -237,6 +257,28 @@ export function TierCarousel({ onGetStarted, onCheckout }) {
   const rowRef = useRef(null);
   const cellRefs = useRef([]);
 
+  // How many founding seats have gone. Read here rather than threaded in as a
+  // prop so both callers -- the pricing screen and the in-app upgrade modal --
+  // get it without either having to know the offer exists.
+  //
+  // `payments` is unreadable from the browser by design (RLS on, no policy,
+  // revoked from anon and authenticated), so this goes through
+  // founding_seats_taken(), a definer function that returns the count and
+  // nothing else. Null means "not known", which leaves the offer showing: the
+  // cap is enforced in api/stripe-checkout, and a failed cosmetic read must
+  // not be able to take a live offer down by itself.
+  const [foundingSold, setFoundingSold] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = (await supabase?.rpc('founding_seats_taken')) ?? {};
+        if (!cancelled && !error && typeof data === 'number') setFoundingSold(data);
+      } catch { /* display only; the server is the gate */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const goTo = (i) => {
     const clamped = Math.max(0, Math.min(TIERS.length - 1, i));
     setIdx(clamped);
@@ -268,6 +310,7 @@ export function TierCarousel({ onGetStarted, onCheckout }) {
               onGetStarted={onGetStarted}
               onCheckout={onCheckout}
               onUpsell={() => goTo(i + 1)}
+              foundingSold={foundingSold}
             />
           </div>
         ))}

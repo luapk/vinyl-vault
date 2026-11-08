@@ -2,6 +2,9 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth } from './lib/auth.js';
 import { tierForPrice, pricingConfigured } from './lib/pricing.js';
+// The cap itself comes from the same module the pricing card renders it from,
+// so the number enforced here and the number advertised there are one value.
+import { FOUNDING_SEATS } from '../src/lib/pricing.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -51,6 +54,34 @@ export default async function handler(req, res) {
     // Determine mode: one-time for founding/lifetime, subscription otherwise
     const price = await stripe.prices.retrieve(priceId);
     const mode = price.type === 'one_time' ? 'payment' : 'subscription';
+
+    // The founding seat cap, enforced here because the pricing card promises
+    // it. Hiding the offer in the browser is not a gate -- the price id is in
+    // the bundle, so anyone can POST it back -- and this is the one product
+    // where overselling cannot be undone: a lifetime seat is a commitment you
+    // owe forever, not a subscription you can decline to renew.
+    //
+    // Counted from `payments`, the ledger of money actually collected, so the
+    // cap and the money cannot disagree.
+    if (mode === 'payment') {
+      const { count, error: countErr } = await supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('kind', 'one_time')
+        .eq('status', 'paid');
+
+      // Fails CLOSED, the same direction requireTier fails. An unreadable
+      // ledger must not become the cheapest way to buy seat 501; a refused
+      // sale costs one retry, an oversold lifetime seat costs forever.
+      // Logged distinctly so a missing table never reads as a sell-out.
+      if (countErr) {
+        console.error('[stripe-checkout] founding ledger unreadable, refusing:', countErr.message);
+        return res.status(503).json({ error: 'founding_unavailable' });
+      }
+      if (count >= FOUNDING_SEATS) {
+        return res.status(409).json({ error: 'founding_sold_out' });
+      }
+    }
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
