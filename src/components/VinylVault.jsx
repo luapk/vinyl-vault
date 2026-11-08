@@ -5789,22 +5789,49 @@ function AboutWalkthrough() {
   const steps = WALKTHROUGH_STEPS;
   const [step, setStep] = useState(0);
   const go = (i) => setStep((i + steps.length) % steps.length);
+  // Back and Next were a footer pair inside the card, which spent the card's
+  // one filled element on "Next" and left the panel bottom-heavy. They are now
+  // chevrons flanking the panel: navigation sits outside the thing being
+  // navigated, and the card ends on its own progress rail.
+  //
+  // They carry the mascot's ground rather than the card's keyline, so this is
+  // the one screen where acid is spent twice -- which is what stops them
+  // reading as part of the panel. The disc is the only other filled thing.
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  const chevron = {
+    background: isLight ? '#08080c' : ACID,
+    color: isLight ? '#ffffff' : '#08080c',
+    border: 'none',
+    cursor: 'pointer',
+  };
+
   return (
     <div className="flex justify-center mb-12 md:mb-14">
-      <WalkthroughCard index={step} steps={steps} onSelect={go} footer={
-        <div className="flex w-full gap-2">
-          <button type="button" onClick={() => go(step - 1)} aria-label="Previous step"
-            className="flex-1 py-2.5 rounded-xl text-sm transition-opacity hover:opacity-70"
-            style={walkthroughBtn('ghost')}>
-            Back
+      {/* A plain block, deliberately: the card's own top margin collapses
+          through it, so this box is exactly the card's box and top-1/2 is the
+          card's true centre rather than the centre of the disc's overhang. */}
+      <div className="relative w-full max-w-sm">
+        <WalkthroughCard index={step} steps={steps} onSelect={go} />
+        {[[-1, CaretLeft, 'Previous step'], [1, CaretRight, 'Next step']].map(([dir, Icon, label]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => go(step + dir)}
+            aria-label={label}
+            // Outside the card where there is room; straddling its edge where
+            // there is not. At 360 the card would be down to 224px wide if
+            // these kept their own column, which is narrower than the body
+            // copy can take. Half-overlapping sits them inside the card's own
+            // px-7 padding, so they never touch the text.
+            className={'absolute top-1/2 -translate-y-1/2 w-11 h-11 rounded-full '
+              + 'flex items-center justify-center transition-transform hover:scale-105 '
+              + (dir < 0 ? 'left-[-22px] sm:left-[-56px]' : 'right-[-22px] sm:right-[-56px]')}
+            style={chevron}
+          >
+            <Icon size={20} weight="bold" />
           </button>
-          <button type="button" onClick={() => go(step + 1)} aria-label="Next step"
-            className="flex-1 py-2.5 rounded-xl text-sm transition-opacity hover:opacity-85"
-            style={walkthroughBtn('primary')}>
-            Next
-          </button>
-        </div>
-      } />
+        ))}
+      </div>
     </div>
   );
 }
@@ -7573,7 +7600,7 @@ function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer })
   // it is a fill behind black-and-white artwork, not text.
   const isLight = document.documentElement.getAttribute('data-theme') === 'light';
   const accent = isLight ? '#08080c' : ACID;
-  const DISC = 152;
+  const DISC = 176;
 
   return (
     <div
@@ -7604,14 +7631,27 @@ function WalkthroughCard({ index, steps = WALKTHROUGH_STEPS, onSelect, footer })
         }}
       >
         {showClip ? (
+          /* Sized past the disc on purpose. Every clip is a 780x440 landscape
+             canvas with the character in a narrow centre column -- for the
+             scan step the ink is 239x330 of it -- so fitting the IMAGE inside
+             the disc fits its empty margins and leaves the character about
+             54px tall in a 152px disc. Sizing to the character instead means
+             the transparent margins hang outside the circle, which costs
+             nothing because they are transparent. The 6px nudge stands the
+             mascot on the disc's lower third rather than floating it.
+             The four clips do not share a fill ratio (scan 75% of canvas
+             height, confirm 92%), so the character still changes size a
+             little between steps; normalising that needs the WebPs recropped
+             to their ink box, which is a composite-and-re-encode because they
+             are animated. */
           <img
             src={current.clip}
             alt=""
             onError={() => setClipFailed(f => ({ ...f, [index]: true }))}
-            style={{ maxHeight: DISC - 36, maxWidth: DISC - 24, objectFit: 'contain' }}
+            style={{ width: 268, height: 151, marginTop: 6, objectFit: 'contain', maxWidth: 'none' }}
           />
         ) : (
-          <StepIcon size={46} weight="light" style={{ color: '#08080c' }} />
+          <StepIcon size={54} weight="light" style={{ color: '#08080c' }} />
         )}
       </div>
 
