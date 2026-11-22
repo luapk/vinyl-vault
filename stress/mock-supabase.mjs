@@ -12,7 +12,7 @@
 //   POST /__test/config              -- { graceMs?, expiresIn? }
 //   POST /__test/revoke              -- { email } revoke every session family
 //   POST /__test/seed-records        -- { email, records: [recordJson] }
-//   POST /__test/set-profile         -- { email, username?, isPublic? }
+//   POST /__test/set-profile         -- { email, username?, isPublic?, avatarUrl? }
 //   POST /__test/set-tier            -- { email, tier } subscription tier
 //   GET  /__test/state               -- { records, users, revocations }
 import http from 'node:http';
@@ -55,7 +55,7 @@ function addUser(email, password, displayName) {
 function profileJson(u) {
   return {
     id: u.id, email: u.email, role: u.email === 'paul@test.local' ? 'admin' : 'user',
-    avatar_url: null, display_name: u.displayName, username: u.username, bio: null,
+    avatar_url: u.avatarUrl || null, display_name: u.displayName, username: u.username, bio: null,
     is_public: !!u.isPublic, preferences: null, subscription_tier: u.tier || 'free',
     subscription_status: null, scans_this_period: 0, scans_period_end: null,
   };
@@ -194,6 +194,7 @@ const server = http.createServer(async (req, res) => {
     if (!target) return send(res, 404, { error: 'no such user' });
     if (body.username !== undefined) target.username = body.username;
     if (body.isPublic !== undefined) target.isPublic = body.isPublic;
+    if (body.avatarUrl !== undefined) target.avatarUrl = body.avatarUrl;
     return send(res, 200, { ok: true });
   }
   if (path === '/__test/state') {
