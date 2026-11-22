@@ -117,7 +117,7 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
           boxShadow: '0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(var(--fg),0.12), inset 0 -1px 0 rgba(0,0,0,0.3)',
         }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, color: 'rgba(var(--fg),0.9)', marginBottom: 20, letterSpacing: '-0.01em' }}>
-            {mode === 'signup' ? 'Create your account' : 'Welcome back'}
+            {success ? 'Check your inbox' : mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </h2>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -154,7 +154,7 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); setSuccess(''); }}
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
@@ -182,7 +182,7 @@ export default function AuthScreen({ onSignIn, onSignUp, onGoogle, loading: auth
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={e => { setPassword(e.target.value); setSuccess(''); }}
                   placeholder="••••••••"
                   required
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
