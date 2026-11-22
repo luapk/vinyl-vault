@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   const tier = tierForPrice(priceId);
   if (!tier) return res.status(400).json({ error: 'Unknown price' });
 
-  const appUrl = process.env.VITE_APP_URL || 'https://vinyl-vault-teal.vercel.app';
+  const appUrl = process.env.VITE_APP_URL || 'https://foundsound.co';
 
   const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,

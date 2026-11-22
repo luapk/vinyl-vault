@@ -21,7 +21,7 @@
 //   UNSUBSCRIBE_SECRET    required, must match the value set on Vercel
 //   CAMPAIGN_FROM         e.g. "Found Sound <hello@yourdomain.com>"
 //   CAMPAIGN_REPLY_TO     optional, defaults to the from address
-//   SITE_URL              defaults to https://vinyl-vault-teal.vercel.app
+//   SITE_URL              defaults to https://foundsound.co
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,7 +57,7 @@ const {
   UNSUBSCRIBE_SECRET,
   CAMPAIGN_FROM,
   CAMPAIGN_REPLY_TO,
-  SITE_URL = 'https://vinyl-vault-teal.vercel.app',
+  SITE_URL = 'https://foundsound.co',
 } = process.env;
 
 if (!UNSUBSCRIBE_SECRET) {

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'No Stripe customer found for this user' });
   }
 
-  const appUrl = process.env.VITE_APP_URL || 'https://vinyl-vault-teal.vercel.app';
+  const appUrl = process.env.VITE_APP_URL || 'https://foundsound.co';
 
   try {
     const session = await stripe.billingPortal.sessions.create({
