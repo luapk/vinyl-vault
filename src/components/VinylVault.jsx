@@ -4372,8 +4372,6 @@ function AccountLink({ label, onClick }) {
 function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggleTheme, onClose, onSignOut, onUpdateDisplayName, onUpdateProfile, onUpdateAvatar, onViewProfile, onPrintLabels, onDownloadCSV, onAddRecordsBulk, collection, onUpdateRecord, onRemoveRecord, onReload, isAdmin, onOpenAdmin, onUpgrade, tier, isPaid, canImport = true, onManageSubscription }) {
   const currentName = user?.user_metadata?.display_name || profile?.display_name || user?.email?.split('@')[0] || '';
   const [displayName, setDisplayName] = useState(currentName);
-  const [saving, setSaving] = useState(false);
-  const [savedOk, setSavedOk] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [openSection, setOpenSection] = useState(null);
@@ -4490,25 +4488,11 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     onUpdateAvatar(null).catch(err => setErrorMsg(err?.message || 'Could not remove photo.'));
   }
 
-  async function saveDisplayName() {
-    const name = displayName.trim();
-    if (!name) return;
-    setSaving(true);
-    setSavedOk(false);
-    setErrorMsg('');
-    try {
-      await onUpdateDisplayName(name);
-      setSavedOk(true);
-      setTimeout(() => setSavedOk(false), 3000);
-    } catch (e) {
-      setErrorMsg(e?.message || 'Could not save. Try again.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function saveProfile() {
     setProfileErr('');
+    setErrorMsg('');
+    const name = displayName.trim();
+    if (!name) { setProfileErr('Enter a collector name.'); return; }
     const uname = username.trim().toLowerCase();
     if (uname && !/^[a-z0-9_]{3,20}$/.test(uname)) {
       setProfileErr('Username: 3-20 chars, lowercase letters, numbers, underscores.');
@@ -4520,6 +4504,7 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
     }
     setProfileSaving(true);
     try {
+      await onUpdateDisplayName(name);
       await onUpdateProfile({ username: uname || undefined, bio: bio.trim(), isPublic });
       setProfileSavedOk(true);
       setTimeout(() => onClose(), 1600);
@@ -4621,37 +4606,17 @@ function AccountModal({ user, profile, accentRGB, isDark, onOpenBadges, onToggle
         {/* Accordion sections */}
         <div>
 
-          <AccountSection label="Collector name" open={openSection === 'name'} onToggle={() => toggleSection('name')}>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={displayName}
-                onChange={e => { setDisplayName(e.target.value); setSavedOk(false); setErrorMsg(''); }}
-                onKeyDown={e => e.key === 'Enter' && saveDisplayName()}
-                placeholder="Your name"
-                style={{ flex: 1, padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none' }}
-                onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
-                onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
-              />
-              <button onClick={saveDisplayName} disabled={saving || savedOk}
-                style={{
-                  padding: '8px 13px', borderRadius: 9, fontSize: 16, fontWeight: 600,
-                  color: 'var(--bg-hex)',
-                  background: saving ? 'rgba(var(--fg),0.3)' : savedOk ? 'rgba(120,220,140,0.9)' : 'rgba(var(--fg),0.9)',
-                  border: 'none',
-                  cursor: (saving || savedOk) ? 'default' : 'pointer',
-                  minWidth: 48,
-                  transition: 'background 0.2s',
-                }}>
-                {saving ? '...' : savedOk ? <Check size={13} weight="bold" /> : 'Save'}
-              </button>
-            </div>
-          </AccountSection>
-
-          <AccountSection label="Profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
-            <p style={{ fontSize: 15, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', marginBottom: 12 }}>
-              Claim a username and make your collection public so others can browse it, follow you, and react.
-            </p>
+          <AccountSection label="Collector profile" open={openSection === 'profile'} onToggle={() => toggleSection('profile')}>
+            <label style={{ display: 'block', fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={e => { setDisplayName(e.target.value); setProfileSavedOk(false); setProfileErr(''); }}
+              placeholder="Your name"
+              style={{ width: '100%', padding: '8px 11px', borderRadius: 9, fontSize: 17, color: 'var(--fg-hex)', background: 'rgba(var(--fg),0.06)', border: '1px solid rgba(var(--fg),0.1)', outline: 'none', marginBottom: 12 }}
+              onFocus={e => e.target.style.borderColor = 'rgba(var(--fg),0.3)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(var(--fg),0.1)'}
+            />
 
             <label style={{ display: 'block', fontSize: 14, fontFamily: 'monospace', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'rgba(var(--fg),0.4)', marginBottom: 6 }}>Username</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
