@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   UserCircle, EnvelopeSimple, ArrowLeft, Crown, ArrowClockwise, Stack,
-  CurrencyGbp, Sparkle, SlidersHorizontal, Lock, Globe, CalendarBlank, Warning,
+  CurrencyGbp, Sparkle, SlidersHorizontal, Lock, Globe, CalendarBlank, Warning, Flask,
 } from '@phosphor-icons/react';
+
+// Lab experiments are fetched only when the Lab tab is opened: the 3D crate
+// wall alone brings three.js (~120KB gzipped) with it.
+const CrateWall = lazy(() => import('./CrateWall.jsx'));
 import { FEATURE_TIER, FEATURE_META, TIER_RANK } from '../lib/pricing.js';
 
 // The admin panel: who is here, what they paid, when they renew, and what the
@@ -119,8 +123,9 @@ function DailySpend({ daily }) {
 
 // ---- the panel --------------------------------------------------------------
 
-export default function AdminPanel({ onBack, onFeatureTiersChanged }) {
+export default function AdminPanel({ onBack, onFeatureTiersChanged, collection = [] }) {
   const [tab, setTab]           = useState('money');
+  const [labPick, setLabPick]   = useState(null);
   const [users, setUsers]       = useState([]);
   const [metrics, setMetrics]   = useState(null);
   const [overrides, setOverrides] = useState({});
@@ -315,6 +320,7 @@ export default function AdminPanel({ onBack, onFeatureTiersChanged }) {
     { id: 'money',    label: 'Money',    icon: CurrencyGbp },
     { id: 'people',   label: 'People',   icon: UserCircle },
     { id: 'features', label: 'Features', icon: SlidersHorizontal },
+    { id: 'lab',      label: 'Lab',      icon: Flask },
   ];
 
   return (
@@ -702,6 +708,34 @@ export default function AdminPanel({ onBack, onFeatureTiersChanged }) {
             )}
           </div>
         </>
+      )}
+
+      {/* ─── LAB ───────────────────────────────────────────────────────────── */}
+      {/* Experiments that are not in the app yet. Admin-only by virtue of living
+          here: nothing in the collection links to them. */}
+      {tab === 'lab' && (
+        <div>
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-white">3D crate wall</h2>
+            <p className="text-[11px] text-white/45 leading-relaxed mt-0.5">
+              Your collection as one wall of covers. Crates sorts each tetromino of covers into its crate's stack.
+              Drag to turn, pinch or scroll to zoom, tap a cover to see what it is.
+            </p>
+          </div>
+          {collection.length === 0 ? (
+            <p className="text-xs text-white/40 py-10 text-center">Your collection is empty, so there is nothing to stack.</p>
+          ) : (
+            <Suspense fallback={<p className="text-xs text-white/40 py-16 text-center font-mono">Loading 3D view...</p>}>
+              <CrateWall records={collection} onSelect={setLabPick} accentRGB="202,254,4" />
+            </Suspense>
+          )}
+          {labPick && (
+            <p className="text-[12px] text-white/70 mt-3 font-mono truncate">
+              {labPick.artist} · {labPick.title}
+              <span className="text-white/35">{' · '}{(labPick.crates && labPick.crates[0]) || 'Unfiled'}</span>
+            </p>
+          )}
+        </div>
       )}
 
       {/* ─── FEATURES ──────────────────────────────────────────────────────── */}

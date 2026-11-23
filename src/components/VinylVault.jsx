@@ -1578,7 +1578,7 @@ export default function VinylVault() {
       {/* Main */}
       <main className="relative px-5 md:px-10 pb-20 max-w-7xl mx-auto">
         {appView === "admin" && (
-          <AdminPanel onBack={() => setAppView("collection")} onFeatureTiersChanged={reloadFeatureTiers} />
+          <AdminPanel onBack={() => setAppView("collection")} onFeatureTiersChanged={reloadFeatureTiers} collection={collection} />
         )}
         {appView === "scan" && (
           <>
