@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import {
   Camera, Upload, VinylRecord, Sparkle, X, ArrowUpRight,
   Play, Pause, Plus, Check, CaretLeft, CaretRight, CaretDown, MagnifyingGlass,
-  DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash,
+  DownloadSimple, Printer, GridNine, Stack, PencilSimple, Trash, Cube,
   Scan, Crown, SignOut, ChartBar, Users,
   ImageSquare, Mountains, CloudArrowDown, Wrench, ArrowsDownUp, ArrowsClockwise,
   MusicNotes, Waveform, Export, DeviceMobile, Rows, LockSimple, Binoculars,
@@ -32,6 +32,8 @@ import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/c
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import EqBars from './EqBars.jsx';
+// three.js is only fetched when somebody opens the 3D view.
+const CrateWall = lazy(() => import('./CrateWall.jsx'));
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
@@ -2945,8 +2947,8 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
               <PredictiveSearch value={search} onChange={setSearch} collection={collection} accentRGB={accentRGB} />
             </div>
             <div className="flex items-center rounded-full overflow-hidden" style={{ border: "1px solid rgba(var(--fg),0.08)" }}>
-              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }, { id: "list", Icon: Rows }].map(({ id, Icon }) => (
-                <button key={id} onClick={() => setViewMode(id)} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(var(--fg),0.09)" : "transparent", color: viewMode === id ? "rgba(var(--fg),0.85)" : "rgba(var(--fg),0.50)" }}>
+              {[{ id: "carousel", Icon: Stack }, { id: "grid", Icon: GridNine }, { id: "list", Icon: Rows }, { id: "wall", Icon: Cube, label: "3D crate wall" }].map(({ id, Icon, label }) => (
+                <button key={id} onClick={() => setViewMode(id)} aria-label={label} title={label} className="px-3 py-2 transition-all" style={{ background: viewMode === id ? "rgba(var(--fg),0.09)" : "transparent", color: viewMode === id ? "rgba(var(--fg),0.85)" : "rgba(var(--fg),0.50)" }}>
                   <Icon size={14} />
                 </button>
               ))}
@@ -3068,6 +3070,11 @@ function CollectionView({ collection, syncedIds, accentRGB, accessToken, userId,
 
           {viewMode === "carousel" && sortedFiltered.length > 0 && (
             <VinylCarousel records={sortedFiltered} index={carouselIdx} onIndexChange={setCarouselIdx} onPrev={goPrev} onNext={goNext} onSelect={(r) => setDetailRecordId(r.id)} onRemove={onRemove} accentRGB={accentRGB} crateColors={crateColors} selectMode={labelSelectMode} selectedIds={selectedForLabels} onToggleSelect={onToggleLabelSelect} onUpdate={onUpdate} allCrates={allCrates} smartCrateNames={smartCrateNames} crateCounts={crateCounts} />
+          )}
+          {viewMode === "wall" && sortedFiltered.length > 0 && (
+            <Suspense fallback={<div className="text-center py-16 text-white/40 text-sm font-mono">Loading 3D view...</div>}>
+              <CrateWall records={sortedFiltered} onSelect={(r) => setDetailRecordId(r.id)} accentRGB={accentRGB} />
+            </Suspense>
           )}
           {viewMode === "list" && sortedFiltered.length > 0 && (
             <RecordListView records={sortedFiltered} onSelect={(r) => setDetailRecordId(r.id)} onDownloadCSV={onDownloadCSV} accentRGB={accentRGB} />
