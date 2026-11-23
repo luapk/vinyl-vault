@@ -17,19 +17,31 @@ export async function control(path, body) {
 export const resetMock = () => control('/__test/reset', {});
 export const mockState = () => control('/__test/state');
 
-// Sign in through the real flow: pricing landing -> login screen -> app shell.
+// Sign in through the real flow. A browser that has never been here gets the
+// promo reel, then the pricing screen, then the login screen; one that has
+// seen the reel goes straight to the login screen.
 export async function signIn(page, { email, password } = JON) {
   await page.goto('/');
-  // Signed-out visitors land on the pricing screen first.
-  await page.getByRole('button', { name: 'Sign in' }).first().click();
-  await page.getByPlaceholder('you@example.com').fill(email);
+  const reelSkip = page.getByRole('dialog', { name: /demo/ }).getByRole('button', { name: 'Skip' });
+  const emailField = page.getByPlaceholder('you@example.com');
+  const pricingSignIn = page.getByRole('button', { name: 'Sign in' }).first();
+  await expect(reelSkip.or(emailField).or(pricingSignIn).first()).toBeVisible({ timeout: 15_000 });
+  if (await reelSkip.isVisible().catch(() => false)) await reelSkip.click();
+  if (!(await emailField.isVisible().catch(() => false))) await pricingSignIn.click();
+  await emailField.fill(email);
   await page.getByPlaceholder('••••••••').fill(password);
+  // The shell renders before the profile lands, and until it does the account
+  // reads as the free tier: a spec that imports in that window is shown the
+  // upgrade offer instead. The first-run walkthrough used to cover that gap by
+  // accident, since dismissing it took longer than the fetch; wait for it.
+  const profileLoaded = page.waitForResponse(
+    (r) => r.url().includes('/rest/v1/profiles') && r.request().method() === 'GET' && r.ok(),
+    { timeout: 15_000 }).catch(() => {});
   await page.getByRole('button', { name: 'Sign in' }).click();
   // Signed-in shell: the account settings button exists only past the auth gate.
   await expect(page.locator('button[title="Account settings"]')).toBeVisible({ timeout: 15_000 });
-  // First-run walkthrough overlay would intercept clicks: dismiss if shown.
-  const skip = page.getByRole('button', { name: 'Skip' });
-  if (await skip.isVisible().catch(() => false)) await skip.click();
+  await profileLoaded;
+  await page.waitForTimeout(250);
 }
 
 // Bulk import (a file, a pasted list, a Discogs collection) is a Selector

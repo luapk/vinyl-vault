@@ -31,12 +31,11 @@ async function open(page, seen) {
   return { asked: seen.slice(before), img };
 }
 
-// The first-run walkthrough overlay renders BEFORE the splash, so the splash
-// is never reached without dismissing it.
+// The splash shows while auth loads, before the signed-out gate (the promo
+// reel, then pricing) is decided, so nothing has to be dismissed to reach it.
 async function prime(page, { rotationCounter = null, heroSeen = null } = {}) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(([i, h]) => {
-    localStorage.setItem('walkthroughSeen', '1');
     localStorage.removeItem('vv_splash_i');
     localStorage.removeItem('vv_splash_hero');
     if (i !== null) localStorage.setItem('vv_splash_i', i);

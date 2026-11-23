@@ -156,7 +156,7 @@ shared device, the smart-crate runs (which may only ever ADD crate names), the
 file import under Discogs rate limiting (a 429 must never be saved as an
 unmatched record) and the tier gate on it (a free account is offered the
 upgrade and spends no Discogs quota, a Selector account still imports), and
-the rule that a community profile can never become somebody's home page, the About route and its walkthrough carousel, the wishlist and Trace rules (a pinned record
+the rule that a community profile can never become somebody's home page, the About route and its walkthrough carousel, the promo reel as a new visitor's first screen (and straight to sign-in after that), the wishlist and Trace rules (a pinned record
 survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), the home screen's four ways in (all above the fold at
@@ -378,6 +378,7 @@ src/
     Badges.jsx         # milestone unlock card + the grid in the account panel
     FileImport.jsx     # CSV/text import hook + status list, shared by home and account
     Wishlist.jsx       # the Wishlist tab: pin a record, trace it, keep the answer
+    DemoReel.jsx       # the promo reel: a new visitor's first screen, and Watch demo on About
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
@@ -454,15 +455,42 @@ route to `AboutView`, which existed in the file unrendered for a long time, so
 the one page explaining the product could not be opened by anyone. That route
 is now asserted by `stress/about.spec.mjs` rather than trusted.
 
-**About opens on the first-run walkthrough, as a carousel.** `WalkthroughCard`
-is shared by `WalkthroughOverlay` and `AboutWalkthrough`, and everything above
-the footer is identical in both on purpose: the point of putting it on About
-is that it is the thing the user already saw. Only the controls differ. On the
-overlay it is a sequence, so the rail fills up to the current step and there
-is a Skip. On About nothing is in sequence, so it wraps at both ends, the rail
-becomes real buttons that mark only the current step, and there is no Skip,
-because nothing is being skipped. A filled-to-here rail would imply a progress
-the reader is not making.
+**A new visitor's first screen is the promo reel.** `DemoReel`
+(`src/components/DemoReel.jsx`, `public/demo-reel.mp4` + `.jpg`) plays full
+screen ahead of the pricing tiers, then hands over to them. The route is:
+splash while auth loads, then the reel, then `PricingScreen`, then
+`AuthScreen`. Rules that hold it together, all asserted by
+`stress/intro.spec.mjs`:
+
+- **It waits for a tap.** Browsers autoplay only muted, and the reel is
+  carried by its voiceover, so it opens on the poster with a play button.
+  Skip is over it from the first frame, focused, and Escape does the same.
+- **Seen once per device.** `vv_reel_seen` (device-wide, not user-scoped:
+  there is no user yet) is set when the reel ends or is skipped. From then on
+  a signed-out visit skips the reel AND the tiers and opens `AuthScreen` in
+  sign-in mode, because somebody who has been here before is coming back to
+  sign in, not to shop.
+- **A reel that fails to load is a Skip.** `onError` ends it, so a missing or
+  blocked video can never stand between a visitor and the app.
+- **Signed in never sees it**, whatever the flag says.
+- About has a **Watch demo** button that opens the same component with Close
+  in place of Skip.
+- Bump `REEL_V` in `DemoReel.jsx` when the file changes at the same path.
+
+It replaced the first-run walkthrough overlay that used to appear after
+sign-up: two introductions to one product, one before you had an account and
+one after. Note for specs: the walkthrough used to cover the gap between the
+signed-in shell rendering and the profile landing, by accident, so a spec that
+imported straight after sign-in was offered the upgrade (the tier reads as
+free until the profile is in). `signIn` in `stress/helpers.mjs` now waits for
+the profile instead.
+
+**About opens on the walkthrough steps, as a carousel.** `AboutWalkthrough`
+renders `WalkthroughCard`, which once also drove the post-sign-up overlay. On
+About nothing is in sequence, so it wraps at both ends, the rail is real
+buttons that mark only the current step, and there is no Skip, because
+nothing is being skipped. A filled-to-here rail would imply a progress the
+reader is not making.
 
 This replaced a second "How it works" grid on About that explained the same
 four steps with `video: null` placeholder icons, because no clip was ever
@@ -511,9 +539,8 @@ so in light mode the keyline, the counter and the rail become ink, the same
 swap `AddCard` makes on the home screen. The disc stays acid in both: it is a
 fill behind black-and-white artwork, not text.
 
-Both footers go through `walkthroughBtn` so the two callers cannot drift.
-They were each written for the acid card (ink on a faint ink wash) and would
-have been black on black here.
+The footer goes through `walkthroughBtn`. It was written for the acid card
+(ink on a faint ink wash) and would have been black on black here.
 
 Note for anyone writing a test against this card: find it by STRUCTURE, not by
 colour. `about.spec.mjs` climbed the tree until it hit an acid background, and

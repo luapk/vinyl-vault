@@ -32,6 +32,7 @@ import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/c
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import EqBars from './EqBars.jsx';
+import DemoReel from './DemoReel.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
@@ -774,15 +775,21 @@ export default function VinylVault() {
     greetingRef.current = { name: displayName, text: getGreeting(displayName) };
   }
   const greeting = user ? greetingRef.current.text : null;
-  const [showWalkthrough, setShowWalkthrough] = useState(() => !localStorage.getItem('walkthroughSeen'));
+  // A signed-out visitor's first screen is the promo reel, then the tiers.
+  // Once this device has seen the reel (watched or skipped), a signed-out
+  // visit goes straight to sign-in: they have met the product already.
+  // Device-wide rather than per user, because nobody is signed in yet.
+  const [reelSeen, setReelSeen] = useState(() => {
+    try { return !!localStorage.getItem('vv_reel_seen'); } catch { return false; }
+  });
   // Owned here rather than inside the scan view: tapping NEW SCAN must open
   // the camera whether that view is already mounted or not, and closing the
   // camera should leave the user on the scan screen.
   const [cameraOpen, setCameraOpen] = useState(false);
-  // Pricing screen: always shown to unauthenticated visitors before auth.
-  // Dismissed in-session only -- no localStorage needed.
-  const [pricingSeen, setPricingSeen] = useState(false);
-  const [authInitialMode, setAuthInitialMode] = useState('signup');
+  // Pricing screen: follows the reel on a first visit, skipped on return
+  // visits. Dismissed in-session only.
+  const [pricingSeen, setPricingSeen] = useState(() => reelSeen);
+  const [authInitialMode, setAuthInitialMode] = useState(() => (reelSeen ? 'signin' : 'signup'));
   const [showAccount, setShowAccount] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(() => new URLSearchParams(window.location.search).get('checkout') === 'success');
@@ -1034,16 +1041,18 @@ export default function VinylVault() {
     });
   }, []);
 
-  // Gate: unauthenticated visitors see pricing first, then auth.
+  // Gate: a first-time visitor sees the reel, then pricing, then auth; a
+  // returning one goes straight to sign-in.
   // Splash shows while auth resolves, with a minimum hold so the mascot
-  // animation reads even when the session restores instantly.
+  // animation reads even when the session restores instantly. The reel waits
+  // for that answer, so somebody already signed in is never shown it.
   if (isSupabaseEnabled && (authLoading || splashHold)) {
-    if (showWalkthrough) {
-      return <WalkthroughOverlay onDismiss={() => { safeSetItem(localStorage, 'walkthroughSeen', '1'); setShowWalkthrough(false); }} />;
-    }
     return <SplashScreen />;
   }
   if (isSupabaseEnabled && !authLoading && !user) {
+    if (!reelSeen) {
+      return <DemoReel mode="intro" onDone={() => { safeSetItem(localStorage, 'vv_reel_seen', '1'); setReelSeen(true); }} />;
+    }
     if (!pricingSeen) {
       return (
         <PricingScreen
@@ -1660,13 +1669,6 @@ export default function VinylVault() {
           onUnreadChange={setMsgUnread}
           onlineUsers={onlineUsers}
         />
-      )}
-
-      {showWalkthrough && appView === 'scan' && (
-        <WalkthroughOverlay onDismiss={() => {
-          safeSetItem(localStorage, 'walkthroughSeen', '1');
-          setShowWalkthrough(false);
-        }} />
       )}
 
       {saveAnim && <SaveConfirmation release={saveAnim.release} accentRGB={accentRGB} />}
@@ -5803,8 +5805,18 @@ function AboutWalkthrough() {
 }
 
 function AboutView({ accentRGB }) {
+  const [showDemo, setShowDemo] = useState(false);
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
+      <button onClick={() => setShowDemo(true)}
+        className="mb-6 inline-flex items-center gap-2.5 rounded-full pl-2 pr-5 py-2 font-semibold text-[15px] transition-opacity hover:opacity-90"
+        style={{ background: '#cafe04', color: '#0d0c0a' }}>
+        <span className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: '#0d0c0a', color: '#cafe04' }}>
+          <Play size={13} weight="fill" style={{ marginLeft: 2 }} />
+        </span>
+        Watch demo
+      </button>
+      {showDemo && <DemoReel mode="demo" onDone={() => setShowDemo(false)} />}
       <AboutWalkthrough />
 
       <div className="text-[13px] tracking-[0.35em] uppercase mb-5 text-white/25 font-mono">About</div>
@@ -7512,7 +7524,7 @@ function LabelModal({ record, accentRGB, onClose }) {
   );
 }
 
-// ----- WalkthroughOverlay ----------------------------------------------------
+// ----- Walkthrough steps (the About carousel) ---------------------------------
 
 // Four steps, acid and ink, matching the splash and pricing screens. Each step
 // has a mascot clip in /walkthrough (see public/walkthrough/BRIEFS.md for the
@@ -7682,36 +7694,6 @@ export function walkthroughBtn(kind) {
     return { background: accent, color: onAccent, border: 'none', fontWeight: 700, letterSpacing: '0.02em', cursor: 'pointer' };
   }
   return { background: 'transparent', color: 'rgba(var(--fg),0.72)', border: '1px solid rgba(var(--fg),0.18)', fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer' };
-}
-
-function WalkthroughOverlay({ onDismiss }) {
-  const steps = WALKTHROUGH_STEPS;
-  const [step, setStep] = useState(0);
-  const isLast = step === steps.length - 1;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: 'rgba(8,8,12,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-    >
-      <WalkthroughCard index={step} steps={steps} footer={<>
-        <button
-          onClick={() => { if (isLast) { onDismiss(); } else { setStep(s => s + 1); } }}
-          className="w-full py-3 rounded-xl text-sm mb-2.5 transition-opacity hover:opacity-85"
-          style={walkthroughBtn('primary')}
-        >
-          {isLast ? "Start digging" : 'Next'}
-        </button>
-        <button
-          onClick={onDismiss}
-          className="text-xs font-mono transition-opacity hover:opacity-70"
-          style={{ color: 'rgba(var(--fg),0.45)', background: 'transparent', border: 'none', cursor: 'pointer' }}
-        >
-          Skip
-        </button>
-      </>} />
-    </div>
-  );
 }
 
 // eslint-disable-next-line no-unused-vars -- built, not yet routed to.
