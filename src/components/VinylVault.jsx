@@ -31,6 +31,7 @@ import { legibleAccentRGB } from '../lib/accentContrast.js';
 import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/collectionFocus.js';
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
+import EqBars from './EqBars.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
@@ -6642,10 +6643,19 @@ function TrackBpmRow({ t, accentRGB, playing, onPlay, detecting }) {
       </div>
 
       {/* Play */}
+      {/* The EQ hangs in the gap left of the button, so the BPM column keeps
+          its alignment with the rows that are not playing. */}
       {t.previewUrl ? (
-        <button onClick={() => onPlay(t.previewUrl)} className="rounded-full flex items-center justify-center transition-all shrink-0" style={{ width: 30, height: 30, background: isPlaying ? `rgba(${accentRGB},0.18)` : 'transparent', border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : '1px solid rgba(var(--fg),0.13)', color: isPlaying ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.5)' }}>
-          {isPlaying ? <Pause size={11} weight="fill" /> : <Play size={11} weight="fill" />}
-        </button>
+        <div className="relative shrink-0 flex">
+          {isPlaying && (
+            <span className="absolute flex" style={{ right: 'calc(100% + 3px)', top: '50%', transform: 'translateY(-50%)' }}>
+              <EqBars color={`rgb(${accentRGB})`} />
+            </span>
+          )}
+          <button onClick={() => onPlay(t.previewUrl)} className="rounded-full flex items-center justify-center transition-all shrink-0" style={{ width: 30, height: 30, background: isPlaying ? `rgba(${accentRGB},0.18)` : 'transparent', border: isPlaying ? `1px solid rgba(${accentRGB},0.35)` : '1px solid rgba(var(--fg),0.13)', color: isPlaying ? `rgb(${accentRGB})` : 'rgba(var(--fg),0.5)' }}>
+            {isPlaying ? <Pause size={11} weight="fill" /> : <Play size={11} weight="fill" />}
+          </button>
+        </div>
       ) : <div className="w-[30px] shrink-0" />}
     </div>
   );

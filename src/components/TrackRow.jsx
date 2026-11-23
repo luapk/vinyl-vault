@@ -6,11 +6,21 @@
 // community view. Importing it from VinylVault would have made Community and
 // VinylVault import each other.
 import { Play, Pause, Clock } from "@phosphor-icons/react";
+import EqBars from "./EqBars";
 
 export default function TrackRow({ track, index, accentRGB, playingPreview, onPlay, bpmLoading, onHotToggle }) {
   const isPlaying = track.previewUrl && playingPreview === track.previewUrl;
 
-  const PlayBtn = ({ size = 9 }) => track.previewUrl ? (
+  // eqInline: the bars take space in the row (mobile, where only the title
+  // gives way). Otherwise they hang in the gap to the left of the button, so
+  // the duration and BPM columns stay aligned with the rows that are not playing.
+  const PlayBtn = ({ size = 9, eqInline = false }) => track.previewUrl ? (
+    <div className="relative flex items-center shrink-0" style={{ gap: 5 }}>
+      {isPlaying && (eqInline
+        ? <EqBars color={`rgb(${accentRGB})`} />
+        : <span className="absolute flex" style={{ right: "calc(100% + 5px)", top: "50%", transform: "translateY(-50%)" }}>
+            <EqBars color={`rgb(${accentRGB})`} />
+          </span>)}
     <button onClick={() => onPlay(track.previewUrl)}
       className="rounded-full flex items-center justify-center transition-all shrink-0"
       style={{
@@ -21,6 +31,7 @@ export default function TrackRow({ track, index, accentRGB, playingPreview, onPl
       }}>
       {isPlaying ? <Pause size={size} weight="fill" /> : <Play size={size} weight="fill" />}
     </button>
+    </div>
   ) : null;
 
   return (
@@ -65,7 +76,7 @@ export default function TrackRow({ track, index, accentRGB, playingPreview, onPl
       </div>
       {/* Mobile play button: sits in the "auto" third column */}
       <div className="md:hidden flex items-center justify-center">
-        <PlayBtn size={10} />
+        <PlayBtn size={10} eqInline />
       </div>
       {/* Desktop columns */}
       <div className="hidden md:flex items-center gap-1 text-[14px] text-white/50 tabular-nums font-mono"><Clock size={11} />{track.duration || "—"}</div>
