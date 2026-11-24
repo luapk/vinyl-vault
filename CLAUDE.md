@@ -466,8 +466,14 @@ splash while auth loads, then the reel, then `PricingScreen`, then
 `stress/intro.spec.mjs`:
 
 - **It waits for a tap.** Browsers autoplay only muted, and the reel is
-  carried by its voiceover, so it opens on the poster with a play button.
-  Skip is over it from the first frame, focused, and Escape does the same.
+  carried by its voiceover, so it opens on the poster with a Watch demo
+  button. Skip is over it from the first frame, focused, and Escape does the
+  same.
+- **Its buttons are one object.** `ReelPill` (exported from `DemoReel.jsx`)
+  is Watch demo, Skip and About's Watch demo alike: an acid lozenge, ink caps,
+  the icon in an ink disc, and a 2px ink keyline that keeps acid readable on
+  the acid poster. They began as an acid disc and a paper pill, which read as
+  two designers. Watch demo sits low on the frame, not over the character.
 - **Seen once per device.** `vv_reel_seen` (device-wide, not user-scoped:
   there is no user yet) is set when the reel ends or is skipped. From then on
   a signed-out visit skips the reel AND the tiers and opens `AuthScreen` in

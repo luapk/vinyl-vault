@@ -4,13 +4,49 @@
 // It waits for a tap rather than autoplaying: browsers only autoplay muted,
 // and the reel is carried by its voiceover. A video that fails to load must
 // never stand between a visitor and the app, so an error ends it like Skip.
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { Play, Pause, X, ArrowRight } from '@phosphor-icons/react';
 import { APP_NAME } from '../lib/brand.js';
 
 // Bump when public/demo-reel.mp4 changes at the same path, to bust caches.
 const REEL_V = '1';
 const ACID = '#cafe04';
+const INK = '#0d0c0a';
+
+// The reel's buttons, and About's "Watch demo", are one object in two sizes:
+// an acid lozenge, ink caps, and the icon in an ink disc. They were two styles
+// (an acid disc for play, a paper pill for Skip), which read as two designers.
+// Exported so the About page cannot drift from the screen it opens.
+export const ReelPill = forwardRef(function ReelPill({ label, icon: Icon, iconSide = 'left', size = 'lg', ...rest }, ref) {
+  const lg = size === 'lg';
+  const disc = lg ? 38 : 28;
+  const pad = lg ? 6 : 5;
+  const iconEl = (
+    <span aria-hidden="true" className="flex items-center justify-center rounded-full flex-shrink-0"
+      style={{ width: disc, height: disc, background: INK, color: ACID }}>
+      <Icon size={lg ? 16 : 13} weight={Icon === Play ? 'fill' : 'bold'} style={Icon === Play ? { marginLeft: 2 } : undefined} />
+    </span>
+  );
+  return (
+    <button ref={ref} {...rest}
+      className={`inline-flex items-center rounded-full font-mono font-bold uppercase transition-transform hover:scale-[1.03] active:scale-[0.98] ${rest.className || ''}`}
+      style={{
+        // The ink keyline is what keeps an acid pill readable on the acid
+        // poster; on black it simply disappears.
+        background: ACID, color: INK, border: `2px solid ${INK}`,
+        outlineColor: ACID, outlineOffset: 3,
+        gap: lg ? 12 : 9,
+        padding: iconSide === 'left' ? `${pad}px ${lg ? 24 : 16}px ${pad}px ${pad}px` : `${pad}px ${pad}px ${pad}px ${lg ? 24 : 16}px`,
+        fontSize: lg ? 15 : 12, letterSpacing: '0.16em',
+        boxShadow: '0 10px 32px rgba(0,0,0,0.45)',
+        ...rest.style,
+      }}>
+      {iconSide === 'left' && iconEl}
+      <span style={{ marginRight: '-0.16em' }}>{label}</span>
+      {iconSide === 'right' && iconEl}
+    </button>
+  );
+});
 
 export default function DemoReel({ onDone, mode = 'intro' }) {
   const videoRef = useRef(null);
@@ -63,17 +99,24 @@ export default function DemoReel({ onDone, mode = 'intro' }) {
       />
 
       {state !== 'playing' && (
-        <button onClick={state === 'ready' ? play : toggle}
-          aria-label={state === 'ready' ? 'Play the demo with sound' : 'Resume the demo'}
-          className="absolute flex items-center justify-center rounded-full transition-transform hover:scale-105"
-          style={{ width: 92, height: 92, background: ACID, color: '#0d0c0a', boxShadow: '0 10px 40px rgba(0,0,0,0.45)' }}>
-          <Play size={38} weight="fill" style={{ marginLeft: 5 }} />
-        </button>
+        // Low on the frame, not dead centre: the centre of the poster is the
+        // character, and a button over his face reads as an accident.
+        <div className="absolute left-0 right-0 flex justify-center pointer-events-none"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)' }}>
+          <ReelPill onClick={state === 'ready' ? play : toggle}
+            label={state === 'ready' ? 'Watch demo' : 'Resume'}
+            icon={Play} className="pointer-events-auto" />
+        </div>
       )}
       {state === 'ready' && (
-        <div className="absolute left-0 right-0 text-center font-mono text-[12px] tracking-[0.18em] uppercase pointer-events-none"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 44px)', color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
-          Tap to watch, with sound · 50 sec
+        // On its own ink chip: where the poster fills a short screen this line
+        // lands on acid, and white on acid is unreadable.
+        <div className="absolute left-0 right-0 flex justify-center pointer-events-none"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}>
+          <span className="font-mono text-[11px] tracking-[0.18em] uppercase rounded-full"
+            style={{ padding: '5px 12px', background: INK, color: 'rgba(247,248,242,0.8)' }}>
+            With sound · 50 sec
+          </span>
         </div>
       )}
       {state === 'playing' && (
@@ -84,12 +127,9 @@ export default function DemoReel({ onDone, mode = 'intro' }) {
         </button>
       )}
 
-      <button ref={skipRef} onClick={onDone}
-        className="absolute right-4 flex items-center gap-1.5 rounded-full font-semibold text-[15px] transition-opacity hover:opacity-90"
-        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', padding: '10px 18px', background: '#f7f8f2', color: '#0d0c0a', boxShadow: '0 4px 20px rgba(0,0,0,0.45)' }}>
-        {leaveLabel}
-        {mode === 'intro' ? <ArrowRight size={16} weight="bold" /> : <X size={16} weight="bold" />}
-      </button>
+      <ReelPill ref={skipRef} onClick={onDone} label={leaveLabel} size="sm" iconSide="right"
+        icon={mode === 'intro' ? ArrowRight : X} className="absolute right-4"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }} />
 
       <div className="absolute left-0 right-0 bottom-0 h-[3px]" style={{ background: 'rgba(255,255,255,0.12)' }} aria-hidden="true">
         <div className="h-full" style={{ width: `${progress * 100}%`, background: ACID }} />

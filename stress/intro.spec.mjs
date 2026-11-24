@@ -16,7 +16,7 @@ test('first visit: the reel, then the tiers; next visit: straight to sign-in', a
   await page.goto('/');
 
   await expect(reel(page)).toBeVisible({ timeout: 15_000 });
-  await expect(reel(page).getByRole('button', { name: 'Play the demo with sound' })).toBeVisible();
+  await expect(reel(page).getByRole('button', { name: 'Watch demo' })).toBeVisible();
   // The way out is there before anything plays.
   await reel(page).getByRole('button', { name: 'Skip' }).click();
   await expect(reel(page)).toBeHidden();

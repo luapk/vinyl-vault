@@ -32,7 +32,7 @@ import { decadeCounts as tallyDecades, matchesFocus, focusLabel } from '../lib/c
 import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import EqBars from './EqBars.jsx';
-import DemoReel from './DemoReel.jsx';
+import DemoReel, { ReelPill } from './DemoReel.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planAllCelebrations, loadLedger, saveLedger, allUnlockDates, measureAll, suiteLedger } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
@@ -5820,14 +5820,8 @@ function AboutView({ accentRGB }) {
   const [showDemo, setShowDemo] = useState(false);
   return (
     <div className="pt-8 md:pt-14 max-w-2xl" style={{ animation: "fadeUp 0.5s ease-out" }}>
-      <button onClick={() => setShowDemo(true)}
-        className="mb-6 inline-flex items-center gap-2.5 rounded-full pl-2 pr-5 py-2 font-semibold text-[15px] transition-opacity hover:opacity-90"
-        style={{ background: '#cafe04', color: '#0d0c0a' }}>
-        <span className="flex items-center justify-center rounded-full" style={{ width: 30, height: 30, background: '#0d0c0a', color: '#cafe04' }}>
-          <Play size={13} weight="fill" style={{ marginLeft: 2 }} />
-        </span>
-        Watch demo
-      </button>
+      <ReelPill onClick={() => setShowDemo(true)} label="Watch demo" icon={Play} size="sm"
+        className="mb-6" style={{ boxShadow: 'none' }} />
       {showDemo && <DemoReel mode="demo" onDone={() => setShowDemo(false)} />}
       <AboutWalkthrough />
 
