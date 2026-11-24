@@ -19,8 +19,8 @@ export function recordFromMatch(match, row) {
     year: match.year || null,
     country: match.country || null,
     format: match.format || null,
-    genres: [],
-    tags: [],
+    genres: match.genres || [],
+    tags: [...(match.genres || [])],
     identified: true,
     confidence: 'high',
     // The lazy tracklist enrichment on the client keys on this source, so an
@@ -79,6 +79,9 @@ export function patchFromMatch(match, existing) {
     country: match.country || null,
     format: match.format || null,
     coverUrl: match.coverUrl || null,
+    // Only when the match has some: an older search result without genres
+    // must not blank genres a draft somehow already carries.
+    ...(match.genres?.length ? { genres: match.genres } : {}),
     identified: true,
     confidence: 'high',
     source: 'discogs_import',

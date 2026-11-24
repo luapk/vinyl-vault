@@ -71,3 +71,17 @@ describe('patchFromMatch', () => {
     }
   });
 });
+
+describe('genres on imported records', () => {
+  it('a match carries its genres onto the record it creates', () => {
+    const r = recordFromMatch({ ...MATCH, genres: ['Electronic', 'Synth-pop'] }, { artist: 'x', title: 'y' });
+    expect(r.genres).toEqual(['Electronic', 'Synth-pop']);
+  });
+
+  it('a retry patch adds genres when it has some, and never blanks them when it has none', () => {
+    expect(patchFromMatch({ ...MATCH, genres: ['Jazz'] }, {}).genres).toEqual(['Jazz']);
+    expect('genres' in patchFromMatch({ ...MATCH, genres: [] }, {})).toBe(false);
+    expect('genres' in patchFromMatch(MATCH, {})).toBe(false);
+  });
+});
+

@@ -124,3 +124,50 @@ export const DISCOGS_COUNTRIES = [
   'Serbia', 'Slovakia', 'Slovenia', 'Taiwan', 'Trinidad & Tobago', 'Turkey',
   'Ukraine', 'Uruguay', 'Venezuela',
 ];
+
+// ----- passport stamps -------------------------------------------------------
+// One stamp per country a collection's pressings were made in, for the
+// Passport badges. Same vocabulary as the flags, so "UK", "United Kingdom" and
+// "England" are one stamp, not three.
+//
+// Three rules, each a decision:
+// - A region is not a country. "Europe", "Worldwide", "Benelux" and friends
+//   stamp nothing, or a collection of EU pressings would read as well
+//   travelled.
+// - A combined territory ("UK, Europe & US") stamps its FIRST real country
+//   only, the same reading isoFor gives it. Granting every member would hand
+//   out three stamps for one sleeve.
+// - A country with no flag still stamps. Yugoslavia, the USSR and the GDR are
+//   exactly the pressings a collector is proud of; they have no emoji, not no
+//   passport. Anything else outside the map stamps under its own name.
+const REGIONS = new Set([
+  'europe', 'eu', 'scandinavia', 'benelux', 'worldwide', 'unknown',
+  'africa', 'asia', 'australasia', 'central america', 'north america',
+  'south america', 'latin america', 'south east asia', 'southeast asia',
+  'middle east', 'gulf cooperation council', 'balkans', 'baltic states',
+  'none', 'not on label',
+]);
+
+const ONE_STATE = {
+  'soviet union': 'ussr', 'east germany': 'gdr',
+  'german democratic republic (gdr)': 'gdr',
+};
+
+function stampForPart(part) {
+  if (!part || REGIONS.has(part)) return null;
+  if (ISO[part] && ISO[part] !== 'EU') return ISO[part];
+  return ONE_STATE[part] || part;
+}
+
+export function passportStamp(country) {
+  const key = String(country || '').trim().toLowerCase();
+  if (!key || REGIONS.has(key)) return null;
+  if (ISO[key] || ONE_STATE[key] || NO_FLAG.has(key)) return stampForPart(key);
+  const parts = key.split(TERRITORY_SEPARATOR).map(p => p.trim()).filter(Boolean);
+  if (parts.length < 2) return stampForPart(key);
+  for (const part of parts) {
+    const s = stampForPart(part);
+    if (s) return s;
+  }
+  return null;
+}

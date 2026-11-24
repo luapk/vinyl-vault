@@ -1,7 +1,7 @@
 const BASE = 'https://api.discogs.com';
 const UA = 'VinylVault/1.0';
 
-function authHeaders() {
+export function authHeaders() {
   const token = process.env.DISCOGS_PERSONAL_ACCESS_TOKEN;
   if (!token) throw new Error('DISCOGS_PERSONAL_ACCESS_TOKEN not configured');
   return {
@@ -267,6 +267,10 @@ export async function searchDiscogs({ catalogNumber, barcode, artist, title, lab
       country: r.country || null,
       format: Array.isArray(r.format) ? r.format.join(', ') : (r.format || null),
       coverUrl: r.cover_image || null,
+      // A search result carries genre and style already. File imports save
+      // straight from a match, and dropping these left every imported record
+      // with no genres at all, so the Range badges could not see them.
+      genres: [...(Array.isArray(r.genre) ? r.genre : []), ...(Array.isArray(r.style) ? r.style : [])],
       viaBarcode: barcodeHitIds.has(r.id) || undefined,
     };
   });

@@ -4,12 +4,22 @@ import { useEffect, useRef } from 'react';
 import {
   Alien, Planet, Rocket, RocketLaunch, FlyingSaucer, MoonStars,
   Meteor, Star, Sun, LockSimple, X,
+  ClockCounterClockwise, Hourglass, Spiral, Aperture,
+  Faders, Ear, Waves, Shuffle, Infinity as InfinityIcon,
+  Suitcase, Stamp, AirplaneTilt, GlobeHemisphereWest, Globe,
 } from '@phosphor-icons/react';
 import {
-  BADGE_TIERS, unlockedCounts, nextTier, progressToward, highestEarned,
+  SUITES, unitFor, suiteUnlocked, suiteNext, suiteProgress, highestEarned, suiteLedger,
 } from '../lib/badges.js';
 
-const ICONS = { Alien, Planet, Rocket, RocketLaunch, FlyingSaucer, MoonStars, Meteor, Star, Sun };
+const suiteCelebrated = (ledger, id) => suiteLedger(ledger, id).celebrated;
+
+const ICONS = {
+  Alien, Planet, Rocket, RocketLaunch, FlyingSaucer, MoonStars, Meteor, Star, Sun,
+  ClockCounterClockwise, Hourglass, Spiral, Aperture,
+  Faders, Ear, Waves, Shuffle, Infinity: InfinityIcon,
+  Suitcase, Stamp, AirplaneTilt, GlobeHemisphereWest, Globe,
+};
 const iconFor = (name) => ICONS[name] || Star;
 
 const ACID = '#cafe04';
@@ -25,6 +35,14 @@ const fmtDate = (ts) => {
     return null;
   }
 };
+
+// "12 more to Escape Velocity" was enough when records were the only unit;
+// with four ladders the unit has to be said.
+function nextLine(suite, value, next) {
+  if (!next) return suite.id === 'records' ? 'Every badge in the vault is yours.' : `Every ${suite.title} badge is yours.`;
+  const gap = Math.max(0, next.count - value);
+  return `${fmt(gap)} more ${unitFor(suite, gap)} to ${next.name}`;
+}
 
 const reducedMotion = () =>
   typeof window !== 'undefined'
@@ -76,10 +94,14 @@ function playFanfare() {
 
 // ----- full-screen unlock card ----------------------------------------------
 
-export function BadgeCelebration({ badge, count, celebrated = [], onClose, onViewBadges }) {
+// `suite` decides the colour, the unit and the ladder the card ends on. It
+// defaults to the records ladder, which is what every card was before the
+// other suites existed.
+export function BadgeCelebration({ badge, suite = SUITES[0], count, celebrated = [], onClose, onViewBadges }) {
   const Icon = iconFor(badge.icon);
-  const next = nextTier(count, celebrated);
-  const unlocked = unlockedCounts(count, celebrated);
+  const ACID = suite.colour;
+  const next = suiteNext(suite, count, celebrated);
+  const unlocked = suiteUnlocked(suite, count, celebrated);
   const still = reducedMotion();
   const playedRef = useRef(false);
 
@@ -120,8 +142,8 @@ export function BadgeCelebration({ badge, count, celebrated = [], onClose, onVie
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 400, width: '100%' }}>
 
-        <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.5)', marginBottom: 22, ...rise(0.05) }}>
-          Badge unlocked
+        <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.75)', marginBottom: 22, ...rise(0.05) }}>
+          {suite.id === 'records' ? 'Badge unlocked' : `${suite.title} badge unlocked`}
         </div>
 
         {/* The seal */}
@@ -139,8 +161,8 @@ export function BadgeCelebration({ badge, count, celebrated = [], onClose, onVie
           {badge.name}
         </h2>
 
-        <div style={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.62)', marginBottom: 16, ...rise(0.36) }}>
-          {fmt(badge.count)} records
+        <div style={{ fontSize: 12, fontFamily: 'monospace', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.75)', marginBottom: 16, ...rise(0.36) }}>
+          {fmt(badge.count)} {unitFor(suite, badge.count)}
         </div>
 
         <p style={{ fontSize: 16, lineHeight: 1.5, color: 'rgba(8,8,12,0.78)', margin: '0 auto 26px', maxWidth: 320, ...rise(0.42) }}>
@@ -149,21 +171,19 @@ export function BadgeCelebration({ badge, count, celebrated = [], onClose, onVie
 
         {/* Where this sits on the ladder, so the card ends on a next step */}
         <div style={{ maxWidth: 300, margin: '0 auto 30px', ...rise(0.50) }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.5)', marginBottom: 8 }}>
-            <span>{unlocked.size} of {BADGE_TIERS.length} unlocked</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(8,8,12,0.75)', marginBottom: 8 }}>
+            <span>{unlocked.size} of {suite.tiers.length} unlocked</span>
             {next && <span>Next at {fmt(next.count)}</span>}
           </div>
           <div style={{ height: 5, borderRadius: 3, background: 'rgba(8,8,12,0.16)', overflow: 'hidden' }}>
             <div style={{
-              width: `${Math.round(progressToward(count, next) * 100)}%`, height: '100%',
+              width: `${Math.round(suiteProgress(suite, count, next) * 100)}%`, height: '100%',
               background: INK, borderRadius: 3,
               transition: still ? 'none' : 'width 0.8s cubic-bezier(0.22,1,0.36,1)',
             }} />
           </div>
-          <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(8,8,12,0.5)', marginTop: 9 }}>
-            {next
-              ? `${fmt(Math.max(0, next.count - count))} more to ${next.name}`
-              : 'Every badge in the vault is yours.'}
+          <div style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(8,8,12,0.75)', marginTop: 9 }}>
+            {nextLine(suite, count, next)}
           </div>
         </div>
 
@@ -224,19 +244,20 @@ export function BadgeChip({ count = 0, size = 'md' }) {
 
 // ----- account panel grid ----------------------------------------------------
 
-export function BadgeGrid({ count = 0, celebrated = [], dates = {} }) {
-  const unlocked = unlockedCounts(count, celebrated);
-  const next = nextTier(count, celebrated);
-  const pct = Math.round(progressToward(count, next) * 100);
+export function BadgeGrid({ suite = SUITES[0], count = 0, celebrated = [], dates = {} }) {
+  const ACID = suite.colour;
+  const unlocked = suiteUnlocked(suite, count, celebrated);
+  const next = suiteNext(suite, count, celebrated);
+  const pct = Math.round(suiteProgress(suite, count, next) * 100);
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7 }}>
         <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'rgba(var(--fg),0.6)' }}>
-          {fmt(count)} {count === 1 ? 'record' : 'records'}
+          {fmt(count)} {unitFor(suite, count)}
         </span>
         <span style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.1em', color: 'rgba(var(--fg),0.35)' }}>
-          {unlocked.size}/{BADGE_TIERS.length} unlocked
+          {unlocked.size}/{suite.tiers.length} unlocked
         </span>
       </div>
 
@@ -245,20 +266,18 @@ export function BadgeGrid({ count = 0, celebrated = [], dates = {} }) {
       </div>
 
       <p style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(var(--fg),0.35)', margin: '0 0 14px' }}>
-        {next
-          ? `${fmt(Math.max(0, next.count - count))} more to ${next.name}`
-          : 'Every badge in the vault is yours.'}
+        {nextLine(suite, count, next)}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        {BADGE_TIERS.map(tier => {
+        {suite.tiers.map(tier => {
           const Icon = iconFor(tier.icon);
           const got = unlocked.has(tier.count);
           const isNext = next?.count === tier.count;
           const on = got ? fmtDate(dates[tier.count]) : null;
           return (
             <div key={tier.count}
-              title={got ? `${tier.name}: ${tier.line}${on ? ` (unlocked ${on})` : ''}` : `Locked: ${fmt(tier.count)} records`}
+              title={got ? `${tier.name}: ${tier.line}${on ? ` (unlocked ${on})` : ''}` : `Locked: ${fmt(tier.count)} ${unitFor(suite, tier.count)}`}
               style={{
                 borderRadius: 12, padding: '13px 6px 10px', textAlign: 'center',
                 minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -298,10 +317,12 @@ export function BadgeGrid({ count = 0, celebrated = [], dates = {} }) {
 }
 
 // ----- standalone panel ------------------------------------------------------
-// Its own screen rather than an accordion drawer: nine tiles and a progress
-// bar need more room than a menu row gives them.
+// Its own screen rather than an accordion drawer: four ladders of tiles need
+// more room than a menu row gives them.
 
-export function BadgesPanel({ count = 0, celebrated = [], dates = {}, onClose }) {
+// values: { records, decades, range, passport }. ledger: the whole badge
+// ledger. dates: allUnlockDates' output, keyed by suite id.
+export function BadgesPanel({ values = {}, ledger = {}, dates = {}, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -329,7 +350,24 @@ export function BadgesPanel({ count = 0, celebrated = [], dates = {}, onClose })
           </button>
         </div>
 
-        <BadgeGrid count={count} celebrated={celebrated} dates={dates} />
+        {SUITES.map((suite, i) => (
+          <section key={suite.id} aria-label={`${suite.title} badges`} style={{ marginTop: i ? 26 : 0 }}>
+            {/* Every suite is headed, records included: with four ladders an
+                unlabelled first grid reads as "the badges" and the rest as
+                something else. The swatch ties the heading to its colour. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: suite.note ? 3 : 10 }}>
+              <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: '50%', background: suite.colour, flexShrink: 0 }} />
+              <h3 style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: 'rgba(var(--fg),0.75)', margin: 0 }}>
+                {suite.title}
+              </h3>
+            </div>
+            {suite.note && (
+              <p style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(var(--fg),0.4)', margin: '0 0 10px 17px' }}>{suite.note}</p>
+            )}
+            <BadgeGrid suite={suite} count={values[suite.id] || 0}
+              celebrated={suiteCelebrated(ledger, suite.id)} dates={dates[suite.id] || {}} />
+          </section>
+        ))}
       </div>
     </div>
   );

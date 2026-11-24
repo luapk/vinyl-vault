@@ -161,7 +161,8 @@ survives a reload with no wishlist tables on the database, a rate limit is
 never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), the home screen's four ways in (all above the fold at
 360x740, and the scan card's state rule absent on an empty collection), and
-the splash clip order (an existing install still gets a new hero, the
+the badge suites (one card per suite, queued not stacked, and nothing replays
+on reload), the splash clip order (an existing install still gets a new hero, the
 rotation advances and wraps, and a failed clip never leaves a broken image).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
@@ -404,6 +405,7 @@ api/                   # Vercel serverless functions (all secret keys live here)
   price.js             # Discogs price history
   trace.js             # one hunt: pressings, live listings, landed cost, verdict
   lib/aiUsage.js       # books every Claude call to the ai_usage ledger
+  lib/genreBackfill.js # fills genres on records the file import saved without them
   gelato-order.js      # print-on-demand order
   invite.js            # invite code validation
 
@@ -430,6 +432,7 @@ supabase/
   bpm-cache.sql        # track_bpm shared BPM cache (service-role only)
   wishlist.sql         # wishlist_items + trace_results (Wishlist tab)
   admin-analytics.sql  # feature_tiers overrides, billing columns, payments + ai_usage ledgers
+  genre-backfill.sql   # service-role functions the import worker uses to fill genres on old imports
 ```
 
 ### Legal pages and the footer
@@ -628,6 +631,7 @@ Also run when updating an existing database:
 - `supabase/import-jobs.sql` (background file imports; until it is run, imports keep running in the browser and stop when the tab does)
 - `supabase/bpm-cache.sql` (shared track_bpm cache -- scans and client waveform analysis feed it; later scans of the same tracks read from it)
 - `supabase/wishlist.sql` (the Wishlist tab; until it is run the tab works but saves to this device only)
+- `supabase/genre-backfill.sql` (lets the import worker's cron fill in genres on records the file import saved without them; until it is run the backfill does nothing, quietly)
 - `supabase/admin-analytics.sql` (the advanced admin panel: editable feature gates, billing detail on the profile, and the payments + AI spend ledgers. Until it is run the panel shows accounts and tiers only and says so, and nothing is recorded)
 
 ## Data model
@@ -727,6 +731,61 @@ unlock card) where everything ahead of the user is greyed out up to 5,000.
   records never takes a badge away. Being local, a first sign-in on a new
   device replays the single highest card once; that is a welcome, and it costs
   no schema change.
+
+**Three more suites: Decades, Range and Passport.** The records ladder rewards
+size; these reward reach. Each has its own colour, ladder and ledger, and all
+of it lives in `SUITES` (`src/lib/badges.js`, unit-tested in
+`badge-suites.test.js`).
+
+| Suite | Colour | Counts | Ladder |
+| --- | --- | --- | --- |
+| Decades | pink `#ff5ec4` | decades holding `DECADE_MIN` (10) records | 3, 5, 7, 8 |
+| Range | light blue `#5ce1ff` | distinct Discogs styles | 10, 25, 50, 100, 150 |
+| Passport | purple `#bd7bff` | distinct countries of pressing | 5, 10, 20, 40, 60 |
+
+- **The thresholds were set against real collections**, not guessed. Every
+  collection over about thirty records already had a record in six to eight
+  decades, so counting a decade at ONE record would have unlocked the whole
+  ladder for everybody on day one. At ten per decade the same collections
+  spread from two to seven.
+- **Range counts styles, not genres.** The saved `genres` array holds Discogs'
+  top-level genres and the styles under them, merged. There are only fifteen
+  top-level genres in the whole of Discogs, so `TOP_GENRES` is excluded and
+  the styles are what is counted.
+- **Passport** goes through `passportStamp` (`src/lib/countryFlag.js`), so it
+  shares the flag vocabulary: UK, United Kingdom and England are one stamp. A
+  region ("Europe", "Worldwide") stamps nothing, a combined territory stamps
+  its first real country only, and a state with no flag (Yugoslavia, the USSR)
+  still stamps, because those are the pressings a collector is proudest of.
+- **One card per suite, queued.** `planAllCelebrations` returns the highest
+  fresh tier of each suite and banks the rest, the same rule as the records
+  ladder. The cards come one after another (`badgeQueue` in `VinylVault.jsx`);
+  "View badges" drops the rest of the queue, because the panel shows them all.
+- **A measure and its dates cannot disagree.** Each suite is a running tally
+  fed one record at a time in `savedAt` order; `measureAll` runs it over the
+  collection and `allUnlockDates` reads the date off the record that crossed
+  each threshold. Two implementations would drift.
+- **The ledger keeps its old shape for records**, so ledgers written before
+  the suites load unchanged; the others sit under `ledger.suites`.
+- The card's small ink labels are at 0.75, not 0.5: on the pink and purple
+  grounds 0.5 is under 3:1, and 0.66 still fell short of AA.
+- The community chip is still records only. It is derived from a public count;
+  the other suites would need the person's whole collection.
+
+**Range needed a data fix first, and it is easy to undo by accident.** The file
+import saved every record with `genres: []`, because the search result it
+saved from was mapped without them, though Discogs sends `genre` and `style` on
+every search result. 3,204 records across five accounts had nothing to count,
+including the two largest collections. `searchDiscogs` now keeps them, and
+`recordFromMatch`, `patchFromMatch` and the in-browser loop all carry them
+through. The ones already saved are filled by `api/lib/genreBackfill.js`, one
+release fetch each, from the import worker's cron. It is the lowest priority
+spend of Discogs quota in the product: it runs only on a cron tick with no
+import locked, stops at the first 429 or when Discogs reports 15 or fewer
+requests left, and is paced at one every two seconds. Its write
+(`genre_backfill_apply`) only lands while the record still has no genres, so it
+cannot overwrite anything, and it stamps `genresCheckedAt` so a release Discogs
+no longer has is not asked about twice.
 
 - **Auth lock**: `supabase.js` uses a **strictly serialising, bounded-wait** `navigator.locks` auth lock. Cross-context serialisation prevents refresh-token reuse revocation (the "session expired" sign-outs when a PWA window + tab share storage); a 5s cap means a hung holder degrades one call instead of freezing the app. supabase-js never re-enters an injected lock (its `_acquireLock` queues nested acquires internally), so no re-entrancy short-circuit is needed -- and an earlier same-tab short-circuit let refreshes bypass serialisation and replay stale tokens (caught by `stress/race.spec.mjs`; do not reintroduce it).
 - **onAuthStateChange deadlock guard**: never `await` a supabase call inside the `onAuthStateChange` callback (`useAuth.js`). supabase-js awaits these callbacks while holding its auth lock; a query there calls `getSession()`, which waits on `initialize()`, which waits on the callback -- a circular wait that wedges the whole client on with-session boots (the historic "profile/admin/community missing until refresh" hydration bug). Dispatch follow-up work with `setTimeout(..., 0)`. Regression-tested by `stress/session.spec.mjs`.

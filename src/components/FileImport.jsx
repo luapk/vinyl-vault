@@ -96,7 +96,7 @@ function releaseFromMatch(m, row) {
   return {
     id: m.id, artist: m.artist || row.artist, title: m.recordTitle || row.title,
     label: m.label, catalogNumber: m.catalogNumber, year: m.year,
-    country: m.country, format: m.format, genres: [], tracklist: [],
+    country: m.country, format: m.format, genres: m.genres || [], tracklist: [],
     coverUrl: m.coverUrl, source: 'discogs_import',
   };
 }
@@ -654,6 +654,7 @@ export function useFileImport(onAddRecordsBulk, { collection, onUpdateRecord, on
           country: m.country || null,
           format: m.format || null,
           coverUrl: m.coverUrl || null,
+          ...(m.genres?.length ? { genres: m.genres } : {}),
           identified: true,
           confidence: 'high',
           source: 'discogs_import',

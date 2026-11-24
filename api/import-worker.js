@@ -11,6 +11,7 @@ import { searchDiscogs } from './lib/discogs.js';
 import { requireAuth } from './lib/auth.js';
 import { requireTier, userAllows } from './lib/tier.js';
 import { recordFromMatch, draftFromRow, patchFromMatch } from './lib/importRecord.js';
+import { backfillGenres } from './lib/genreBackfill.js';
 import { rowCanIdentify } from '../src/lib/importParse.js';
 
 // Leave headroom under the function's maxDuration so the last flush and the
@@ -294,5 +295,26 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message, handled });
   }
 
-  return res.status(200).json({ ok: true, handled });
+  // Spare cron time goes to the genre backfill (api/lib/genreBackfill.js), but
+  // only when no import holds a lock: imports, and live scanning behind them,
+  // come first. A user's on-demand kick never runs it.
+  let backfill = null;
+  if (auth.cron && Date.now() < deadline - 30_000) {
+    try {
+      const { data: busy } = await db.from('import_jobs').select('id')
+        .gt('locked_until', new Date().toISOString()).limit(1);
+      if (!busy?.length) {
+        backfill = await backfillGenres(db, { deadline: Math.min(deadline, Date.now() + 90_000) });
+        if (backfill.ran && backfill.reason !== 'done') {
+          console.log(`[import-worker] genre backfill filled=${backfill.filled} gone=${backfill.gone} ` +
+            `batch=${backfill.batch} stop=${backfill.reason}`);
+        }
+      }
+    } catch (err) {
+      // Never let the backfill turn a healthy import tick into a failure.
+      console.warn('[import-worker] genre backfill', err.message);
+    }
+  }
+
+  return res.status(200).json({ ok: true, handled, backfill });
 }

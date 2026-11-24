@@ -34,7 +34,7 @@ import TrackRow from './TrackRow.jsx';
 import EqBars from './EqBars.jsx';
 import DemoReel from './DemoReel.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
-import { planCelebration, loadLedger, saveLedger, stampUnlocks, unlockDates } from '../lib/badges.js';
+import { planAllCelebrations, loadLedger, saveLedger, allUnlockDates, measureAll, suiteLedger } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
 import { detectBarcode, loadBarcodeDetector } from '../lib/barcodeScanner.js';
 import { safeSetItem } from '../lib/localCache.js';
@@ -975,11 +975,14 @@ export default function VinylVault() {
   const { collection, syncedIds, addRecord, removeRecord, updateRecord, renameCrate, deleteCrate, addRecordsBulk, reloadFromCloud } = useCollection(userId);
 
   // ----- Milestone badges ----------------------------------------------------
-  // Watched off the collection size rather than hooked into each save, so every
+  // Watched off the collection rather than hooked into each save, so every
   // route in counts the same: single scan, batch, Discogs import, file import.
-  const [pendingBadge, setPendingBadge] = useState(null);
+  // Four suites (records, decades, range, passport), at most one card each,
+  // queued so they arrive one after another rather than stacked.
+  const [badgeQueue, setBadgeQueue] = useState([]);
+  const pendingBadge = badgeQueue[0] || null;
   const [showBadges, setShowBadges] = useState(false);
-  const [ledger, setLedger] = useState({ celebrated: [], unlockedAt: {} });
+  const [ledger, setLedger] = useState({ celebrated: [], unlockedAt: {}, suites: {} });
   // Ledger mirror, so the evaluator never reads a stale closure.
   const ledgerRef = useRef(ledger);
   const badgeUserRef = useRef(null);
@@ -987,9 +990,9 @@ export default function VinylVault() {
   useEffect(() => {
     if (!userId) {
       badgeUserRef.current = null;
-      ledgerRef.current = { celebrated: [], unlockedAt: {} };
+      ledgerRef.current = { celebrated: [], unlockedAt: {}, suites: {} };
       setLedger(ledgerRef.current);
-      setPendingBadge(null);
+      setBadgeQueue([]);
       setShowBadges(false);
       return;
     }
@@ -999,30 +1002,36 @@ export default function VinylVault() {
     setLedger(ledgerRef.current);
   }, [userId]);
 
-  const total = collection.length;
+  // Every suite's value, and a string of them so the evaluator re-runs when any
+  // one moves (a genre backfill landing changes Range without changing size).
+  const badgeValues = useMemo(() => measureAll(collection), [collection]);
+  const badgeKey = `${badgeValues.records}|${badgeValues.decades}|${badgeValues.range}|${badgeValues.passport}`;
   useEffect(() => {
-    if (!userId || badgeUserRef.current !== userId || !total) return;
+    if (!userId || badgeUserRef.current !== userId || !badgeValues.records) return;
     // Settle first. The cached collection renders before the cloud load lands,
     // so evaluating on the first frame would fire a card for 50 and then
     // another for 500 a second later.
     const t = setTimeout(() => {
-      const { badge, celebrated: next } = planCelebration(total, ledgerRef.current.celebrated);
-      if (next.length !== ledgerRef.current.celebrated.length) {
-        const updated = { celebrated: next, unlockedAt: stampUnlocks(ledgerRef.current.unlockedAt, next) };
+      const { badges, ledger: updated, changed } = planAllCelebrations(badgeValues, ledgerRef.current);
+      if (changed) {
         ledgerRef.current = updated;
         setLedger(updated);
         saveLedger(userId, updated);
       }
-      if (badge) setPendingBadge(badge);
+      if (badges.length) {
+        // A suite already waiting in the queue is replaced by its newer, higher
+        // card rather than shown twice.
+        setBadgeQueue(q => [...q.filter(b => !badges.some(n => n.suite.id === b.suite.id)), ...badges]);
+      }
     }, 1500);
     return () => clearTimeout(t);
-  }, [total, userId]);
+  }, [badgeKey, userId]);
 
-  // Dates come from the collection (the Nth record's savedAt is the day the
-  // Nth milestone was reached), with the ledger as fallback.
+  // Dates come from the collection (the day the tally first reached each
+  // tier), with the ledger as fallback.
   const badgeDates = useMemo(
-    () => unlockDates(collection, ledger.unlockedAt),
-    [collection, ledger.unlockedAt]
+    () => allUnlockDates(collection, ledger),
+    [collection, ledger]
   );
 
   const updateReleaseBpm = useCallback((trackIdx, bpm) => {
@@ -1677,18 +1686,21 @@ export default function VinylVault() {
           running batch, and never on top of the account panel it links to. */}
       {pendingBadge && !batchProcessing && !showAccount && !showBadges && (
         <BadgeCelebration
-          badge={pendingBadge}
-          count={collection.length}
-          celebrated={ledger.celebrated}
-          onClose={() => setPendingBadge(null)}
-          onViewBadges={() => { setPendingBadge(null); setShowBadges(true); }}
+          key={pendingBadge.suite.id}
+          badge={pendingBadge.tier}
+          suite={pendingBadge.suite}
+          count={badgeValues[pendingBadge.suite.id] || 0}
+          celebrated={suiteLedger(ledger, pendingBadge.suite.id).celebrated}
+          onClose={() => setBadgeQueue(q => q.slice(1))}
+          // The panel shows every suite, so the cards still queued are on it.
+          onViewBadges={() => { setBadgeQueue([]); setShowBadges(true); }}
         />
       )}
 
       {showBadges && (
         <BadgesPanel
-          count={collection.length}
-          celebrated={ledger.celebrated}
+          values={badgeValues}
+          ledger={ledger}
           dates={badgeDates}
           onClose={() => setShowBadges(false)}
         />
