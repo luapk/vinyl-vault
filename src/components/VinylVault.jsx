@@ -6067,7 +6067,7 @@ const SPLASH_HERO = { src: `/splash-power-flight.webp?v=${SPLASH_V}`, dur: 5 };
 // and splash-flight.webp are retired from the rotation but kept in public/.
 const SPLASH_CLIPS = [
   SPLASH_HERO,
-  { src: `/splash-power-hover.webp?v=${SPLASH_V}`, dur: 5 },
+  { src: `/splash-power-hover.webp?v=${SPLASH_V}`, dur: 3.8 },
 ];
 
 // The hero is shown when this device has not yet seen THIS hero, which is not
