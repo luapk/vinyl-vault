@@ -123,4 +123,13 @@ Made the same way, with two refinements worth keeping:
   the corners up to the character's own white outline, then filling the
   enclosed glow (handle hole, arm loops, the gap between the legs) by hand.
   That keeps the exact image that was approved.
+- The hover's bob and flames are added AFTER generation, not prompted. Four
+  takes asked for "a slow, heavy rise and fall" and none moved more than a few
+  pixels, so the motion is applied to the keyed frames instead: the figure is
+  scaled to 74% for headroom and moved on a sine (two cycles per loop, 64px of
+  travel, never closer than 17px to an edge), and each flame is cut off at the
+  sole and stretched per frame, flaring as he rises and mirrored every couple
+  of frames for a hand-drawn flicker. Every periodic term is a whole number of
+  cycles over the loop, so it stays seamless. Doing it in code is what makes
+  "bob more without leaving the frame" a number that can be checked.
 
