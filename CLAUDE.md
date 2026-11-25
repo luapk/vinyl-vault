@@ -507,9 +507,19 @@ wired into it. Two explanations of one product, one of them without the
 artwork. Do not reintroduce it: the walkthrough steps are the single copy.
 
 **The splash leads with the hero, then rotates, hero included.**
-`SPLASH_HERO` (`/splash-flight.webp`, the rocket flight) leads, and it also
-keeps its place in `SPLASH_CLIPS` rather than being the best asset in the set
-and shown once.
+`SPLASH_HERO` (`/splash-power-flight.webp`, the superhero flight) leads, and it
+also keeps its place in `SPLASH_CLIPS` rather than being the best asset in the
+set and shown once. The rotation is now a pair, flight and
+`/splash-power-hover.webp` (hovering, fists on hips), so returning visits
+strictly alternate the two.
+
+The pair replaced the original rocket flight, in which the mascot read puny
+and aimless: small in frame, legs trailing, no direction. The new poses are
+staged for weight (the case big in frame, a low camera, a fist or the chest
+leading), auditioned as stills against the existing mascot art as a reference,
+and animated with the SAME image as start and end frame so each loop is
+seamless. `splash.webp`, `splash2.webp`, `splash4.webp` and
+`splash-flight.webp` are out of the rotation but still in `public/`.
 
 **The hero is keyed to the ASSET, not to the device being new**, and that
 distinction is the whole point. `vv_splash_hero` stores the hero's own `src`

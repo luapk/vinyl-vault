@@ -6048,7 +6048,7 @@ function ManualSearchView({ initial, accentRGB, onPick, onCancel, priorSearch, o
 // invisible and the animation reads as part of the page.
 const SPLASH_ACID = '#cafe04';
 
-// Two mascot animations, alternated on each visit so the boot screen varies.
+// Mascot animations, alternated on each visit so the boot screen varies.
 // Clips are transparent animated WebP (not video): WebP is sRGB, so there is
 // no YUV colour-range shift -- the transparent background lets the page's own
 // acid show through, making a colour mismatch impossible. `dur` (seconds) is
@@ -6057,15 +6057,17 @@ const SPLASH_ACID = '#cafe04';
 const SPLASH_V = '4';
 
 // The hero: the shot that leads, and the one a person meets the product with.
-const SPLASH_HERO = { src: `/splash-flight.webp?v=${SPLASH_V}`, dur: 5 };
+// The superhero flight replaced an earlier flight clip in which the mascot read
+// small and aimless; this one is staged for weight (big in frame, low camera,
+// the fist leading). See public/walkthrough/BRIEFS.md for how both were made.
+const SPLASH_HERO = { src: `/splash-power-flight.webp?v=${SPLASH_V}`, dur: 5 };
 
-// The rotation INCLUDES the hero. It leads, and then it keeps its place in
-// the mix rather than being the best asset in the set and shown once.
+// The rotation INCLUDES the hero, and is now just the pair: flight and the
+// hovering power stance, alternating. splash.webp, splash2.webp, splash4.webp
+// and splash-flight.webp are retired from the rotation but kept in public/.
 const SPLASH_CLIPS = [
   SPLASH_HERO,
-  { src: `/splash.webp?v=${SPLASH_V}`, dur: 5 },
-  { src: `/splash2.webp?v=${SPLASH_V}`, dur: 5 },
-  { src: `/splash4.webp?v=${SPLASH_V}`, dur: 6 },
+  { src: `/splash-power-hover.webp?v=${SPLASH_V}`, dur: 5 },
 ];
 
 // The hero is shown when this device has not yet seen THIS hero, which is not

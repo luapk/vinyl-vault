@@ -106,3 +106,21 @@ working on any background later.
 A ~1px fringe of the old ramp survives at the character's edge. It is
 invisible at the 168px display size and invisible on the acid card. It would
 show on a strongly contrasting background.
+
+## The splash pair (splash-power-flight / splash-power-hover)
+
+Made the same way, with two refinements worth keeping:
+
+- The pose was auditioned as a STILL first (`gpt_image_2_6` with the mascot's
+  existing art as image references), and only the chosen still was animated.
+  Prompting motion straight from a reference produced the weak original
+  flight; choosing the pose before animating it is what fixed it.
+- The animation passes the chosen still as BOTH `start_image` and `end_image`
+  (`seedance_2_0`), so the clip starts and ends on the identical frame and the
+  loop has no jump.
+- A still that comes back on the wrong ground does not need regenerating: the
+  hover pose came back on black and was moved onto acid by flood-filling from
+  the corners up to the character's own white outline, then filling the
+  enclosed glow (handle hole, arm loops, the gap between the legs) by hand.
+  That keeps the exact image that was approved.
+

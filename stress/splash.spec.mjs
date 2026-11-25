@@ -9,8 +9,8 @@
 import { test, expect } from '@playwright/test';
 
 const name = (u) => u.split('/').pop().split('?')[0];
-const HERO = 'splash-flight.webp';
-const ROTATION = ['splash-flight.webp', 'splash.webp', 'splash2.webp', 'splash4.webp'];
+const HERO = 'splash-power-flight.webp';
+const ROTATION = ['splash-power-flight.webp', 'splash-power-hover.webp'];
 
 function recorder(page) {
   const seen = [];
@@ -47,7 +47,7 @@ test('a device that already uses the app still gets the hero', async ({ page }) 
   const seen = recorder(page);
   // The exact case that was broken: an existing install, mid-rotation, that
   // has never seen this hero. It must still be served it.
-  await prime(page, { rotationCounter: '2' });
+  await prime(page, { rotationCounter: '1' });
 
   const first = await open(page, seen);
   expect(first.asked).toContain(HERO);
@@ -57,7 +57,7 @@ test('a device that already uses the app still gets the hero', async ({ page }) 
   // And the hero does not repeat on the very next open: it is shown once per
   // hero, then the rotation carries on from where it was.
   const second = await open(page, seen);
-  expect(second.asked).toContain('splash2.webp');
+  expect(second.asked).toContain(ROTATION[1]);
 });
 
 test('a brand new device gets the hero first', async ({ page }) => {
@@ -70,7 +70,7 @@ test('a brand new device gets the hero first', async ({ page }) => {
 
 test('a device that has seen this hero goes straight into the rotation, hero included', async ({ page }) => {
   const seen = recorder(page);
-  await prime(page, { rotationCounter: '0', heroSeen: `/splash-flight.webp?v=4` });
+  await prime(page, { rotationCounter: '0', heroSeen: `/splash-power-flight.webp?v=4` });
 
   const got = [];
   for (let i = 0; i < 5; i++) {
@@ -78,16 +78,15 @@ test('a device that has seen this hero goes straight into the rotation, hero inc
     expect(o.img.w).toBeGreaterThan(0);
     got.push(o.asked.find((a) => ROTATION.includes(a)));
   }
-  // Advances in order and wraps.
-  expect(got.slice(0, 4)).toEqual(ROTATION);
-  expect(got[4]).toBe(ROTATION[0]);
+  // Advances in order and wraps: with the pair, that is a strict alternation.
+  expect(got).toEqual([0, 1, 2, 3, 4].map((i) => ROTATION[i % ROTATION.length]));
   // The hero keeps its place in the mix rather than being shown once.
   expect(got).toContain(HERO);
 });
 
 test('a clip that fails to load never leaves a broken image', async ({ page }) => {
   const seen = recorder(page);
-  await page.route('**/splash-flight.webp*', (r) => r.abort());
+  await page.route('**/splash-power-flight.webp*', (r) => r.abort());
   await prime(page);
   const first = await open(page, seen);
   expect(first.asked).toContain(HERO);   // it tried
