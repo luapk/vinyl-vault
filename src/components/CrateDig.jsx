@@ -15,13 +15,14 @@
 // view asks for its cover at high priority; the next few are preloaded while
 // you look at it. All the geometry is in src/lib/crateDigLayout.js.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { cardPose, digSort, dividers, tabOffset, flickTarget, AHEAD, BEHIND } from '../lib/crateDigLayout.js';
+import { cardPose, isoPose, digSort, dividers, tabOffset, flickTarget, AHEAD, BEHIND, ISO_AHEAD, ISO_BEHIND } from '../lib/crateDigLayout.js';
 import { VINYL_COLORS } from '../lib/vinylColors.js';
 
 const ACID = '#cafe04';
 const INK = '#0d0c0a';
 const PRELOAD = 6;            // covers fetched ahead of the visible window
 const SETTLE_MS = 450;        // rest this long on a record and its disc slides out
+const ISO_THICK = 0.035;      // sleeve thickness in the angled stack, as a fraction of S
 
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -42,6 +43,8 @@ function Disc({ record, size, out }) {
     <div aria-hidden="true" style={{
       position: 'absolute', zIndex: 0, width: size * 0.94, height: size * 0.94,
       left: size * 0.03, top: size * 0.03, borderRadius: '50%',
+      // Out of the top of the sleeve, in both carousels: out of the side, in
+      // the angled stack, it left the stage.
       transform: `translateY(${out ? -size * 0.36 : 0}px)`,
       transition: still ? 'none' : 'transform 0.55s cubic-bezier(0.2, 0.9, 0.25, 1)',
       boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
@@ -64,7 +67,12 @@ function Disc({ record, size, out }) {
   );
 }
 
-export default function CrateDig({ records, onSelect }) {
+// variant 'dig' is Carousel B: the crate seen from above, flicked forward.
+// variant 'iso' is Carousel C: the same records in an angled, near isometric
+// row, the one in view pulled up out of it. Everything but the camera and the
+// geometry is shared, so the two cannot drift apart in how they scrub.
+export default function CrateDig({ records, onSelect, variant = 'dig' }) {
+  const iso = variant === 'iso';
   const sorted = useMemo(() => digSort(records), [records]);
   const tabs = useMemo(() => dividers(sorted), [sorted]);
   const tabAt = useMemo(() => new Map(tabs.map(t => [t.index, t.letter])), [tabs]);
@@ -88,16 +96,25 @@ export default function CrateDig({ records, onSelect }) {
     const el = stageRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([e]) => {
-      const s = Math.round(Math.min(e.contentRect.width * 0.76, 320));
+      const s = Math.round(iso ? Math.min(e.contentRect.width * 0.66, 290) : Math.min(e.contentRect.width * 0.76, 320));
       sRef.current = s; setS(s);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [iso]);
 
   const apply = useCallback(() => {
     const pos = posRef.current, s = sRef.current;
     for (const [i, c] of cards.current) {
+      if (iso) {
+        // A real 3D scene: depth sorting is the browser's, so no z-index.
+        const p = isoPose(i - pos, s);
+        c.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, ${p.z.toFixed(1)}px) rotateY(${p.ry.toFixed(2)}deg) rotateX(${p.rx.toFixed(2)}deg)`;
+        c.el.style.opacity = p.opacity;
+        c.el.style.visibility = p.opacity <= 0.01 ? 'hidden' : 'visible';
+        if (c.shade) c.shade.style.opacity = p.shade;
+        continue;
+      }
       const p = cardPose(i - pos, s);
       c.el.style.transform = `translate3d(0, ${p.y.toFixed(1)}px, ${p.z.toFixed(1)}px) rotateX(${p.rx.toFixed(2)}deg)`;
       c.el.style.opacity = p.opacity;
@@ -105,7 +122,7 @@ export default function CrateDig({ records, onSelect }) {
       c.el.style.visibility = p.opacity <= 0.01 ? 'hidden' : 'visible';
       if (c.shade) c.shade.style.opacity = p.shade;
     }
-  }, []);
+  }, [iso]);
 
   const tick = useCallback(() => {
     const still = reducedMotion();
@@ -230,8 +247,9 @@ export default function CrateDig({ records, onSelect }) {
   if (!n) return null;
   const current = sorted[base];
   const lipH = S * 0.2;
-  const stageH = Math.round(S * 1.9);
-  const first = Math.max(0, base - BEHIND - 1), last = Math.min(n - 1, base + AHEAD);
+  const stageH = Math.round(iso ? S * 1.72 : S * 1.9);
+  const first = Math.max(0, base - (iso ? ISO_BEHIND : BEHIND + 1));
+  const last = Math.min(n - 1, base + (iso ? ISO_AHEAD : AHEAD));
   const slots = [];
   for (let i = first; i <= last; i++) slots.push(i);
   const currentLetter = [...tabs].reverse().find(t => t.index <= base)?.letter;
@@ -255,14 +273,23 @@ export default function CrateDig({ records, onSelect }) {
       </div>
 
       <div ref={stageRef} tabIndex={0} onKeyDown={onKeyDown}
-        aria-label="Crate dig: swipe or use the arrow keys to flick through, Enter to open"
+        aria-label={`${iso ? 'Angled stack' : 'Crate dig'}: swipe or use the arrow keys to flick through, Enter to open`}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
         className="relative outline-none rounded-2xl overflow-hidden"
         style={{
           height: stageH, touchAction: 'none', cursor: 'grab',
-          perspective: 680, perspectiveOrigin: '50% -70%',
+          perspective: iso ? 2400 : 680, perspectiveOrigin: iso ? '50% 35%' : '50% -70%',
           background: 'radial-gradient(120% 80% at 50% 100%, rgba(202,254,4,0.06), transparent 60%)',
         }}>
+        {/* In the angled stack every record lives inside one rotated scene;
+            in the crate the stage itself is the camera. */}
+        {/* The scene is itself a plane in 3D, so part of a record turned toward
+            the camera ends up BEHIND it: without pointer-events none it swallowed
+            taps on the middle of the pulled record. Only the records take them. */}
+        <div style={iso ? {
+          position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none',
+          transform: `translate(${(-S * 0.3).toFixed(0)}px, ${(-S * 0.02).toFixed(0)}px) rotateX(-22deg) rotateY(-50deg)`,
+        } : { position: 'absolute', inset: 0 }}>
         {slots.map(i => {
           const r = sorted[i];
           const letter = tabAt.get(i);
@@ -271,11 +298,19 @@ export default function CrateDig({ records, onSelect }) {
             <div key={r.id || i} data-dig-i={i}
               ref={el => { if (el) cards.current.set(i, { el, shade: el.querySelector('[data-shade]') }); else cards.current.delete(i); }}
               style={{
-                position: 'absolute', left: '50%', bottom: S * 0.06, width: S, height: S, marginLeft: -S / 2,
+                position: 'absolute', left: '50%', bottom: iso ? S * 0.3 : S * 0.06, width: S, height: S, marginLeft: -S / 2,
                 transformOrigin: '50% 100%', willChange: 'transform, opacity', backfaceVisibility: 'hidden',
-                transform: 'translate3d(0,0,0)',
+                transform: 'translate3d(0,0,0)', transformStyle: iso ? 'preserve-3d' : undefined, pointerEvents: 'auto',
               }}>
               {i === base && <Disc record={r} size={S} out={discOut} />}
+              {iso && (
+                // the sleeve's top edge, so the row reads as solid records
+                <div aria-hidden="true" style={{
+                  position: 'absolute', left: 0, top: 0, width: '100%', height: S * ISO_THICK,
+                  transformOrigin: '50% 0', transform: 'rotateX(-90deg)',
+                  background: 'linear-gradient(90deg, #3a3a40, #1c1c20)', borderTop: '1px solid rgba(255,255,255,0.25)',
+                }} />
+              )}
               {letter && (
                 <div aria-hidden="true" style={{
                   position: 'absolute', zIndex: 0, top: -S * 0.085, height: S * 0.12, width: S * 0.16,
@@ -301,17 +336,18 @@ export default function CrateDig({ records, onSelect }) {
             </div>
           );
         })}
+        </div>
 
         {/* The back of the crate recedes into the page rather than being cut
             off by the stage edge mid-cover. */}
-        <div aria-hidden="true" style={{
+        {!iso && <div aria-hidden="true" style={{
           position: 'absolute', zIndex: 650, left: 0, right: 0, top: 0, height: S * 0.42, pointerEvents: 'none',
           background: 'linear-gradient(to bottom, rgb(var(--bg)) 0%, rgba(var(--bg), 0.85) 30%, rgba(var(--bg), 0) 100%)',
-        }} />
+        }} />}
 
         {/* The crate's front panel. Records behind sit inside it; the one you
             are looking at rises clear of it; flicked ones fall forward over it. */}
-        <div aria-hidden="true" style={{
+        {!iso && <div aria-hidden="true" style={{
           position: 'absolute', zIndex: 600, bottom: 0, left: '50%', width: S * 1.18, marginLeft: -S * 0.59, height: lipH,
           background: 'linear-gradient(180deg, #1c1c18, #0b0b09)', borderTop: `2px solid ${ACID}`,
           borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -320,14 +356,14 @@ export default function CrateDig({ records, onSelect }) {
         }}>
           <span>{currentLetter || ''}</span>
           <span>{base + 1} / {n}</span>
-        </div>
+        </div>}
       </div>
 
       {/* What you are looking at, large: the legibility the 3D must not cost */}
       {current && (
         <div className="text-center mt-4" aria-live="polite">
           <div className="text-[11px] tracking-[0.22em] uppercase text-white/40 font-mono mb-1">
-            {[current.year, current.format, current.country].filter(Boolean).join(' · ')}
+            {[iso ? `${base + 1} / ${n}` : null, current.year, current.format, current.country].filter(Boolean).join(' · ')}
           </div>
           <div className="text-xl leading-tight text-white"><span className="italic">{current.artist}</span></div>
           <div className="text-base text-white/55 leading-snug">{current.title}</div>

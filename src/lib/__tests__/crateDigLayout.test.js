@@ -76,3 +76,44 @@ describe('flickTarget', () => {
     expect(flickTarget(8, 1, 10)).toBe(9);
   });
 });
+
+import { isoPose, ISO_SLIDE, ISO_TURN, ISO_AHEAD, ISO_GAP } from '../crateDigLayout.js';
+
+describe('isoPose (carousel C)', () => {
+  it('slides the record in view out of the row and turns it toward the camera', () => {
+    const p = isoPose(0, S);
+    expect(p.x).toBeCloseTo(ISO_SLIDE * S);
+    expect(p.ry).toBeCloseTo(ISO_TURN);
+    expect(p.y).toBeLessThan(0);
+    expect(p.opacity).toBe(1);
+  });
+
+  it('leaves every other record in the row, unturned, in depth order', () => {
+    for (const d of [-2, -1, 1, 2, 5]) {
+      const p = isoPose(d, S);
+      expect(p.x).toBeCloseTo(0);
+      expect(p.y).toBeCloseTo(0);
+      expect(p.ry).toBeCloseTo(0);
+    }
+    const zs = [-2, -1, 0, 1, 2, 5].map(d => isoPose(d, S).z);
+    for (let k = 1; k < zs.length; k++) expect(zs[k]).toBeLessThan(zs[k - 1]);
+  });
+
+  it('opens a gap around it: the neighbours sit further apart than the row spacing', () => {
+    const gap = isoPose(-1, S).z - isoPose(1, S).z;
+    expect(gap).toBeGreaterThan(2 * ISO_GAP * S);
+    // and it closes again further along the row
+    expect(isoPose(4, S).z - isoPose(5, S).z).toBeCloseTo(ISO_GAP * S);
+  });
+
+  it('moves continuously through the pulled record, so a scrub never jumps', () => {
+    for (const k of ['x', 'y', 'z', 'ry']) {
+      expect(Math.abs(isoPose(0.002, S)[k] - isoPose(-0.002, S)[k])).toBeLessThan(1);
+    }
+  });
+
+  it('fades the ends of the row in rather than popping them', () => {
+    expect(isoPose(ISO_AHEAD, S).opacity).toBe(0);
+    expect(isoPose(-3, S).opacity).toBe(0);
+  });
+});

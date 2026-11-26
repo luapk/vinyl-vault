@@ -718,7 +718,7 @@ export default function AdminPanel({ onBack, onFeatureTiersChanged, collection =
       {tab === 'lab' && (
         <div>
           <div className="flex gap-1.5 mb-3">
-            {[{ id: 'dig', label: 'Crate dig' }, { id: 'wall', label: '3D crate wall' }].map(x => (
+            {[{ id: 'dig', label: 'Carousel B' }, { id: 'iso', label: 'Carousel C' }, { id: 'wall', label: '3D crate wall' }].map(x => (
               <button key={x.id} onClick={() => { setLabExp(x.id); setLabPick(null); }}
                 className="px-3 py-1.5 rounded-full text-[12px] font-medium"
                 style={labExp === x.id
@@ -729,8 +729,14 @@ export default function AdminPanel({ onBack, onFeatureTiersChanged, collection =
             ))}
           </div>
           <div className="mb-3">
-            {labExp === 'dig' ? (<>
-              <h2 className="text-sm font-semibold text-white">Crate dig</h2>
+            {labExp === 'iso' ? (<>
+              <h2 className="text-sm font-semibold text-white">Carousel C: angled stack</h2>
+              <p className="text-[11px] text-white/45 leading-relaxed mt-0.5">
+                The collection as one row of records seen from an angle. The record in view is pulled up out of the row and turns toward you;
+                its neighbours lean apart to let it out. Same swipe, keys and A to Z as Carousel B; tap the pulled record to open it.
+              </p>
+            </>) : labExp === 'dig' ? (<>
+              <h2 className="text-sm font-semibold text-white">Carousel B: crate dig</h2>
               <p className="text-[11px] text-white/45 leading-relaxed mt-0.5">
                 A 3D carousel with no 3D library. Swipe, or pull down, to flick the front record forward; the next one rises out of the crate.
                 Rest on a record and its disc slides out. Letter tabs and the A to Z row jump through the crate; tap the front record to open it.
@@ -747,8 +753,8 @@ export default function AdminPanel({ onBack, onFeatureTiersChanged, collection =
             <p className="text-xs text-white/40 py-10 text-center">Your collection is empty, so there is nothing to stack.</p>
           ) : (
             <Suspense fallback={<p className="text-xs text-white/40 py-16 text-center font-mono">Loading...</p>}>
-              {labExp === 'dig'
-                ? <CrateDig records={collection} onSelect={setLabPick} />
+              {labExp === 'dig' || labExp === 'iso'
+                ? <CrateDig key={labExp} variant={labExp} records={collection} onSelect={setLabPick} />
                 : <CrateWall records={collection} onSelect={setLabPick} accentRGB="202,254,4" />}
             </Suspense>
           )}

@@ -63,3 +63,31 @@ test('the keyboard digs, the letter row jumps, and a tap opens the record in vie
   await page.locator('[data-dig-i="15"]').click({ position: { x: 60, y: 80 } });
   await expect(page.getByText(new RegExp(`Daft Punk · ${shown}`))).toBeVisible();
 });
+
+// Carousel C is the same component with a different camera, so it has to keep
+// the same promises: a bounded window, the keys, and a tap on the record that
+// is pulled out of the row opening that record.
+test('carousel C keeps the window small, digs with the keys, and opens the pulled record', async ({ page, context }) => {
+  await stubApi(context);
+  await openDig(page, 400);
+  await page.getByRole('button', { name: 'Carousel C' }).click();
+  const stage = page.getByLabel(/Angled stack: swipe/);
+  await expect(stage).toBeVisible();
+  expect(await page.locator('[data-dig-i]').count()).toBeLessThanOrEqual(15);
+
+  await stage.focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText(/^3 \/ 400/)).toBeVisible({ timeout: 5_000 });
+
+  await page.waitForTimeout(600);
+  const shown = (await page.getByText(/^Record \d{3}$/).first().textContent()).trim();
+  // Tap the middle of the cover as a person would, with the real mouse at its
+  // on-screen centre. Playwright's own click aims at the element's box and runs
+  // its own hit check, which misjudges a rotated 3D scene; the mouse checks the
+  // app's hit-testing instead, which is the thing that once failed here (the
+  // scene plane swallowed taps on the middle of the pulled record).
+  const box = await page.locator('[data-dig-i="2"] > div:last-child').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByText(new RegExp(`· ${shown}`))).toBeVisible();
+});
