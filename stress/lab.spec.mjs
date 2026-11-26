@@ -91,3 +91,58 @@ test('carousel C keeps the window small, digs with the keys, and opens the pulle
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(page.getByText(new RegExp(`· ${shown}`))).toBeVisible();
 });
+
+// Stickiness: a wheel or trackpad moves one record per notch, never a
+// continuous scroll, and a trackpad's long momentum tail cannot spin the stack.
+test('the wheel steps exactly one record per notch, and a trackpad coast stays in hand', async ({ page, context }) => {
+  await stubApi(context);
+  const stage = await openDig(page, 400);
+  await stage.scrollIntoViewIfNeeded();
+  const box = await stage.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 100);
+  await expect(stage.getByText('2 / 400')).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(400);
+  await page.mouse.wheel(0, 100);
+  await expect(stage.getByText('3 / 400')).toBeVisible({ timeout: 5_000 });
+
+  // 60 small deltas, 720px in all, the shape of a trackpad swipe and its
+  // coast: a few records, where a 50px step would have covered fourteen.
+  await page.waitForTimeout(400);
+  for (let k = 0; k < 60; k++) { await page.mouse.wheel(0, 12); await page.waitForTimeout(8); }
+  await page.waitForTimeout(800);
+  const at = Number((await stage.getByText(/^\d+ \/ 400$/).textContent()).split(' ')[0]);
+  expect(at).toBeGreaterThan(3);
+  expect(at).toBeLessThanOrEqual(7);
+});
+
+// Carousel C opens on a short camera move, ends on its own at the resting
+// camera, and gets out of the way the moment anyone touches anything.
+test('carousel C plays its intro once, ends on its own, and a key cuts it short', async ({ page, context }) => {
+  await stubApi(context);
+  await openDig(page, 40);
+  await page.getByRole('button', { name: 'Carousel C' }).click();
+  const stage = page.getByLabel(/Angled stack: swipe/);
+  await expect(stage).toHaveAttribute('data-intro', 'on');
+  await expect(stage).toHaveAttribute('data-intro', 'off', { timeout: 4_000 });
+
+  // Back to B and into C again: a fresh mount plays it again, and a key ends
+  // it on the spot and still moves the record.
+  await page.getByRole('button', { name: 'Carousel B' }).click();
+  await page.getByRole('button', { name: 'Carousel C' }).click();
+  await expect(stage).toHaveAttribute('data-intro', 'on');
+  await stage.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(stage).toHaveAttribute('data-intro', 'off', { timeout: 300 });
+  await expect(page.getByText(/^2 \/ 40/)).toBeVisible({ timeout: 5_000 });
+});
+
+test('with reduced motion carousel C has no intro at all', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  await stubApi(context);
+  await openDig(page, 40);
+  await page.getByRole('button', { name: 'Carousel C' }).click();
+  await expect(page.getByLabel(/Angled stack: swipe/)).toHaveAttribute('data-intro', 'off');
+  await context.close();
+});

@@ -15,7 +15,10 @@
 // view asks for its cover at high priority; the next few are preloaded while
 // you look at it. All the geometry is in src/lib/crateDigLayout.js.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { cardPose, isoPose, digSort, dividers, tabOffset, flickTarget, AHEAD, BEHIND, ISO_AHEAD, ISO_BEHIND } from '../lib/crateDigLayout.js';
+import {
+  cardPose, isoPose, digSort, dividers, tabOffset, flickTarget, detent, introCamera,
+  AHEAD, BEHIND, ISO_AHEAD, ISO_BEHIND, DRAG_PER_RECORD, CAM_REST, CAM_START, INTRO_MS,
+} from '../lib/crateDigLayout.js';
 import { VINYL_COLORS } from '../lib/vinylColors.js';
 
 const ACID = '#cafe04';
@@ -24,8 +27,16 @@ const PRELOAD = 6;            // covers fetched ahead of the visible window
 const SETTLE_MS = 450;        // rest this long on a record and its disc slides out
 const ISO_THICK = 0.035;      // sleeve thickness in the angled stack, as a fraction of S
 
+const NOTCH = 50;             // one wheel event this big is a mouse notch: one record
+const TRACKPAD_STEP = 200;    // a trackpad's small deltas add up to this for one record
+const WHEEL_GAP_MS = 160;     // and at most one record per this long, so a trackpad's coast cannot run away
+
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+// The angled stack's camera, applied to the scene that holds every record.
+const camTransform = (c, S) =>
+  `translate(${(c.tx * S).toFixed(1)}px, ${(c.ty * S).toFixed(1)}px) rotateX(${c.rx.toFixed(2)}deg) rotateY(${c.ry.toFixed(2)}deg) scale3d(${c.scale.toFixed(4)}, ${c.scale.toFixed(4)}, ${c.scale.toFixed(4)})`;
 
 function discBackground(colorId) {
   const def = VINYL_COLORS.find(v => v.id === colorId) || VINYL_COLORS[0];
@@ -90,6 +101,12 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
   const baseRef = useRef(0);
   const [settled, setSettled] = useState(true);
   const [discOut, setDiscOut] = useState(false);
+  // Carousel C opens on a short camera move: wide and swung round, orbiting in
+  // to the record in view, which slides out of the row as the camera arrives.
+  // Never with reduced motion, and any touch, key or wheel ends it at once.
+  const sceneRef = useRef(null);
+  const [introOn, setIntroOn] = useState(() => iso && !reducedMotion());
+  const introRef = useRef({ on: iso && !reducedMotion(), pull: iso && !reducedMotion() ? 0 : 1, raf: 0 });
 
   // Size the sleeve to the stage, capped so the stack and the disc have room.
   useEffect(() => {
@@ -108,7 +125,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     for (const [i, c] of cards.current) {
       if (iso) {
         // A real 3D scene: depth sorting is the browser's, so no z-index.
-        const p = isoPose(i - pos, s);
+        const p = isoPose(i - pos, s, introRef.current.pull);
         c.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, ${p.z.toFixed(1)}px) rotateY(${p.ry.toFixed(2)}deg) rotateX(${p.rx.toFixed(2)}deg)`;
         c.el.style.opacity = p.opacity;
         c.el.style.visibility = p.opacity <= 0.01 ? 'hidden' : 'visible';
@@ -158,16 +175,45 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     kick();
   }, [kick, n]);
 
+  const endIntro = useCallback(() => {
+    const it = introRef.current;
+    if (!it.on) return;
+    it.on = false; it.pull = 1;
+    cancelAnimationFrame(it.raf);
+    if (sceneRef.current) sceneRef.current.style.transform = camTransform(CAM_REST, sRef.current);
+    apply();
+    setIntroOn(false);
+  }, [apply]);
+
+  useEffect(() => {
+    const it = introRef.current;
+    if (!it.on) return;
+    let start = 0;
+    const frame = (now) => {
+      if (!it.on) return;
+      if (!start) start = now;
+      const t = Math.min(1, (now - start) / INTRO_MS);
+      const cam = introCamera(t);
+      it.pull = cam.pull;
+      if (sceneRef.current) sceneRef.current.style.transform = camTransform(cam, sRef.current);
+      apply();
+      if (t < 1) it.raf = requestAnimationFrame(frame);
+      else endIntro();
+    };
+    it.raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(it.raf);
+  }, [apply, endIntro]);
+
   // Re-apply after the window remounts or the sleeve resizes.
   useEffect(() => { apply(); }, [apply, base, S]);
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
   // Rest on a record and the disc comes out of the sleeve.
   useEffect(() => {
-    if (!settled) return;
+    if (!settled || introOn) return;
     const t = setTimeout(() => setDiscOut(true), SETTLE_MS);
     return () => clearTimeout(t);
-  }, [settled, base]);
+  }, [settled, base, introOn]);
 
   // Preload the covers just past the window, so a flick never lands on a blank.
   useEffect(() => {
@@ -180,6 +226,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
   // ---- input ---------------------------------------------------------------
   const onPointerDown = (e) => {
     if (e.button !== undefined && e.button !== 0) return;
+    endIntro();
     // Which record is under the finger has to be read NOW: once the stage
     // captures the pointer, the lift-off is reported against the stage, not
     // the sleeve, and a tap could not tell which record it landed on.
@@ -198,11 +245,17 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < 6) return;
     d.moved = true;
-    // Swipe left, or pull down toward you, to dig forward.
-    const p = d.pos + (dy - dx) / (sRef.current * 0.55);
+    // Swipe left, or pull down toward you, to dig forward. The finger moves a
+    // RAW position; what is shown goes through the detent, slow over each
+    // record and quick between them, measured from where the drag began so
+    // picking up a record that is still moving never makes it jump.
+    const raw = d.pos + (dy - dx) / (sRef.current * DRAG_PER_RECORD);
+    const p = d.pos + detent(raw) - detent(d.pos);
     posRef.current = Math.max(-0.35, Math.min(n - 0.65, p));
     targetRef.current = posRef.current;
-    d.samples.push({ t: performance.now(), p: posRef.current });
+    // Velocity is read off the raw position: the detent's own speed-up
+    // between records is not the finger flicking.
+    d.samples.push({ t: performance.now(), p: raw });
     if (d.samples.length > 6) d.samples.shift();
   };
   const onPointerUp = () => {
@@ -225,20 +278,30 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    let idle = 0;
+    // One record per notch, never a continuous scroll. A mouse wheel's notch
+    // arrives as one big delta and moves exactly one record; a trackpad sends
+    // many small ones, which add up to TRACKPAD_STEP a record. Steps are also
+    // spaced, so a trackpad's momentum tail cannot spin the stack on its own.
+    let acc = 0, last = 0, stepped = 0;
     const onWheel = (e) => {
       e.preventDefault();
-      posRef.current = Math.max(0, Math.min(n - 1, posRef.current + (e.deltaY + e.deltaX) / (sRef.current * 1.4)));
-      targetRef.current = posRef.current;
-      kick();
-      clearTimeout(idle);
-      idle = setTimeout(() => goTo(Math.round(posRef.current)), 140);
+      endIntro();
+      const now = performance.now();
+      if (now - last > 220) acc = 0;           // a new gesture starts from nothing
+      last = now;
+      const delta = (e.deltaY + e.deltaX) * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1);
+      acc += Math.abs(delta) >= NOTCH ? Math.sign(delta) * TRACKPAD_STEP : delta;
+      if (Math.abs(acc) < TRACKPAD_STEP || now - stepped < WHEEL_GAP_MS) return;
+      const dir = Math.sign(acc);
+      acc = 0; stepped = now;
+      goTo(Math.round(targetRef.current) + dir);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => { el.removeEventListener('wheel', onWheel); clearTimeout(idle); };
-  }, [goTo, kick, n]);
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [goTo, endIntro]);
 
   const onKeyDown = (e) => {
+    endIntro();
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); goTo(Math.round(targetRef.current) + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); goTo(Math.round(targetRef.current) - 1); }
     else if (e.key === 'Enter' && sorted[baseRef.current]) onSelect?.(sorted[baseRef.current]);
@@ -272,7 +335,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
         })}
       </div>
 
-      <div ref={stageRef} tabIndex={0} onKeyDown={onKeyDown}
+      <div ref={stageRef} tabIndex={0} onKeyDown={onKeyDown} data-intro={introOn ? 'on' : 'off'}
         aria-label={`${iso ? 'Angled stack' : 'Crate dig'}: swipe or use the arrow keys to flick through, Enter to open`}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
         className="relative outline-none rounded-2xl overflow-hidden"
@@ -286,11 +349,12 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
         {/* The scene is itself a plane in 3D, so part of a record turned toward
             the camera ends up BEHIND it: without pointer-events none it swallowed
             taps on the middle of the pulled record. Only the records take them. */}
-        <div style={iso ? {
+        <div ref={sceneRef} style={iso ? {
           position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none',
           // Turned less than a true isometric so the covers sit more face-on:
           // legibility comes from the camera, not from turning one record.
-          transform: `translate(${(-S * 0.3).toFixed(0)}px, ${(-S * 0.02).toFixed(0)}px) rotateX(-18deg) rotateY(-32deg)`,
+          // While the intro runs it owns this transform, frame by frame.
+          transform: camTransform(introOn ? CAM_START : CAM_REST, S),
         } : { position: 'absolute', inset: 0 }}>
         {slots.map(i => {
           const r = sorted[i];

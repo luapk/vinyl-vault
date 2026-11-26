@@ -337,6 +337,23 @@ pays for none of them until opened. Three so far:
   It is a variant of B rather than a copy, so the scrub, momentum, keys, A to
   Z and windowing are one code path (`isoPose` beside `cardPose` in
   `crateDigLayout.js`).
+- **Both carousels are sticky on purpose**, because the first versions were
+  too sensitive to land on the record you wanted. A drag goes through
+  `detent()`: slow over each record and quick between them, measured from
+  where the drag began so grabbing a moving stack never jumps it, with
+  `DRAG_PER_RECORD` of finger travel a record. `flickTarget` treats a release
+  under `FLICK_MIN` as no flick at all and never carries one more than
+  `FLICK_MAX` records. The wheel moves exactly one record per mouse notch;
+  a trackpad's small deltas add up to `TRACKPAD_STEP` a record, and steps are
+  spaced so a momentum tail cannot spin the stack. Flick velocity is read off
+  the RAW drag position, not the detented one, or the detent's own speed-up
+  between records would read as a flick. Guarded by `stress/lab.spec.mjs`.
+- **Carousel C opens on a 1.6s camera move** (`introCamera`): wide and swung
+  round (`CAM_START`), orbiting in to `CAM_REST`, the orbit leading and the
+  zoom lagging so it reads as a camera rather than a scale-up, and the
+  record in view sliding out of the row only as the camera arrives. Any
+  touch, key or wheel ends it at once; reduced motion never plays it. The
+  disc waits for it to finish. The stage carries `data-intro` for the specs.
 
 `VINYL_COLORS` lives in `src/lib/vinylColors.js` so the crate dig's discs and
 the app's colour picker share one list; importing it from `VinylVault.jsx`

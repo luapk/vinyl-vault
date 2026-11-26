@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cardPose, digSort, digLetter, dividers, tabOffset, flickTarget, LIFT, AHEAD } from '../crateDigLayout.js';
+import { cardPose, digSort, digLetter, dividers, tabOffset, flickTarget, detent, introCamera, CAM_REST, CAM_START, FLICK_MAX, LIFT, AHEAD } from '../crateDigLayout.js';
 
 const S = 300;
 
@@ -71,9 +71,54 @@ describe('dividers', () => {
 describe('flickTarget', () => {
   it('rests on a whole record, coasts with velocity, and stays in range', () => {
     expect(flickTarget(3.4, 0, 10)).toBe(3);
-    expect(flickTarget(3, 0.02, 10)).toBeGreaterThan(5);
+    expect(flickTarget(3, 0.02, 10)).toBeGreaterThan(4);
     expect(flickTarget(1, -1, 10)).toBe(0);
     expect(flickTarget(8, 1, 10)).toBe(9);
+  });
+
+  it('treats a gentle release as no flick at all: it lands on the nearest record', () => {
+    expect(flickTarget(3.3, 0.002, 100)).toBe(3);
+    expect(flickTarget(3.6, -0.002, 100)).toBe(4);
+  });
+
+  it('never carries a flick more than FLICK_MAX records', () => {
+    expect(flickTarget(10, 5, 100)).toBe(10 + FLICK_MAX);
+    expect(flickTarget(50, -5, 100)).toBe(50 - FLICK_MAX);
+  });
+});
+
+describe('detent', () => {
+  it('maps whole and half records to themselves, so a drag never drifts', () => {
+    for (const r of [0, 0.5, 1, 1.5, 7, -2]) expect(detent(r)).toBeCloseTo(r);
+  });
+
+  it('is slow at each record and fast between them: the record sticks', () => {
+    const slope = (r) => (detent(r + 1e-4) - detent(r - 1e-4)) / 2e-4;
+    expect(slope(3)).toBeLessThan(0.5);
+    expect(slope(3.5)).toBeGreaterThan(1.5);
+  });
+
+  it('only ever moves forward as the finger does', () => {
+    for (let r = -1; r < 3; r += 0.01) expect(detent(r + 0.01)).toBeGreaterThan(detent(r));
+  });
+});
+
+describe('introCamera', () => {
+  it('starts wide and swung round, and ends exactly on the resting camera', () => {
+    const a = introCamera(0), z = introCamera(1);
+    expect(a.ry).toBe(CAM_START.ry);
+    expect(a.scale).toBe(CAM_START.scale);
+    expect(a.pull).toBe(0);
+    for (const k of ['ry', 'rx', 'scale', 'tx', 'ty']) expect(z[k]).toBeCloseTo(CAM_REST[k]);
+    expect(z.pull).toBe(1);
+  });
+
+  it('orbits before it zooms, and pulls the record out last', () => {
+    const mid = introCamera(0.4);
+    const orbitDone = (mid.ry - CAM_START.ry) / (CAM_REST.ry - CAM_START.ry);
+    const zoomDone = (mid.scale - CAM_START.scale) / (CAM_REST.scale - CAM_START.scale);
+    expect(orbitDone).toBeGreaterThan(zoomDone);
+    expect(introCamera(0.6).pull).toBe(0);
   });
 });
 

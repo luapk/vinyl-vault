@@ -77,9 +77,56 @@ export function tabOffset(letter) {
 
 // Where a flick comes to rest: the current position carried on by its
 // velocity (records per ms), rounded to a whole record and kept in range.
-export function flickTarget(pos, velocity, count, coast = 260) {
-  const target = Math.round(pos + velocity * coast);
+//
+// Tuned for stickiness. A release slower than FLICK_MIN is not a flick at
+// all and lands on the nearest record; a real flick coasts a short way and
+// never more than FLICK_MAX records, so a nervous thumb cannot send the stack
+// spinning past what it was looking for.
+export const FLICK_MIN = 0.0025;   // records per ms
+export const FLICK_MAX = 5;        // records one flick can carry
+export function flickTarget(pos, velocity, count, coast = 150) {
+  const here = Math.round(pos);
+  if (Math.abs(velocity) < FLICK_MIN) return Math.max(0, Math.min(count - 1, here));
+  const carry = Math.max(-FLICK_MAX, Math.min(FLICK_MAX, velocity * coast));
+  const target = Math.round(pos + carry);
   return Math.max(0, Math.min(count - 1, target));
+}
+
+// Magnetic detents for a drag. Maps the raw drag position r (in records) to
+// the displayed one: slow at every whole record and fast between them, so a
+// record settles under the finger and the next one snaps in rather than
+// sliding past. Whole and half records map to themselves, so it never drifts.
+export const DETENT = 0.65;        // 0 is linear; towards 1, stickier
+export function detent(r, strength = DETENT) {
+  return r - (strength / (2 * Math.PI)) * Math.sin(2 * Math.PI * r);
+}
+
+// How far a finger travels for one record, as a fraction of the sleeve.
+export const DRAG_PER_RECORD = 0.9;
+
+// The intro camera for carousel C: start wide and swung round to the side,
+// orbit round the selection, then zoom in. The orbit leads and the zoom lags,
+// which is what makes it read as a camera move rather than a scale-up. The
+// pulled record slides out over the last stretch, as the camera arrives.
+export const CAM_REST = { ry: -32, rx: -18, scale: 1, tx: -0.3, ty: -0.02 };
+export const CAM_START = { ry: -82, rx: -34, scale: 0.58, tx: -0.22, ty: 0.1 };
+export const INTRO_MS = 1600;
+
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const span = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+const mix = (a, b, k) => a + (b - a) * k;
+
+export function introCamera(t) {
+  const orbit = easeInOut(span(t, 0, 0.78));
+  const zoom = easeInOut(span(t, 0.3, 1));
+  return {
+    ry: mix(CAM_START.ry, CAM_REST.ry, orbit),
+    rx: mix(CAM_START.rx, CAM_REST.rx, orbit),
+    scale: mix(CAM_START.scale, CAM_REST.scale, zoom),
+    tx: mix(CAM_START.tx, CAM_REST.tx, zoom),
+    ty: mix(CAM_START.ty, CAM_REST.ty, zoom),
+    pull: easeInOut(span(t, 0.62, 1)),
+  };
 }
 
 // ----- Carousel C: the angled stack -----------------------------------------
@@ -107,9 +154,9 @@ export const ISO_BEHIND = 3;      // records rendered in front of it
 const smooth = (t) => t * t * (3 - 2 * t);
 const ISO_R = ISO_GAP / ISO_ARC;  // the arc's radius, in sleeves
 
-export function isoPose(d, S) {
+export function isoPose(d, S, pullGain = 1) {
   const a = Math.abs(d);
-  const pull = a < 1 ? smooth(1 - a) : 0;
+  const pull = (a < 1 ? smooth(1 - a) : 0) * pullGain;
   // Neighbours move apart along the row, most at the gap and to nothing two
   // records away; at the record itself this term is zero, so a scrub through
   // it never jumps.
