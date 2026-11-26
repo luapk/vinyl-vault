@@ -34,6 +34,7 @@ import { uploadUserCover } from '../lib/coverCache.js';
 import TrackRow from './TrackRow.jsx';
 import EqBars from './EqBars.jsx';
 import DemoReel, { ReelPill } from './DemoReel.jsx';
+import CrateDig from './CrateDig.jsx';
 import { BadgeCelebration, BadgesPanel } from './Badges.jsx';
 import { planAllCelebrations, loadLedger, saveLedger, allUnlockDates, measureAll, suiteLedger } from '../lib/badges.js';
 import { useFileImport, ImportStatusList, ImportSummary, ImportShapeWarning } from './FileImport.jsx';
@@ -3207,153 +3208,28 @@ function RecordListView({ records, onSelect, onDownloadCSV, accentRGB }) {
 
 // ----- VinylCarousel ---------------------------------------------------------
 
-// Elastic resistance curve: free movement up to ELASTIC_START, then
-// progressively damped so the card feels like it's held by a spring.
-const ELASTIC_START   = 55;   // px -- free zone before resistance kicks in
-const SNAP_THRESHOLD  = 82;   // px raw drag -- commits the swipe
-const VELOCITY_SNAP   = 0.28; // px/ms -- fast flick commits regardless of distance
-const SPRING_DECAY    = 0.72; // per-frame multiplier for spring-back animation
-
-function elasticDelta(raw) {
-  if (Math.abs(raw) <= ELASTIC_START) return raw;
-  const sign = raw < 0 ? -1 : 1;
-  const excess = Math.abs(raw) - ELASTIC_START;
-  // Diminishing returns: each extra px beyond ELASTIC_START contributes less
-  return sign * (ELASTIC_START + excess * 0.28);
-}
-
+// The records themselves are the angled stack (CrateDig, carousel C), in the
+// user's own sort and filter; everything under it (the record's details, its
+// crates, batch select, the arrows and dots) is this component's, as before.
+// The index lives here so the arrows, dots and keys drive the stack.
 function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect, onRemove, accentRGB, crateColors = {}, selectMode = false, selectedIds = new Set(), onToggleSelect, onUpdate, allCrates = [], smartCrateNames = [], crateCounts = {} }) {
-  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-  const startXRef    = useRef(null);
-  const startTimeRef = useRef(null);
-  const rawDeltaRef  = useRef(0);
-  const didDragRef   = useRef(false);
-  const rafRef       = useRef(null);
-  const [visualDelta, setVisualDelta] = useState(0);
   const [showCratePicker, setShowCratePicker] = useState(false);
   const [cratePickerInput, setCratePickerInput] = useState('');
-
-  // Spring-back: animate visualDelta toward 0 with exponential decay
-  const springBack = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    let v = visualDelta;
-    function step() {
-      v *= SPRING_DECAY;
-      if (Math.abs(v) < 0.8) { setVisualDelta(0); rafRef.current = null; return; }
-      setVisualDelta(v);
-      rafRef.current = requestAnimationFrame(step);
-    }
-    rafRef.current = requestAnimationFrame(step);
-  }, [visualDelta]);
-
-  const onTouchStart = (e) => {
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    startXRef.current = e.touches[0].clientX;
-    startTimeRef.current = performance.now();
-    rawDeltaRef.current = 0;
-    didDragRef.current = false;
-    setVisualDelta(0);
-  };
-
-  const onTouchMove = (e) => {
-    if (startXRef.current === null) return;
-    const raw = e.touches[0].clientX - startXRef.current;
-    if (Math.abs(raw) > 6) didDragRef.current = true;
-    if (!didDragRef.current) return;
-    rawDeltaRef.current = raw;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => setVisualDelta(elasticDelta(raw)));
-  };
-
-  const onTouchEnd = (e) => {
-    if (startXRef.current === null) return;
-    const raw = e.changedTouches[0].clientX - startXRef.current;
-    const dt = Math.max(performance.now() - startTimeRef.current, 1);
-    const velocity = raw / dt;
-    const wasDrag = didDragRef.current;
-    startXRef.current = null;
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-    if (!wasDrag) { setVisualDelta(0); return; }
-
-    const committed = Math.abs(raw) >= SNAP_THRESHOLD || Math.abs(velocity) >= VELOCITY_SNAP;
-    if (committed) {
-      setVisualDelta(0);
-      if (raw < 0 || velocity < -VELOCITY_SNAP) onNext();
-      else onPrev();
-    } else {
-      // Not far enough -- spring back
-      springBack();
-    }
-  };
 
   // Close picker when navigating to a different record (must be before early return)
   useEffect(() => { setShowCratePicker(false); }, [index]);
 
   const current = records[index];
   if (!current) return null;
-  const isDragging = visualDelta !== 0;
 
   return (
     <div className="select-none">
-      <div className="relative mx-auto" style={{ height: "min(68vw, 480px)", maxWidth: "min(68vw, 480px)" }}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-        {[-2, -1, 0, 1, 2].map((offset) => {
-          const record = records[index + offset];
-          if (!record) return null;
-          const abs = Math.abs(offset);
-          const isActive = offset === 0;
-          const tx = (offset + (isDragging ? visualDelta / 280 : 0)) * 48;
-          const ty = abs * 11;
-          const rot = offset * 2.5 + (isDragging && isActive ? visualDelta * 0.025 : 0);
-          const scale = 1 - abs * 0.065;
-          const opacity = abs > 2 ? 0 : 1 - abs * 0.15;
-
-          return (
-            <div key={record.id} onClick={() => !didDragRef.current && (isActive ? onSelect(record) : onIndexChange(index + offset))}
-              style={{ position: "absolute", inset: 0, transform: `translateX(${tx}px) translateY(${ty}px) rotate(${rot}deg) scale(${scale})`, zIndex: 10 - abs, opacity, transition: isDragging ? "none" : "transform 0.22s cubic-bezier(0.25, 1.1, 0.5, 1), opacity 0.15s ease", cursor: "pointer", transformOrigin: "center bottom" }}>
-              {/* Glass panel frame */}
-              <div style={{
-                position: 'relative', width: '100%', height: '100%', borderRadius: 20, padding: 10,
-                background: isLight
-                  ? (isActive
-                    ? `linear-gradient(145deg, rgba(255,255,255,0.96) 0%, rgba(${accentRGB},0.06) 100%)`
-                    : `linear-gradient(145deg, rgba(255,255,255,0.88) 0%, rgba(248,246,240,0.82) 100%)`)
-                  : (isActive
-                    ? `linear-gradient(145deg, rgba(${accentRGB},0.18) 0%, rgba(${accentRGB},0.07) 55%, rgba(var(--fg),0.03) 100%)`
-                    : `linear-gradient(145deg, rgba(var(--fg),0.11) 0%, rgba(var(--fg),0.03) 100%)`),
-                backdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
-                WebkitBackdropFilter: `blur(${isActive ? 28 : Math.max(6, 18 - abs * 6)}px)`,
-                boxShadow: isLight
-                  ? (isActive
-                    ? `0 20px 60px -12px rgba(0,0,0,0.20), 0 0 30px -5px rgba(${accentRGB},0.15), 0 2px 0 0px rgba(0,0,0,0.10), 0 4px 0 0px rgba(0,0,0,0.06), 0 7px 0 0px rgba(0,0,0,0.03), 0 0 0 1px rgba(0,0,0,0.09), inset 0 1px 0 rgba(255,255,255,1), inset 0 0 30px rgba(${accentRGB},0.03)`
-                    : `0 ${10 + abs * 6}px 35px -8px rgba(0,0,0,0.13), 0 2px 0 0px rgba(0,0,0,0.07), 0 4px 0 0px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,${Math.max(0.05, 0.09 - abs * 0.01)}), inset 0 1px 0 rgba(255,255,255,0.9)`)
-                  : (isActive
-                    ? `0 36px 64px -22px rgba(0,0,0,0.82), 0 0 60px -10px rgba(${accentRGB},0.24), 0 2px 0 0px rgba(0,0,0,0.7), 0 4px 0 0px rgba(0,0,0,0.42), 0 7px 0 0px rgba(0,0,0,0.2), 0 0 0 1px rgba(var(--fg),0.17), inset 0 1px 0 rgba(var(--fg),0.32), inset 0 0 40px rgba(${accentRGB},0.04)`
-                    : `0 ${14 + abs * 9}px 55px -10px rgba(0,0,0,0.82), 0 2px 0 0px rgba(0,0,0,0.58), 0 4px 0 0px rgba(0,0,0,0.32), 0 0 0 1px rgba(var(--fg),${Math.max(0.05, 0.12 - abs * 0.02)}), inset 0 1px 0 rgba(var(--fg),0.16)`),
-              }}>
-                {/* Album cover inset */}
-                <div style={{ width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
-                  {record.coverUrl
-                    ? <img src={record.coverUrl} alt={record.title} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(${accentRGB},0.1), rgba(${accentRGB},0.02))` }}>
-                        <VinylRecord size={56} weight="thin" className="opacity-20" />
-                      </div>
-                  }
-                  {isActive && <div style={{ position: 'absolute', inset: 0, background: isLight ? "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 45%)" : "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%)", pointerEvents: 'none' }} />}
-                  {record.vinylColor && record.vinylColor !== 'black' && (
-                    <div style={{ position: 'absolute', bottom: 7, right: 7, pointerEvents: 'none' }}>
-                      <VinylColorDot colorId={record.vinylColor} size={isActive ? 16 : 11} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mx-auto" style={{ maxWidth: 480 }}>
+        <CrateDig variant="iso" live records={records} index={index} onIndexChange={onIndexChange} onSelect={onSelect} />
       </div>
 
       {/* Info */}
-      <div className="mt-11 text-center">
+      <div className="mt-3 text-center">
         <div key={current.id} style={{ animation: "fadeOnly 0.12s ease-out" }}>
         <div className="text-[13px] tracking-[0.25em] uppercase text-white/30 mb-1.5 font-mono flex items-center justify-center gap-2">
           <span>{[current.year, current.format, current.country].filter(Boolean).join(" · ")}</span>

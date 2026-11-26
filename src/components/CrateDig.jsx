@@ -31,6 +31,10 @@ const NOTCH = 50;             // one wheel event this big is a mouse notch: one 
 const TRACKPAD_STEP = 200;    // a trackpad's small deltas add up to this for one record
 const WHEEL_GAP_MS = 160;     // and at most one record per this long, so a trackpad's coast cannot run away
 
+// The live collection plays the intro once per visit, not on every return to
+// the tab; the Lab plays it every time it is opened.
+let introPlayedThisVisit = false;
+
 const reducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -82,31 +86,41 @@ function Disc({ record, size, out }) {
 // variant 'iso' is Carousel C: the same records in an angled, near isometric
 // row, the one in view pulled up out of it. Everything but the camera and the
 // geometry is shared, so the two cannot drift apart in how they scrub.
-export default function CrateDig({ records, onSelect, variant = 'dig' }) {
+//
+// The live collection uses the angled stack with `live`: the records arrive in
+// the user's own sort and filter rather than A to Z, the index is the
+// parent's (its arrows, dots and keys drive it), and the page around it has to
+// keep scrolling. So in live mode the stage takes SIDEWAYS drags only and lets
+// a vertical swipe or wheel through to the page, leaves the arrow keys to the
+// parent, and has no letter row, divider tabs or caption of its own.
+export default function CrateDig({ records, onSelect, variant = 'dig', live = false, index, onIndexChange }) {
   const iso = variant === 'iso';
-  const sorted = useMemo(() => digSort(records), [records]);
-  const tabs = useMemo(() => dividers(sorted), [sorted]);
+  const sorted = useMemo(() => (live ? records : digSort(records)), [records, live]);
+  const tabs = useMemo(() => (live ? [] : dividers(sorted)), [sorted, live]);
   const tabAt = useMemo(() => new Map(tabs.map(t => [t.index, t.letter])), [tabs]);
   const n = sorted.length;
 
   const stageRef = useRef(null);
   const [S, setS] = useState(250);
   const sRef = useRef(250);
-  const posRef = useRef(0);
-  const targetRef = useRef(0);
+  const start0 = Math.max(0, Math.min(n - 1, index ?? 0));
+  const posRef = useRef(start0);
+  const targetRef = useRef(start0);
+  const reportedRef = useRef(start0);         // the last index handed to the parent
   const dragRef = useRef(null);
   const rafRef = useRef(0);
   const cards = useRef(new Map());          // index -> { el, shade }
-  const [base, setBase] = useState(0);      // the record in view, which also picks the mounted window
-  const baseRef = useRef(0);
+  const [base, setBase] = useState(start0); // the record in view, which also picks the mounted window
+  const baseRef = useRef(start0);
   const [settled, setSettled] = useState(true);
   const [discOut, setDiscOut] = useState(false);
   // Carousel C opens on a short camera move: wide and swung round, orbiting in
   // to the record in view, which slides out of the row as the camera arrives.
   // Never with reduced motion, and any touch, key or wheel ends it at once.
   const sceneRef = useRef(null);
-  const [introOn, setIntroOn] = useState(() => iso && !reducedMotion());
-  const introRef = useRef({ on: iso && !reducedMotion(), pull: iso && !reducedMotion() ? 0 : 1, raf: 0 });
+  const introWanted = iso && !reducedMotion() && !(live && introPlayedThisVisit);
+  const [introOn, setIntroOn] = useState(introWanted);
+  const introRef = useRef({ on: introWanted, pull: introWanted ? 0 : 1, raf: 0 });
   // Tilt the phone to turn the camera (carousel C). It listens at once
   // everywhere. iOS sends nothing until a tap asks for the motion sensors, so
   // on a touch screen that has a permission call, Tilt to turn shows until
@@ -163,6 +177,8 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     if (nearest !== baseRef.current) {
       baseRef.current = nearest;
       setBase(nearest);
+      reportedRef.current = nearest;
+      onIndexChange?.(nearest);
       // one tiny tick per record passed, where the phone supports it
       try { navigator.vibrate?.(3); } catch { /* not supported */ }
     }
@@ -173,7 +189,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
       rafRef.current = 0;
       setSettled(true);
     }
-  }, [apply, n]);
+  }, [apply, n, onIndexChange]);
 
   const kick = useCallback(() => {
     setSettled(false);
@@ -190,11 +206,12 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     const it = introRef.current;
     if (!it.on) return;
     it.on = false; it.pull = 1;
+    if (live) introPlayedThisVisit = true;
     cancelAnimationFrame(it.raf);
     if (sceneRef.current) sceneRef.current.style.transform = camTransform(restCam(), sRef.current);
     apply();
     setIntroOn(false);
-  }, [apply]);
+  }, [apply, live]);
 
   useEffect(() => {
     const it = introRef.current;
@@ -262,6 +279,38 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     if (iso && !introRef.current.on && sceneRef.current) sceneRef.current.style.transform = camTransform(restCam(), S);
   }, [S, iso]);
 
+  // Live: the parent moves the index (its arrows, dots, keys, a filter that
+  // starts the list again). Only a change WE did not report is a move to make,
+  // or the parent echoing each record a flick passes would stop the flick there.
+  useEffect(() => {
+    if (index == null || index === reportedRef.current) return;
+    reportedRef.current = index;
+    // A long way (the dots, or a filter starting the list again) is a cut,
+    // not a blur of fifty records sliding past.
+    if (Math.abs(index - posRef.current) > 12) {
+      const i = Math.max(0, Math.min(n - 1, index));
+      posRef.current = targetRef.current = i;
+      baseRef.current = i;
+      setBase(i);
+      apply();
+    }
+    goTo(index);
+  }, [index, goTo, n, apply]);
+
+  // A new list (sort, filter, search) is not somewhere to animate across from
+  // the old one: land on the index outright.
+  const listRef = useRef(sorted);
+  useEffect(() => {
+    if (listRef.current === sorted) return;
+    listRef.current = sorted;
+    if (!live) return;
+    const i = Math.max(0, Math.min(n - 1, index ?? 0));
+    posRef.current = targetRef.current = i;
+    baseRef.current = i; reportedRef.current = i;
+    setBase(i);
+    apply();
+  }, [sorted, live, n, index, apply]);
+
   // Re-apply after the window remounts or the sleeve resizes.
   useEffect(() => { apply(); }, [apply, base, S]);
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
@@ -302,12 +351,15 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     if (!d) return;
     const dx = e.clientX - d.x, dy = e.clientY - d.y;
     if (!d.moved && Math.hypot(dx, dy) < 6) return;
+    // Live: a mostly vertical start is the page scrolling, not a dig. The
+    // browser takes it (touch-action pan-y) and cancels this pointer.
+    if (!d.moved && live && Math.abs(dy) > Math.abs(dx)) { dragRef.current = null; goTo(baseRef.current); return; }
     d.moved = true;
     // Swipe left, or pull down toward you, to dig forward. The finger moves a
     // RAW position; what is shown goes through the detent, slow over each
     // record and quick between them, measured from where the drag began so
     // picking up a record that is still moving never makes it jump.
-    const raw = d.pos + (dy - dx) / (sRef.current * DRAG_PER_RECORD);
+    const raw = d.pos + (live ? -dx : dy - dx) / (sRef.current * DRAG_PER_RECORD);
     const p = d.pos + detent(raw) - detent(d.pos);
     posRef.current = Math.max(-0.35, Math.min(n - 0.65, p));
     targetRef.current = posRef.current;
@@ -333,6 +385,16 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     kick();
   };
 
+  // A cancelled pointer (the page took the gesture to scroll, a call came in)
+  // is never a tap: it settles on the nearest record and opens nothing.
+  const onPointerCancel = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    targetRef.current = flickTarget(posRef.current, 0, n);
+    kick();
+  };
+
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -342,12 +404,15 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     // spaced, so a trackpad's momentum tail cannot spin the stack on its own.
     let acc = 0, last = 0, stepped = 0;
     const onWheel = (e) => {
+      // Live: the vertical wheel belongs to the page; only a sideways swipe
+      // on a trackpad moves the records.
+      if (live && Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
       e.preventDefault();
       endIntro();
       const now = performance.now();
       if (now - last > 220) acc = 0;           // a new gesture starts from nothing
       last = now;
-      const delta = (e.deltaY + e.deltaX) * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1);
+      const delta = (live ? e.deltaX : e.deltaY + e.deltaX) * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1);
       acc += Math.abs(delta) >= NOTCH ? Math.sign(delta) * TRACKPAD_STEP : delta;
       if (Math.abs(acc) < TRACKPAD_STEP || now - stepped < WHEEL_GAP_MS) return;
       const dir = Math.sign(acc);
@@ -356,10 +421,14 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [goTo, endIntro]);
+  }, [goTo, endIntro, live]);
 
   const onKeyDown = (e) => {
     endIntro();
+    if (live) {                                     // the parent owns the arrows
+      if (e.key === 'Enter' && sorted[baseRef.current]) onSelect?.(sorted[baseRef.current]);
+      return;
+    }
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); goTo(Math.round(targetRef.current) + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); goTo(Math.round(targetRef.current) - 1); }
     else if (e.key === 'Enter' && sorted[baseRef.current]) onSelect?.(sorted[baseRef.current]);
@@ -380,7 +449,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
       <style>{'@keyframes crateDigSpin { to { transform: rotate(360deg); } }'}</style>
 
       {/* A to Z: every letter present, the one you are in lit */}
-      <div className="flex gap-1 overflow-x-auto pb-2 mb-1" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Jump to letter">
+      {!live && <div className="flex gap-1 overflow-x-auto pb-2 mb-1" style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Jump to letter">
         {tabs.map(t => {
           const on = t.letter === currentLetter;
           return (
@@ -391,14 +460,14 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       <div ref={stageRef} tabIndex={0} onKeyDown={onKeyDown} data-intro={introOn ? 'on' : 'off'}
         aria-label={`${iso ? 'Angled stack' : 'Crate dig'}: swipe or use the arrow keys to flick through, Enter to open`}
-        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+        onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
         className="relative outline-none rounded-2xl overflow-hidden"
         style={{
-          height: stageH, touchAction: 'none', cursor: 'grab',
+          height: stageH, touchAction: live ? 'pan-y' : 'none', cursor: 'grab',
           perspective: iso ? 2400 : 680, perspectiveOrigin: iso ? '50% 35%' : '50% -70%',
           background: 'radial-gradient(120% 80% at 50% 100%, rgba(202,254,4,0.06), transparent 60%)',
         }}>
@@ -416,7 +485,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
         } : { position: 'absolute', inset: 0 }}>
         {slots.map(i => {
           const r = sorted[i];
-          const letter = tabAt.get(i);
+          const letter = live ? null : tabAt.get(i);
           const near = Math.abs(i - base) <= 2;
           return (
             <div key={r.id || i} data-dig-i={i}
@@ -451,7 +520,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px -12px rgba(0,0,0,0.8)',
               }}>
                 {r.coverUrl
-                  ? <img src={r.coverUrl} alt="" draggable={false} decoding="async"
+                  ? <img src={r.coverUrl} alt={r.title || ''} draggable={false} decoding="async"
                       loading={near ? 'eager' : 'lazy'} fetchpriority={i === base ? 'high' : 'low'}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                   : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14, textAlign: 'center', color: 'rgba(255,255,255,0.55)', fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
@@ -489,14 +558,14 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
         <div className="flex justify-center mt-3">
           <button type="button" onClick={askTilt}
             className="font-mono text-[11px] tracking-[0.18em] uppercase rounded-full px-3 py-1.5"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
+            style={{ background: 'rgba(var(--fg),0.06)', color: 'rgba(var(--fg),0.7)' }}>
             Tilt to turn
           </button>
         </div>
       )}
 
       {/* What you are looking at, large: the legibility the 3D must not cost */}
-      {current && (
+      {current && !live && (
         <div className="text-center mt-4" aria-live="polite">
           <div className="text-[11px] tracking-[0.22em] uppercase text-white/40 font-mono mb-1">
             {[iso ? `${base + 1} / ${n}` : null, current.year, current.format, current.country].filter(Boolean).join(' · ')}

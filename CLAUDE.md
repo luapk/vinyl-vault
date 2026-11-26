@@ -163,7 +163,10 @@ cannot use it), the home screen's four ways in (all above the fold at
 360x740, and the scan card's state rule absent on an empty collection), and
 the badge suites (one card per suite, queued not stacked, and nothing replays
 on reload), the Lab's crate dig (a small DOM window at any collection size,
-keyboard and letter navigation, and a tap opening the record in view), the splash clip order (an existing install still gets a new hero, the
+keyboard and letter navigation, and a tap opening the record in view), the
+collection carousel (the angled stack in the user's order, driven by the
+arrows and keys, the page still scrolling around it, a tap opening the
+record in view, and the intro once a visit), the splash clip order (an existing install still gets a new hero, the
 rotation advances and wraps, and a failed clip never leaves a broken image).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
@@ -366,6 +369,41 @@ pays for none of them until opened. Three so far:
   did not need. Tilt to turn shows only on a touch screen with the call and
   hides on the first reading, which is the one signal iOS cannot fake.
 
+**Carousel C graduated: it is now the collection carousel.** `VinylCarousel`
+(`VinylVault.jsx`) renders `<CrateDig variant="iso" live>` as its stage and
+keeps everything under it as it was: the record's details, its crates and
+crate picker, Add to batch, the arrows and the dots. What `live` changes, and
+why each one is load-bearing:
+
+- **The order is the user's.** The records arrive sorted and filtered by the
+  collection screen; `live` skips `digSort`, and with it the A to Z row, the
+  divider tabs and the caption, which only mean anything in artist order.
+- **The index belongs to the parent.** Its arrows, dots and window arrow keys
+  move `carouselIdx`; the stack reports the record it lands on through
+  `onIndexChange`. An incoming index equal to the last one REPORTED is an echo
+  and is ignored, or the parent echoing every record a flick passes would
+  stop the flick on the first. A jump of more than 12 records is a cut, and a
+  new list (sort, filter, search) lands on its index outright rather than
+  sliding across from the old one.
+- **The page still scrolls.** The stage takes sideways drags only, with
+  `touch-action: pan-y`, so a vertical swipe on the stack scrolls the page;
+  the vertical wheel scrolls the page too, and only a sideways trackpad swipe
+  steps records. A cancelled pointer (the browser taking the swipe to scroll)
+  is never a tap: it settles and opens nothing. In the Lab the stage still
+  takes every direction.
+- **The arrow keys are the window's**, not the stage's, or a focused stage
+  would step twice. Enter on the stage still opens the record.
+- **The intro plays once a visit**, not on every return to the Collection tab.
+- **Covers keep `alt` = the title.** Specs across the suite find records by
+  it (`img[alt="..."]`), and so does a screen reader.
+
+Guarded by `stress/collection-carousel.spec.mjs`, which also fails on any
+page error. Checked by hand on an emulated Pixel 7 with real touch events:
+a vertical swipe on the stack scrolled the page 310px and moved nothing, a
+sideways one stepped a record. Note for anyone doing that again: a seeded
+collection can earn a badge card on arrival, which sits over everything and
+swallows the touches; dismiss it first, as the specs do.
+
 `VINYL_COLORS` lives in `src/lib/vinylColors.js` so the crate dig's discs and
 the app's colour picker share one list; importing it from `VinylVault.jsx`
 into a lazy Lab chunk would have been a circular import.
@@ -456,7 +494,7 @@ src/
     FileImport.jsx     # CSV/text import hook + status list, shared by home and account
     Wishlist.jsx       # the Wishlist tab: pin a record, trace it, keep the answer
     DemoReel.jsx       # the promo reel: a new visitor's first screen, and Watch demo on About
-    CrateDig.jsx       # Lab: the 3D crate-dig carousel (CSS 3D, no library)
+    CrateDig.jsx       # the collection carousel (angled stack, `live`) + the Lab's crate dig
     CrateWall.jsx      # Lab: the three.js crate wall
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
