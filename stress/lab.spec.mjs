@@ -146,3 +146,32 @@ test('with reduced motion carousel C has no intro at all', async ({ browser }) =
   await expect(page.getByLabel(/Angled stack: swipe/)).toHaveAttribute('data-intro', 'off');
   await context.close();
 });
+
+// Tilting the phone turns carousel C's camera: left is more side on, right
+// more face-on, measured from however the phone was held to begin with. The
+// record in view carries no outline: being pulled out is what marks it.
+test('carousel C turns with the phone, and the record in view has no outline', async ({ page, context }) => {
+  await stubApi(context);
+  await openDig(page, 40);
+  await page.getByRole('button', { name: 'Carousel C' }).click();
+  const stage = page.getByLabel(/Angled stack: swipe/);
+  await expect(stage).toHaveAttribute('data-intro', 'off', { timeout: 4_000 });
+
+  const ry = () => page.locator('[data-dig-scene]').evaluate(el => Number(/rotateY\((-?[\d.]+)deg\)/.exec(el.style.transform)[1]));
+  const tilt = (gamma) => page.evaluate((g) => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: 0, beta: 40, gamma: g })), gamma);
+  const rest = await ry();
+
+  await tilt(10);                     // how the phone happens to be held: level
+  await page.waitForTimeout(300);
+  expect(Math.abs(await ry() - rest)).toBeLessThan(0.5);
+
+  await tilt(-15);                    // tilt left: more side on
+  await expect.poll(ry, { timeout: 3_000 }).toBeLessThan(rest - 6);
+  await tilt(35);                     // tilt right: more face-on
+  await expect.poll(ry, { timeout: 3_000 }).toBeGreaterThan(rest + 6);
+  await tilt(10);                     // back to level
+  await expect.poll(async () => Math.abs(await ry() - rest), { timeout: 3_000 }).toBeLessThan(0.5);
+
+  const shadow = await page.locator('[data-dig-i="0"] > div:last-child').evaluate(el => getComputedStyle(el).boxShadow);
+  expect(shadow).not.toMatch(/202,\s*254,\s*4/);
+});

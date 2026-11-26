@@ -319,7 +319,8 @@ pays for none of them until opened. Three so far:
   records in one long row seen from above and to one side, in a real CSS 3D
   scene, bending in a gentle arc (`ISO_ARC`, about 2.6 degrees a record) with
   the record in view at the apex. That record slides SIDEWAYS part way out of
-  the row toward the camera side, lifts a touch and carries an acid keyline;
+  the row toward the camera side and lifts a touch, with no outline (it had
+  an acid keyline, dropped: being pulled out and lit is what marks it);
   its neighbours part to open a gap, and the records in front of it step
   aside the other way. What building it taught, each now in a test:
   - **The pulled record stays PARALLEL to the row.** It first turned toward
@@ -354,6 +355,16 @@ pays for none of them until opened. Three so far:
   record in view sliding out of the row only as the camera arrives. Any
   touch, key or wheel ends it at once; reduced motion never plays it. The
   disc waits for it to finish. The stage carries `data-intro` for the specs.
+- **Carousel C turns with the phone.** Left-right tilt (`gamma`) away from
+  however the phone was held when it opened becomes up to `TILT_RANGE` (12)
+  degrees on the camera's `ry` (`tiltOffset`, a tanh so it eases out): left
+  is more side on, right more face-on. Portrait only, re-levelled on
+  returning to the page, eased per frame so sensor noise never shows, and
+  off with reduced motion. It listens at once everywhere. **Do not gate it on
+  `DeviceOrientationEvent.requestPermission` existing**: Chrome has that call
+  too and never needs it, so gating on it left Android waiting for a tap it
+  did not need. Tilt to turn shows only on a touch screen with the call and
+  hides on the first reading, which is the one signal iOS cannot fake.
 
 `VINYL_COLORS` lives in `src/lib/vinylColors.js` so the crate dig's discs and
 the app's colour picker share one list; importing it from `VinylVault.jsx`

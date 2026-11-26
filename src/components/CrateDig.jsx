@@ -16,7 +16,7 @@
 // you look at it. All the geometry is in src/lib/crateDigLayout.js.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  cardPose, isoPose, digSort, dividers, tabOffset, flickTarget, detent, introCamera,
+  cardPose, isoPose, digSort, dividers, tabOffset, flickTarget, detent, introCamera, tiltOffset,
   AHEAD, BEHIND, ISO_AHEAD, ISO_BEHIND, DRAG_PER_RECORD, CAM_REST, CAM_START, INTRO_MS,
 } from '../lib/crateDigLayout.js';
 import { VINYL_COLORS } from '../lib/vinylColors.js';
@@ -107,6 +107,17 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
   const sceneRef = useRef(null);
   const [introOn, setIntroOn] = useState(() => iso && !reducedMotion());
   const introRef = useRef({ on: iso && !reducedMotion(), pull: iso && !reducedMotion() ? 0 : 1, raf: 0 });
+  // Tilt the phone to turn the camera (carousel C). It listens at once
+  // everywhere. iOS sends nothing until a tap asks for the motion sensors, so
+  // on a touch screen that has a permission call, Tilt to turn shows until
+  // the first reading arrives. Chrome has the same call but never needs it,
+  // so the reading arriving, not the call existing, is what hides the button.
+  const tiltRef = useRef({ base: null, target: 0, cur: 0, raf: 0 });
+  const tiltOn = iso && !reducedMotion() && typeof window !== 'undefined' && !!window.DeviceOrientationEvent;
+  const [tiltAsk, setTiltAsk] = useState(() => tiltOn
+    && typeof window.DeviceOrientationEvent.requestPermission === 'function'
+    && !!window.matchMedia?.('(pointer: coarse)').matches);
+  const restCam = () => ({ ...CAM_REST, ry: CAM_REST.ry + tiltRef.current.cur });
 
   // Size the sleeve to the stage, capped so the stack and the disc have room.
   useEffect(() => {
@@ -180,7 +191,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     if (!it.on) return;
     it.on = false; it.pull = 1;
     cancelAnimationFrame(it.raf);
-    if (sceneRef.current) sceneRef.current.style.transform = camTransform(CAM_REST, sRef.current);
+    if (sceneRef.current) sceneRef.current.style.transform = camTransform(restCam(), sRef.current);
     apply();
     setIntroOn(false);
   }, [apply]);
@@ -194,6 +205,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
       if (!start) start = now;
       const t = Math.min(1, (now - start) / INTRO_MS);
       const cam = introCamera(t);
+      cam.ry += tiltRef.current.cur;
       it.pull = cam.pull;
       if (sceneRef.current) sceneRef.current.style.transform = camTransform(cam, sRef.current);
       apply();
@@ -203,6 +215,52 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
     it.raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(it.raf);
   }, [apply, endIntro]);
+
+  // The tilt: a reading away from where the phone was held when it started
+  // becomes a turn of the camera, eased toward so sensor noise never shows.
+  // Portrait only: on its side the same axis means something else.
+  useEffect(() => {
+    if (!tiltOn) return;
+    const tr = tiltRef.current;
+    const frame = () => {
+      tr.cur += (tr.target - tr.cur) * 0.12;
+      if (Math.abs(tr.target - tr.cur) < 0.01) tr.cur = tr.target;
+      if (!introRef.current.on && sceneRef.current) sceneRef.current.style.transform = camTransform(restCam(), sRef.current);
+      tr.raf = tr.cur === tr.target ? 0 : requestAnimationFrame(frame);
+    };
+    const onOrient = (e) => {
+      if (e.gamma == null) return;
+      setTiltAsk(false);
+      const angle = window.screen?.orientation?.angle ?? 0;
+      if (angle % 180 !== 0) { tr.base = null; tr.target = 0; }
+      else {
+        const g = angle === 180 ? -e.gamma : e.gamma;
+        if (tr.base === null) tr.base = g;
+        tr.target = tiltOffset(g - tr.base);
+      }
+      if (!tr.raf) tr.raf = requestAnimationFrame(frame);
+    };
+    // Coming back to the page re-levels to however the phone is held now.
+    const onVis = () => { if (!document.hidden) tr.base = null; };
+    window.addEventListener('deviceorientation', onOrient);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('deviceorientation', onOrient);
+      document.removeEventListener('visibilitychange', onVis);
+      cancelAnimationFrame(tr.raf); tr.raf = 0;
+    };
+  }, [tiltOn]);
+
+  // Readings follow on their own once granted; a refusal just hides the button.
+  const askTilt = async () => {
+    try { await window.DeviceOrientationEvent.requestPermission(); } catch { /* refused or unsupported */ }
+    setTiltAsk(false);
+  };
+
+  // A resize re-renders the scene's resting transform; put the tilt back on it.
+  useEffect(() => {
+    if (iso && !introRef.current.on && sceneRef.current) sceneRef.current.style.transform = camTransform(restCam(), S);
+  }, [S, iso]);
 
   // Re-apply after the window remounts or the sleeve resizes.
   useEffect(() => { apply(); }, [apply, base, S]);
@@ -349,7 +407,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
         {/* The scene is itself a plane in 3D, so part of a record turned toward
             the camera ends up BEHIND it: without pointer-events none it swallowed
             taps on the middle of the pulled record. Only the records take them. */}
-        <div ref={sceneRef} style={iso ? {
+        <div ref={sceneRef} data-dig-scene="" style={iso ? {
           position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none',
           // Turned less than a true isometric so the covers sit more face-on:
           // legibility comes from the camera, not from turning one record.
@@ -388,12 +446,9 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
               )}
               <div style={{
                 position: 'absolute', inset: 0, zIndex: 1, borderRadius: 5, overflow: 'hidden', background: '#16161a',
-                // In the angled stack the record in prime position carries a
-                // thin acid keyline and a soft glow, so it reads as the one
-                // chosen rather than just the one nearest.
-                boxShadow: iso && i === base
-                  ? `0 0 0 2px ${ACID}, 0 18px 44px -14px rgba(202,254,4,0.45)`
-                  : 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px -12px rgba(0,0,0,0.8)',
+                // No outline on the record in view: being pulled out of the
+                // row and lit, while the rest dim, is what marks it.
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px -12px rgba(0,0,0,0.8)',
               }}>
                 {r.coverUrl
                   ? <img src={r.coverUrl} alt="" draggable={false} decoding="async"
@@ -429,6 +484,16 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
           <span>{base + 1} / {n}</span>
         </div>}
       </div>
+
+      {tiltAsk && (
+        <div className="flex justify-center mt-3">
+          <button type="button" onClick={askTilt}
+            className="font-mono text-[11px] tracking-[0.18em] uppercase rounded-full px-3 py-1.5"
+            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)' }}>
+            Tilt to turn
+          </button>
+        </div>
+      )}
 
       {/* What you are looking at, large: the legibility the 3D must not cost */}
       {current && (

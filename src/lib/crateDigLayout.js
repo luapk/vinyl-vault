@@ -129,6 +129,19 @@ export function introCamera(t) {
   };
 }
 
+// Tilting the phone turns the camera: tilt left and the row is seen more side
+// on, tilt right and it comes more face-on. delta is the phone's left-right
+// tilt (DeviceOrientationEvent.gamma) away from where it was held when the
+// carousel opened, in degrees; the result is added to the camera's ry. It
+// eases out rather than stopping dead, so it never swings the stack past
+// TILT_RANGE however far the phone goes.
+export const TILT_RANGE = 12;      // most the camera turns, degrees
+export const TILT_FULL = 20;       // phone tilt that gets most of the way there
+export function tiltOffset(delta) {
+  if (!Number.isFinite(delta)) return 0;
+  return TILT_RANGE * Math.tanh(delta / TILT_FULL);
+}
+
 // ----- Carousel C: the angled stack -----------------------------------------
 // The same records seen from above and to one side, standing on edge in one
 // long row that bends in a gentle arc, the record in view at its apex. That

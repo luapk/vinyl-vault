@@ -122,7 +122,22 @@ describe('introCamera', () => {
   });
 });
 
-import { isoPose, ISO_SLIDE, ISO_AHEAD, ISO_GAP, ISO_STEP_ASIDE } from '../crateDigLayout.js';
+import { isoPose, ISO_SLIDE, ISO_AHEAD, ISO_GAP, ISO_STEP_ASIDE, tiltOffset, TILT_RANGE } from '../crateDigLayout.js';
+
+describe('tiltOffset', () => {
+  it('is level where the phone was held, side on tilting left and face-on tilting right', () => {
+    expect(tiltOffset(0)).toBe(0);
+    expect(tiltOffset(-15)).toBeLessThan(0);     // ry more negative: more side on
+    expect(tiltOffset(15)).toBeGreaterThan(0);   // toward face-on
+    expect(tiltOffset(15)).toBeCloseTo(-tiltOffset(-15));
+  });
+
+  it('never turns the camera past TILT_RANGE, however far the phone goes', () => {
+    expect(Math.abs(tiltOffset(90))).toBeLessThanOrEqual(TILT_RANGE);
+    expect(Math.abs(tiltOffset(20))).toBeGreaterThan(TILT_RANGE * 0.7);
+    expect(tiltOffset(NaN)).toBe(0);
+  });
+});
 
 describe('isoPose (carousel C)', () => {
   it('slides the record in view out of the row, PARALLEL to the rest, at the apex', () => {
