@@ -166,6 +166,12 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     }
   }, [iso]);
 
+  const report = useCallback((i) => {
+    if (i === reportedRef.current) return;
+    reportedRef.current = i;
+    onIndexChange?.(i);
+  }, [onIndexChange]);
+
   const tick = useCallback(() => {
     const still = reducedMotion();
     if (!dragRef.current) {
@@ -177,8 +183,11 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     if (nearest !== baseRef.current) {
       baseRef.current = nearest;
       setBase(nearest);
-      reportedRef.current = nearest;
-      onIndexChange?.(nearest);
+      // Only a drag reports each record it passes. A move toward a target
+      // reported its TARGET when it began (goTo), and reporting the records
+      // it passes on the way would pull the parent's index back behind its
+      // own arrows: press next five times quickly and land on the second.
+      if (dragRef.current) report(nearest);
       // one tiny tick per record passed, where the phone supports it
       try { navigator.vibrate?.(3); } catch { /* not supported */ }
     }
@@ -189,7 +198,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
       rafRef.current = 0;
       setSettled(true);
     }
-  }, [apply, n, onIndexChange]);
+  }, [apply, n, report]);
 
   const kick = useCallback(() => {
     setSettled(false);
@@ -197,10 +206,13 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     if (!rafRef.current) rafRef.current = requestAnimationFrame(tick);
   }, [tick]);
 
-  const goTo = useCallback((i) => {
+  // Every move the stack makes on its own account (a tap, a flick, the wheel,
+  // its keys) reports where it will land; one the parent asked for does not.
+  const goTo = useCallback((i, fromParent = false) => {
     targetRef.current = Math.max(0, Math.min(n - 1, i));
+    if (!fromParent) report(targetRef.current);
     kick();
-  }, [kick, n]);
+  }, [kick, n, report]);
 
   const endIntro = useCallback(() => {
     const it = introRef.current;
@@ -294,7 +306,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
       setBase(i);
       apply();
     }
-    goTo(index);
+    goTo(index, true);
   }, [index, goTo, n, apply]);
 
   // A new list (sort, filter, search) is not somewhere to animate across from
@@ -381,8 +393,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     }
     const a = d.samples[0], b = d.samples[d.samples.length - 1];
     const v = (b.p - a.p) / Math.max(1, b.t - a.t);
-    targetRef.current = flickTarget(posRef.current, v, n);
-    kick();
+    goTo(flickTarget(posRef.current, v, n));
   };
 
   // A cancelled pointer (the page took the gesture to scroll, a call came in)
@@ -391,8 +402,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     const d = dragRef.current;
     dragRef.current = null;
     if (!d) return;
-    targetRef.current = flickTarget(posRef.current, 0, n);
-    kick();
+    goTo(flickTarget(posRef.current, 0, n));
   };
 
   useEffect(() => {

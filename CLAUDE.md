@@ -382,7 +382,11 @@ why each one is load-bearing:
   move `carouselIdx`; the stack reports the record it lands on through
   `onIndexChange`. An incoming index equal to the last one REPORTED is an echo
   and is ignored, or the parent echoing every record a flick passes would
-  stop the flick on the first. A jump of more than 12 records is a cut, and a
+  stop the flick on the first. And only a DRAG reports each record it passes:
+  any other move reports its target once, when it starts. Reporting the
+  records a move slid past pulled the parent's index back behind its own
+  arrows, so eight quick presses of next landed on the second record; the
+  spec now presses quickly. A jump of more than 12 records is a cut, and a
   new list (sort, filter, search) lands on its index outright rather than
   sliding across from the old one.
 - **The page still scrolls.** The stage takes sideways drags only, with

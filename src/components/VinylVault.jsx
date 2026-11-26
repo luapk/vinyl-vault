@@ -3359,7 +3359,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
 
       {/* Controls */}
       <div className="flex items-center justify-center gap-4 mt-5">
-        <button onClick={onPrev} disabled={index === 0} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
+        <button onClick={onPrev} disabled={index === 0} aria-label="Previous record" className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretLeft size={14} />
         </button>
         {/* Progress dots — click to seek. Capped so the track never overruns the arrows. */}
@@ -3394,7 +3394,7 @@ function VinylCarousel({ records, index, onIndexChange, onPrev, onNext, onSelect
             </div>
           );
         })()}
-        <button onClick={onNext} disabled={index === records.length - 1} className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
+        <button onClick={onNext} disabled={index === records.length - 1} aria-label="Next record" className="w-9 h-9 rounded-full flex items-center justify-center transition-all disabled:opacity-15" style={{ border: "1px solid rgba(var(--fg),0.10)", background: "rgba(var(--fg),0.03)" }}>
           <CaretRight size={14} />
         </button>
       </div>

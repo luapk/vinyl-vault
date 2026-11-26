@@ -47,7 +47,21 @@ test('the collection carousel is the angled stack, driven by its arrows and keys
   await page.keyboard.press('ArrowLeft');
   await expect(counter(page, 2, 30)).toBeVisible({ timeout: 5_000 });
 
+  // Quick presses all count. The stack once reported each record it slid past
+  // on the way, which pulled the index back behind the presses still coming.
+  for (let k = 0; k < 8; k++) await page.keyboard.press('ArrowRight');
+  await expect(counter(page, 10, 30)).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(800);
+  await expect(counter(page, 10, 30)).toBeVisible();
+  for (let k = 0; k < 8; k++) await page.getByRole('button', { name: 'Previous record' }).click();
+  await expect(counter(page, 2, 30)).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(800);
+  await expect(counter(page, 2, 30)).toBeVisible();
+
   // A horizontal trackpad swipe steps a record; the vertical wheel scrolls the page.
+  // (The arrow clicks scrolled the page to reach the buttons: come back up.)
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(200);
   const box = await stage.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(120, 0);
