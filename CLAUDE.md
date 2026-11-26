@@ -162,7 +162,8 @@ never shown as no match, and Trace spends no Discogs quota for a user who
 cannot use it), the home screen's four ways in (all above the fold at
 360x740, and the scan card's state rule absent on an empty collection), and
 the badge suites (one card per suite, queued not stacked, and nothing replays
-on reload), the splash clip order (an existing install still gets a new hero, the
+on reload), the Lab's crate dig (a small DOM window at any collection size,
+keyboard and letter navigation, and a tap opening the record in view), the splash clip order (an existing install still gets a new hero, the
 rotation advances and wraps, and a failed clip never leaves a broken image).
 CI runs it on every push
 (`.github/workflows/test.yml`). When touching auth, sync, or session code,
@@ -253,7 +254,8 @@ to be written down.
   still arrive in scan data, but nothing displays it.
 
 ### The admin panel, and where its numbers come from
-`src/components/AdminPanel.jsx` is three screens: Money, People, Features.
+`src/components/AdminPanel.jsx` is three screens: Money, People, Features,
+plus a Lab tab for experiments that are not in the app yet (see below).
 
 - **The feature matrix edits the gate, not a copy of it.** `public.feature_tiers`
   holds one row per overridden feature and both the client gates
@@ -293,6 +295,30 @@ to be written down.
   run**, the same rule `admin_list_users` already followed: `admin_metrics()`
   answering nothing shows a banner naming the file to run, and the users list
   falls back to the old shape.
+
+### The Lab
+The admin panel's Lab tab holds experiments, each lazy-loaded so the panel
+pays for none of them until opened. Two so far:
+
+- **3D crate wall** (`CrateWall.jsx`, three.js, ~122KB gzipped): the whole
+  collection as one wall of covers that stacks itself into crates.
+- **Crate dig** (`CrateDig.jsx`, ~4KB gzipped, no 3D library): a 3D carousel.
+  Records stand upright in a crate seen from slightly above; a swipe (or a
+  pull toward you) tips the front record forward on its bottom edge, the next
+  rises out of the crate flat to the camera, A to Z divider tabs stick up out
+  of the stack, and resting on a record slides its disc out of the sleeve,
+  spinning, in its own vinyl colour. Built load-first: CSS transforms on a
+  window of about ten records whatever the collection size, a motion loop that
+  writes transforms straight to those elements instead of re-rendering React,
+  and only the record in view loading its cover at high priority. Geometry is
+  in `src/lib/crateDigLayout.js` (unit-tested). Guarded by
+  `stress/lab.spec.mjs`, including the trap it fell into once: with the
+  pointer captured by the stage, a tap's lift-off reports the stage as its
+  target, so the record under the finger has to be read at touch-down.
+
+`VINYL_COLORS` lives in `src/lib/vinylColors.js` so the crate dig's discs and
+the app's colour picker share one list; importing it from `VinylVault.jsx`
+into a lazy Lab chunk would have been a circular import.
 
 ### Wishlist and Trace
 The Wishlist tab (`src/components/Wishlist.jsx`, `src/hooks/useWishlist.js`) is
@@ -380,6 +406,8 @@ src/
     FileImport.jsx     # CSV/text import hook + status list, shared by home and account
     Wishlist.jsx       # the Wishlist tab: pin a record, trace it, keep the answer
     DemoReel.jsx       # the promo reel: a new visitor's first screen, and Watch demo on About
+    CrateDig.jsx       # Lab: the 3D crate-dig carousel (CSS 3D, no library)
+    CrateWall.jsx      # Lab: the three.js crate wall
   hooks/
     useAuth.js         # Supabase auth state + sign in/out/oauth
     useCollection.js   # collection state, localStorage + Supabase sync
@@ -390,6 +418,8 @@ src/
     badges.js          # milestone ladder + earned/celebrated logic (unit-tested)
     collectionFocus.js # decade buckets + the genre/decade slice filter (unit-tested)
     homeStats.js       # the count + last-added line on the home scan card (unit-tested)
+    crateDigLayout.js  # the crate dig's geometry, dividers and flick maths (unit-tested)
+    vinylColors.js     # vinyl colour / pressing types, shared by the app and the Lab
   App.jsx              # root: auth gate -> VinylVault or AuthScreen
 
 api/                   # Vercel serverless functions (all secret keys live here)
