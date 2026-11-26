@@ -77,33 +77,65 @@ describe('flickTarget', () => {
   });
 });
 
-import { isoPose, ISO_SLIDE, ISO_TURN, ISO_AHEAD, ISO_GAP } from '../crateDigLayout.js';
+import { isoPose, ISO_SLIDE, ISO_AHEAD, ISO_GAP, ISO_STEP_ASIDE } from '../crateDigLayout.js';
 
 describe('isoPose (carousel C)', () => {
-  it('slides the record in view out of the row and turns it toward the camera', () => {
+  it('slides the record in view out of the row, PARALLEL to the rest, at the apex', () => {
     const p = isoPose(0, S);
     expect(p.x).toBeCloseTo(ISO_SLIDE * S);
-    expect(p.ry).toBeCloseTo(ISO_TURN);
+    expect(p.ry).toBeCloseTo(0);
     expect(p.y).toBeLessThan(0);
+    expect(p.shade).toBe(0);
     expect(p.opacity).toBe(1);
   });
 
-  it('leaves every other record in the row, unturned, in depth order', () => {
-    for (const d of [-2, -1, 1, 2, 5]) {
-      const p = isoPose(d, S);
-      expect(p.x).toBeCloseTo(0);
-      expect(p.y).toBeCloseTo(0);
-      expect(p.ry).toBeCloseTo(0);
+  it('bends the row into an arc that falls away from the apex both ways', () => {
+    for (const d of [1, 2, 5]) {
+      const ahead = isoPose(d, S), behind = isoPose(-d, S);
+      expect(ahead.x).toBeLessThan(0);
+      expect(behind.x).toBeLessThanOrEqual(ahead.x + 1e-6);  // the arc, plus the step aside in front
+      expect(ahead.ry).toBeCloseTo(-behind.ry);
+      expect(ahead.shade).toBeGreaterThan(0);
     }
-    const zs = [-2, -1, 0, 1, 2, 5].map(d => isoPose(d, S).z);
+    expect(Math.abs(isoPose(5, S).ry)).toBeGreaterThan(Math.abs(isoPose(1, S).ry));
+    // and stays subtle: the far end of the window is bent, not folded back
+    expect(Math.abs(isoPose(ISO_AHEAD, S).ry)).toBeLessThan(35);
+  });
+
+  it('moves the records in front of it aside, the other way, so they do not cover it', () => {
+    const front = isoPose(-1, S), pulled = isoPose(0, S);
+    expect(front.x).toBeLessThan(-ISO_STEP_ASIDE * S * 0.5);
+    // a full sleeve width apart: the face in prime position is clear of the one in front
+    expect(pulled.x - front.x).toBeGreaterThan(S * 0.95);
+    // records behind it do not move aside: the pulled record already covers them
+    expect(isoPose(1, S).x).toBeGreaterThan(-0.01 * S);
+  });
+
+  it('keeps depth order along the whole row', () => {
+    const zs = [-2, -1, 0, 1, 2, 5, 9].map(d => isoPose(d, S).z);
     for (let k = 1; k < zs.length; k++) expect(zs[k]).toBeLessThan(zs[k - 1]);
   });
 
-  it('opens a gap around it: the neighbours sit further apart than the row spacing', () => {
-    const gap = isoPose(-1, S).z - isoPose(1, S).z;
-    expect(gap).toBeGreaterThan(2 * ISO_GAP * S);
-    // and it closes again further along the row
-    expect(isoPose(4, S).z - isoPose(5, S).z).toBeCloseTo(ISO_GAP * S);
+  it('never lets a neighbour cut through the record in view', () => {
+    // The pulled record is parallel at the apex. A neighbour turned by ry and
+    // centred at depth z reaches half a sleeve across, so its nearest edge is
+    // at |z| - S/2 * sin|ry| from the pulled record's plane. That must stay
+    // clear for every step of a scrub past it.
+    for (let d = -2; d <= 2; d += 0.05) {
+      const here = isoPose(d, S);
+      for (const k of [-1, 1]) {
+        const n = isoPose(d + k, S);
+        const reach = (S / 2) * Math.abs(Math.sin(((n.ry - here.ry) * Math.PI) / 180));
+        expect(Math.abs(n.z - here.z) - reach).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('opens a gap around it that closes again further along the row', () => {
+    expect(isoPose(-1, S).z - isoPose(1, S).z).toBeGreaterThan(2 * ISO_GAP * S * 0.99);
+    const far = isoPose(4, S).z - isoPose(5, S).z;
+    expect(far).toBeLessThan(ISO_GAP * S * 1.01);
+    expect(far).toBeGreaterThan(ISO_GAP * S * 0.9);
   });
 
   it('moves continuously through the pulled record, so a scrub never jumps', () => {

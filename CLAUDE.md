@@ -316,18 +316,27 @@ pays for none of them until opened. Three so far:
   pointer captured by the stage, a tap's lift-off reports the stage as its
   target, so the record under the finger has to be read at touch-down.
 - **Carousel C, the angled stack** (`<CrateDig variant="iso">`): the same
-  records in one long row seen from above and to one side, near isometric, in
-  a real CSS 3D scene. The record in view slides SIDEWAYS part way out of the
-  row, lifts a touch and turns toward the camera, and its neighbours part to
-  open a gap for it. Two findings from building it: it first slid UP, which
-  left the record in front of it covering its lower half, so the pull has to
-  go sideways and, with the camera swung round, toward the camera side, or
-  the records in front cover it again. And the 3D scene wrapper must take
-  `pointer-events: none`: it is itself a plane in the scene, the pulled
-  record turns partly behind it, and it was silently swallowing taps on the
-  middle of the very record the carousel exists to show. It is a variant of B rather than a
-  copy, so the scrub, momentum, keys, A to Z and windowing are one code path
-  (`isoPose` beside `cardPose` in `crateDigLayout.js`).
+  records in one long row seen from above and to one side, in a real CSS 3D
+  scene, bending in a gentle arc (`ISO_ARC`, about 2.6 degrees a record) with
+  the record in view at the apex. That record slides SIDEWAYS part way out of
+  the row toward the camera side, lifts a touch and carries an acid keyline;
+  its neighbours part to open a gap, and the records in front of it step
+  aside the other way. What building it taught, each now in a test:
+  - **The pulled record stays PARALLEL to the row.** It first turned toward
+    the camera, and a turned sleeve swept its edges through the records beside
+    it. Legibility comes from turning the whole scene more face-on instead,
+    and a test asserts no neighbour's edge can reach its plane at any point
+    of a scrub.
+  - **It slides sideways, toward the camera side.** Sliding UP left the record
+    in front covering its lower half; sliding the other way tucked it behind.
+  - **The records in front step aside.** Once the scene faces the camera, the
+    one just in front otherwise covers the left of the chosen cover; the test
+    holds them a full sleeve apart.
+  - **The 3D scene wrapper takes `pointer-events: none`.** It is itself a plane
+    in the scene and was swallowing taps on the middle of the pulled record.
+  It is a variant of B rather than a copy, so the scrub, momentum, keys, A to
+  Z and windowing are one code path (`isoPose` beside `cardPose` in
+  `crateDigLayout.js`).
 
 `VINYL_COLORS` lives in `src/lib/vinylColors.js` so the crate dig's discs and
 the app's colour picker share one list; importing it from `VinylVault.jsx`

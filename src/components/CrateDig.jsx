@@ -288,7 +288,9 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
             taps on the middle of the pulled record. Only the records take them. */}
         <div style={iso ? {
           position: 'absolute', inset: 0, transformStyle: 'preserve-3d', pointerEvents: 'none',
-          transform: `translate(${(-S * 0.3).toFixed(0)}px, ${(-S * 0.02).toFixed(0)}px) rotateX(-22deg) rotateY(-50deg)`,
+          // Turned less than a true isometric so the covers sit more face-on:
+          // legibility comes from the camera, not from turning one record.
+          transform: `translate(${(-S * 0.3).toFixed(0)}px, ${(-S * 0.02).toFixed(0)}px) rotateX(-18deg) rotateY(-32deg)`,
         } : { position: 'absolute', inset: 0 }}>
         {slots.map(i => {
           const r = sorted[i];
@@ -322,7 +324,12 @@ export default function CrateDig({ records, onSelect, variant = 'dig' }) {
               )}
               <div style={{
                 position: 'absolute', inset: 0, zIndex: 1, borderRadius: 5, overflow: 'hidden', background: '#16161a',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px -12px rgba(0,0,0,0.8)',
+                // In the angled stack the record in prime position carries a
+                // thin acid keyline and a soft glow, so it reads as the one
+                // chosen rather than just the one nearest.
+                boxShadow: iso && i === base
+                  ? `0 0 0 2px ${ACID}, 0 18px 44px -14px rgba(202,254,4,0.45)`
+                  : 'inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px -12px rgba(0,0,0,0.8)',
               }}>
                 {r.coverUrl
                   ? <img src={r.coverUrl} alt="" draggable={false} decoding="async"

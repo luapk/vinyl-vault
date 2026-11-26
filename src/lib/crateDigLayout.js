@@ -83,22 +83,29 @@ export function flickTarget(pos, velocity, count, coast = 260) {
 }
 
 // ----- Carousel C: the angled stack -----------------------------------------
-// The same records seen from above and to one side, near isometric, standing
-// on edge in one long row like a shop shelf. The record in view slides
-// SIDEWAYS, part way out of the row toward its open side, lifts a touch and
-// turns toward the camera; its neighbours part to open a gap for it. Sliding
-// out, rather than up, is what keeps it legible: once it is clear of the row,
-// nothing in front of it covers its face.
+// The same records seen from above and to one side, standing on edge in one
+// long row that bends in a gentle arc, the record in view at its apex. That
+// record slides SIDEWAYS part way out of the row and lifts a touch; its
+// neighbours part to open a gap for it.
+//
+// It stays PARALLEL to the rest. It used to turn toward the camera as it came
+// out, and a turned sleeve swept its edges through the records beside it. The
+// legibility now comes from the whole scene being turned more face-on, not
+// from turning the one record, so nothing can intersect: every sleeve is at
+// most ISO_ARC off its neighbour's angle, far too little to reach across the
+// gap between them (asserted in the tests).
 
-export const ISO_GAP = 0.11;      // depth between records in the row
+export const ISO_GAP = 0.11;      // spacing between records along the arc
+export const ISO_ARC = 0.045;     // radians the row bends per record (about 2.6 degrees)
 export const ISO_SLIDE = 0.62;    // how far the record in view slides out of the row
 export const ISO_LIFT = 0.05;     // and how far it rises as it does
-export const ISO_TURN = 32;       // degrees it turns toward the camera once out
 export const ISO_OPEN = 0.07;     // the gap its neighbours open for it
+export const ISO_STEP_ASIDE = 0.5; // how far the records in front of it move aside
 export const ISO_AHEAD = 11;      // records rendered behind the one in view
 export const ISO_BEHIND = 3;      // records rendered in front of it
 
 const smooth = (t) => t * t * (3 - 2 * t);
+const ISO_R = ISO_GAP / ISO_ARC;  // the arc's radius, in sleeves
 
 export function isoPose(d, S) {
   const a = Math.abs(d);
@@ -108,16 +115,27 @@ export function isoPose(d, S) {
   // it never jumps.
   const near = Math.max(0, 1 - a / 2);
   const part = Math.sign(d) * ISO_OPEN * near * (1 - pull);
+  // Position on the arc: the apex (d = 0) is nearest the camera side, and the
+  // row bends away from it both ways. Each sleeve faces along the arc.
+  // The records IN FRONT of it also step aside, the other way: with the scene
+  // turned face-on, the one just in front otherwise covers the left of the
+  // cover the carousel is showing. Zero at the record itself, so continuous.
+  const aside = d < 0 ? -ISO_STEP_ASIDE * Math.max(0, 1 - a / 4) * (1 - pull) : 0;
+  const phi = d * ISO_ARC;
+  const ax = -ISO_R * (1 - Math.cos(phi));
+  const az = -ISO_R * Math.sin(phi);
   let opacity = 1;
   if (d > ISO_AHEAD - 1) opacity = Math.max(0, ISO_AHEAD - d);
   if (d < -(ISO_BEHIND - 1)) opacity = Math.max(0, ISO_BEHIND + d);
   return {
-    x: pull * ISO_SLIDE * S,      // toward the camera side: away from the records in front of it
+    x: (ax + aside + pull * ISO_SLIDE) * S,   // the slide is toward the camera side, clear of the records in front
     y: -pull * ISO_LIFT * S,
-    z: (-d * ISO_GAP - part) * S,
-    ry: pull * ISO_TURN,
+    z: (az - part) * S,
+    ry: phi * 180 / Math.PI,
     rx: 0,
     opacity,
-    shade: Math.min(0.55, Math.max(0, d) * 0.06),
+    // Off the apex, both ways, a record dims: the one in prime position is the
+    // brightest thing in the row.
+    shade: Math.min(0.5, a * 0.07),
   };
 }
