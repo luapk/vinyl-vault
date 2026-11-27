@@ -366,8 +366,12 @@ pays for none of them until opened. Three so far:
   off with reduced motion. It listens at once everywhere. **Do not gate it on
   `DeviceOrientationEvent.requestPermission` existing**: Chrome has that call
   too and never needs it, so gating on it left Android waiting for a tap it
-  did not need. Tilt to turn shows only on a touch screen with the call and
-  hides on the first reading, which is the one signal iOS cannot fake.
+  did not need. There is no on-screen prompt for it (a Tilt to turn pill was
+  tried and dropped: people find tilt, and it cost 45px above the record
+  details). iOS still has to be asked during a gesture, so the first
+  `pointerup` on the stage calls `requestPermission` once, unless a reading
+  has already arrived. It is pointerup and not pointerdown on purpose: to
+  Safari a finger's pointerdown is not a user gesture, and the call fails.
 
 **Carousel C graduated: it is now the collection carousel.** `VinylCarousel`
 (`VinylVault.jsx`) renders `<CrateDig variant="iso" live>` as its stage and

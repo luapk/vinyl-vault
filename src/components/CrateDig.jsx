@@ -122,15 +122,14 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
   const [introOn, setIntroOn] = useState(introWanted);
   const introRef = useRef({ on: introWanted, pull: introWanted ? 0 : 1, raf: 0 });
   // Tilt the phone to turn the camera (carousel C). It listens at once
-  // everywhere. iOS sends nothing until a tap asks for the motion sensors, so
-  // on a touch screen that has a permission call, Tilt to turn shows until
-  // the first reading arrives. Chrome has the same call but never needs it,
-  // so the reading arriving, not the call existing, is what hides the button.
+  // everywhere, with nothing on screen to explain it: people find it. iOS
+  // sends nothing until the page asks for the motion sensors during a tap, so
+  // the first touch on the stage that ENDS (a pointerup is a user gesture to
+  // Safari; a pointerdown from a finger is not) asks, once, unless a reading
+  // has already arrived. Chrome has the same call and answers it silently.
   const tiltRef = useRef({ base: null, target: 0, cur: 0, raf: 0 });
   const tiltOn = iso && !reducedMotion() && typeof window !== 'undefined' && !!window.DeviceOrientationEvent;
-  const [tiltAsk, setTiltAsk] = useState(() => tiltOn
-    && typeof window.DeviceOrientationEvent.requestPermission === 'function'
-    && !!window.matchMedia?.('(pointer: coarse)').matches);
+  const tiltAskRef = useRef(tiltOn && typeof window.DeviceOrientationEvent.requestPermission === 'function');
   const restCam = () => ({ ...CAM_REST, ry: CAM_REST.ry + tiltRef.current.cur });
 
   // Size the sleeve to the stage, capped so the stack and the disc have room.
@@ -259,7 +258,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     };
     const onOrient = (e) => {
       if (e.gamma == null) return;
-      setTiltAsk(false);
+      tiltAskRef.current = false;
       const angle = window.screen?.orientation?.angle ?? 0;
       if (angle % 180 !== 0) { tr.base = null; tr.target = 0; }
       else {
@@ -280,10 +279,11 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     };
   }, [tiltOn]);
 
-  // Readings follow on their own once granted; a refusal just hides the button.
-  const askTilt = async () => {
-    try { await window.DeviceOrientationEvent.requestPermission(); } catch { /* refused or unsupported */ }
-    setTiltAsk(false);
+  // Readings follow on their own once granted; a refusal leaves the camera still.
+  const askTilt = () => {
+    if (!tiltAskRef.current) return;
+    tiltAskRef.current = false;
+    try { window.DeviceOrientationEvent.requestPermission().catch(() => {}); } catch { /* unsupported */ }
   };
 
   // A resize re-renders the scene's resting transform; put the tilt back on it.
@@ -381,6 +381,7 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     if (d.samples.length > 6) d.samples.shift();
   };
   const onPointerUp = () => {
+    askTilt();
     const d = dragRef.current;
     dragRef.current = null;
     if (!d) return;
@@ -563,16 +564,6 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
           <span>{base + 1} / {n}</span>
         </div>}
       </div>
-
-      {tiltAsk && (
-        <div className="flex justify-center mt-3">
-          <button type="button" onClick={askTilt}
-            className="font-mono text-[11px] tracking-[0.18em] uppercase rounded-full px-3 py-1.5"
-            style={{ background: 'rgba(var(--fg),0.06)', color: 'rgba(var(--fg),0.7)' }}>
-            Tilt to turn
-          </button>
-        </div>
-      )}
 
       {/* What you are looking at, large: the legibility the 3D must not cost */}
       {current && !live && (
