@@ -402,6 +402,12 @@ why each one is load-bearing:
 - **The arrow keys are the window's**, not the stage's, or a focused stage
   would step twice. Enter on the stage still opens the record.
 - **The intro plays once a visit**, not on every return to the Collection tab.
+- **The stack is 15% smaller than in the Lab.** At the Lab's size it stood
+  about 100px taller than the flat carousel it replaced and pushed the arrows
+  and dots below the fold on a phone. The record details also come up into
+  the stage's empty floor (`marginBottom` of -0.12 of a sleeve, measured to
+  clear the lowest a record reaches at full tilt), which is what puts the
+  arrows back above the fold on a Pixel-size screen.
 - **Covers keep `alt` = the title.** Specs across the suite find records by
   it (`img[alt="..."]`), and so does a screen reader.
 

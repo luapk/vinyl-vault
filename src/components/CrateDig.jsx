@@ -137,12 +137,15 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
     const el = stageRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([e]) => {
-      const s = Math.round(iso ? Math.min(e.contentRect.width * 0.66, 290) : Math.min(e.contentRect.width * 0.76, 320));
+      // Live, in the collection, the stack is 15% smaller than in the Lab, so
+      // the record's details, arrows and dots stay above the fold on a phone.
+      const k = live ? 0.85 : 1;
+      const s = Math.round(k * (iso ? Math.min(e.contentRect.width * 0.66, 290) : Math.min(e.contentRect.width * 0.76, 320)));
       sRef.current = s; setS(s);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [iso]);
+  }, [iso, live]);
 
   const apply = useCallback(() => {
     const pos = posRef.current, s = sRef.current;
@@ -479,6 +482,10 @@ export default function CrateDig({ records, onSelect, variant = 'dig', live = fa
         className="relative outline-none rounded-2xl overflow-hidden"
         style={{
           height: stageH, touchAction: live ? 'pan-y' : 'none', cursor: 'grab',
+          // Live: the bottom of the stage is empty (the records stand above
+          // it), so what follows comes up into it. 0.12 of a sleeve still
+          // clears the lowest a record goes, at the extreme of the tilt.
+          marginBottom: live ? -Math.round(S * 0.12) : 0,
           perspective: iso ? 2400 : 680, perspectiveOrigin: iso ? '50% 35%' : '50% -70%',
           background: 'radial-gradient(120% 80% at 50% 100%, rgba(202,254,4,0.06), transparent 60%)',
         }}>
